@@ -48,7 +48,9 @@ These reports remain useful regression evidence, but they do not identify their 
 
 ## Current-build manual evidence still required
 
-- At least one nonempty schema-3 export from version `0.2.4`.
+The schema-3 report can directly establish:
+
+- At least one nonempty export from version `0.2.4`.
 - Current ammo template ID, internal name, and base speed match the installed template.
 - Complete four-layer chain.
 - Complete five-layer chain.
@@ -57,12 +59,18 @@ These reports remain useful regression evidence, but they do not identify their 
 - Bot body-health change.
 - Bot equipped-armor durability change.
 - Covered post-death armor durability change at zero body health.
-- Uncovered post-death hit leaves armor unchanged.
+- Fragment or deviated-shot continuation into a later collision.
+- Matching CSV and JSON record counts.
+
+The following require direct observation or combined report and code evidence. Version `0.2.4`
+does not export the struck body part, loot-screen state, armor-application call order, or death-event
+count, so the report alone cannot prove them:
+
+- An uncovered post-death hit leaves armor unchanged.
 - Living armor is not double-damaged.
 - Multiple matching armor layers follow the existing game order.
 - Looted armor retains its changed durability.
 - Corpse health and death events are not replayed.
-- CSV and JSON parity for the schema-3 export.
 
 ## Stabilization fixes completed after the first baseline
 
