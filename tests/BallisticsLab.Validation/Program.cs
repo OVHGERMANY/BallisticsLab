@@ -9,9 +9,13 @@ const string granitBr5 = "64afc71497cf3a403c01ff38";
 string itemsPath = args.Length > 0
     ? Path.GetFullPath(args[0])
     : @"E:\Games\SPT\SPT_Runtime\SPT_Data\database\templates\items.json";
+string reportsPath = args.Length > 1
+    ? Path.GetFullPath(args[1])
+    : string.Empty;
 
 List<string> failures = new();
 int passed = 0;
+Dictionary<string, AmmoRow> ammunition = new(StringComparer.Ordinal);
 
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
 Check(LabPolicies.OutcomeName(1, false, false) == "PENETRATED / DEVIATED", "deviation taxonomy");
@@ -86,6 +90,16 @@ else
     foreach (JsonProperty item in document.RootElement.EnumerateObject())
     {
         JsonElement value = item.Value;
+        if (value.TryGetProperty("_name", out JsonElement ammunitionNameElement)
+            && value.TryGetProperty("_props", out JsonElement ammunitionProps)
+            && ammunitionProps.TryGetProperty("InitialSpeed", out JsonElement initialSpeedElement)
+            && TryGetFloat(initialSpeedElement, out float initialSpeed))
+        {
+            ammunition[item.Name] = new AmmoRow(
+                ammunitionNameElement.GetString() ?? item.Name,
+                initialSpeed);
+        }
+
         if (!value.TryGetProperty("_parent", out JsonElement parent)
             || parent.GetString() != plateParent
             || !value.TryGetProperty("_props", out JsonElement props)
@@ -137,6 +151,78 @@ else
     }
 }
 
+if (!string.IsNullOrEmpty(reportsPath))
+{
+    string latestReport = Directory.Exists(reportsPath)
+        ? Directory.GetFiles(reportsPath, "BallisticsLab-*.json", SearchOption.TopDirectoryOnly)
+            .OrderBy(File.GetLastWriteTimeUtc)
+            .ThenBy(path => path, StringComparer.Ordinal)
+            .LastOrDefault() ?? string.Empty
+        : string.Empty;
+    Check(!string.IsNullOrEmpty(latestReport), "latest BallisticsLab report exists");
+
+    if (!string.IsNullOrEmpty(latestReport))
+    {
+        using JsonDocument report = JsonDocument.Parse(File.ReadAllText(latestReport));
+        bool schemaTwo = report.RootElement.TryGetProperty("schema", out JsonElement schemaElement)
+            && schemaElement.TryGetInt32(out int schema)
+            && schema == 2;
+        Check(schemaTwo, "latest BallisticsLab report uses schema 2");
+
+        JsonElement recordsElement = report.RootElement.TryGetProperty("records", out JsonElement records)
+            ? records
+            : default;
+        bool hasRecords = recordsElement.ValueKind == JsonValueKind.Array
+            && recordsElement.GetArrayLength() > 0;
+        Check(hasRecords, "latest BallisticsLab report contains shot records");
+
+        string identityFailure = string.Empty;
+        if (hasRecords)
+        {
+            foreach (JsonElement record in recordsElement.EnumerateArray())
+            {
+                string templateId = record.TryGetProperty("ammoTemplateId", out JsonElement idElement)
+                    ? idElement.GetString() ?? string.Empty
+                    : string.Empty;
+                string reportedName = record.TryGetProperty("ammoName", out JsonElement nameElement)
+                    ? nameElement.GetString() ?? string.Empty
+                    : string.Empty;
+                float reportedSpeed = 0f;
+                bool hasReportedSpeed = record.TryGetProperty("templateSpeed", out JsonElement speedElement)
+                    && TryGetFloat(speedElement, out reportedSpeed);
+
+                if (!ammunition.TryGetValue(templateId, out AmmoRow expected))
+                {
+                    identityFailure = "unknown template " + templateId;
+                    break;
+                }
+                if (!string.Equals(reportedName, expected.Name, StringComparison.Ordinal))
+                {
+                    identityFailure = templateId + " reports name " + reportedName
+                        + " but the installed template is " + expected.Name;
+                    break;
+                }
+                if (!hasReportedSpeed || !NearlyWithin(reportedSpeed, expected.InitialSpeed, 0.001f))
+                {
+                    identityFailure = templateId + " reports a template speed that differs from the installed template";
+                    break;
+                }
+            }
+        }
+        else
+        {
+            identityFailure = "report contains no records";
+        }
+
+        Check(
+            string.IsNullOrEmpty(identityFailure),
+            string.IsNullOrEmpty(identityFailure)
+                ? "latest report ammo identity and speed match the installed live template"
+                : "latest report ammo identity mismatch: " + identityFailure);
+        Console.WriteLine("Latest report: " + Path.GetFileName(latestReport));
+    }
+}
+
 if (failures.Count > 0)
 {
     Console.Error.WriteLine("FAILED " + failures.Count.ToString(CultureInfo.InvariantCulture));
@@ -178,9 +264,31 @@ bool TryGetInt(JsonElement element, out int value)
     return false;
 }
 
+bool TryGetFloat(JsonElement element, out float value)
+{
+    if (element.ValueKind == JsonValueKind.Number)
+    {
+        return element.TryGetSingle(out value);
+    }
+
+    if (element.ValueKind == JsonValueKind.String)
+    {
+        return float.TryParse(element.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+    }
+
+    value = 0f;
+    return false;
+}
+
 bool Nearly(float actual, float expected)
 {
     return Math.Abs(actual - expected) <= 0.00001f;
 }
 
+bool NearlyWithin(float actual, float expected, float tolerance)
+{
+    return Math.Abs(actual - expected) <= tolerance;
+}
+
 internal sealed record PlateRow(string Id, string Name, int ArmorClass, string Material, int Durability);
+internal sealed record AmmoRow(string Name, float InitialSpeed);
