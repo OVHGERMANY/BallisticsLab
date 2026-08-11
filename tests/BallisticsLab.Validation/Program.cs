@@ -17,6 +17,12 @@ List<string> failures = new();
 int passed = 0;
 Dictionary<string, AmmoRow> ammunition = new(StringComparer.Ordinal);
 
+Check(
+    LabBuild.PluginGuid == "com.janky.ballisticslab"
+    && LabBuild.PluginName == "Janky-BallisticsLab"
+    && LabBuild.PluginVersion == "0.2.4"
+    && LabBuild.ReportSchema == 3,
+    "report provenance constants match the current plugin build");
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
 Check(LabPolicies.OutcomeName(1, false, false) == "PENETRATED / DEVIATED", "deviation taxonomy");
 Check(LabPolicies.OutcomeName(3, false, false) == "PENETRATED / FRAGMENTED", "fragment taxonomy");
@@ -198,10 +204,18 @@ if (!string.IsNullOrEmpty(reportsPath))
     if (!string.IsNullOrEmpty(latestReport))
     {
         using JsonDocument report = JsonDocument.Parse(File.ReadAllText(latestReport));
-        bool schemaTwo = report.RootElement.TryGetProperty("schema", out JsonElement schemaElement)
+        bool currentSchema = report.RootElement.TryGetProperty("schema", out JsonElement schemaElement)
             && schemaElement.TryGetInt32(out int schema)
-            && schema == 2;
-        Check(schemaTwo, "latest BallisticsLab report uses schema 2");
+            && schema == LabBuild.ReportSchema;
+        Check(currentSchema, "latest BallisticsLab report uses the current schema");
+        string reportVersion = report.RootElement.TryGetProperty(
+                "pluginVersion",
+                out JsonElement versionElement)
+            ? versionElement.GetString() ?? string.Empty
+            : string.Empty;
+        Check(
+            string.Equals(reportVersion, LabBuild.PluginVersion, StringComparison.Ordinal),
+            "latest BallisticsLab report identifies the current plugin version");
 
         JsonElement recordsElement = report.RootElement.TryGetProperty("records", out JsonElement records)
             ? records

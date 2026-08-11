@@ -105,11 +105,13 @@ namespace BallisticsLab.Runtime.Telemetry
         {
             StringBuilder builder = new StringBuilder();
             builder.AppendLine(
-                "sequence,utc,chainId,fireIndex,fragmentIndex,parentDepth,rootRandomSeed,isForwardHit,ammoTemplateId,ammoName,shooter,targetKind,target,material,fixtureId,layer,layerCount,fixtureTemplateId,fixtureName,fixtureArmorClass,fixtureArmorMaterial,layerSpacing,colliderThickness,outcome,angleDegrees,impactSpeed,templateSpeed,fraction,incomingDamage,incomingPenetration,decisionDamage,decisionPenetration,armorRealResistance,armorClassResistance,armorCf,penetrationChancePercent,blockedBy,deflectedBy,fragments,durabilityBefore,durabilityAfter,fixtureMaximumDurability,bodyHealthBefore,bodyHealthAfter,targetAliveBefore,targetAliveAfter,armorChanges,continuationKind,continuationSourceFixtureId,continuationSourceLayer,continuationPenetrationFactor,continuationVelocityFactor,continuationOutcomeFactor,continuationArmorCf,continuationDamageBefore,continuationPenetrationBefore,continuationDamageAfter,continuationPenetrationAfter,hitX,hitY,hitZ");
+                "schema,pluginVersion,sequence,utc,chainId,fireIndex,fragmentIndex,parentDepth,rootRandomSeed,isForwardHit,ammoTemplateId,ammoName,shooter,targetKind,target,material,fixtureId,layer,layerCount,fixtureTemplateId,fixtureName,fixtureArmorClass,fixtureArmorMaterial,layerSpacing,colliderThickness,outcome,angleDegrees,impactSpeed,templateSpeed,fraction,incomingDamage,incomingPenetration,decisionDamage,decisionPenetration,armorRealResistance,armorClassResistance,armorCf,penetrationChancePercent,blockedBy,deflectedBy,fragments,durabilityBefore,durabilityAfter,fixtureMaximumDurability,bodyHealthBefore,bodyHealthAfter,targetAliveBefore,targetAliveAfter,armorChanges,continuationKind,continuationSourceFixtureId,continuationSourceLayer,continuationPenetrationFactor,continuationVelocityFactor,continuationOutcomeFactor,continuationArmorCf,continuationDamageBefore,continuationPenetrationBefore,continuationDamageAfter,continuationPenetrationAfter,hitX,hitY,hitZ");
             foreach (ShotRecord record in records)
             {
                 string[] values =
                 {
+                    LabBuild.ReportSchema.ToString(CultureInfo.InvariantCulture),
+                    LabBuild.PluginVersion,
                     record.Sequence.ToString(CultureInfo.InvariantCulture),
                     record.Utc.ToString("O", CultureInfo.InvariantCulture),
                     record.ChainId,
@@ -181,7 +183,11 @@ namespace BallisticsLab.Runtime.Telemetry
         private static string BuildJson(IReadOnlyList<ShotRecord> records)
         {
             StringBuilder builder = new StringBuilder();
-            builder.Append("{\"schema\":2,\"records\":[");
+            builder.Append("{\"schema\":")
+                .Append(LabBuild.ReportSchema.ToString(CultureInfo.InvariantCulture))
+                .Append(",\"pluginVersion\":")
+                .Append(LabPolicies.Json(LabBuild.PluginVersion))
+                .Append(",\"records\":[");
             for (int index = 0; index < records.Count; index++)
             {
                 if (index > 0)

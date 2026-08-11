@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Logging;
+using BallisticsLab.Core;
 using BallisticsLab.Runtime;
 using BallisticsLab.Runtime.Patches;
 using SPT.Reflection.Patching;
@@ -16,9 +17,9 @@ namespace BallisticsLab
     [BepInDependency(SptVersionCompatibility.CorePluginGuid, SptVersionCompatibility.SupportedCoreVersionText)]
     public sealed class Plugin : BaseUnityPlugin
     {
-        internal const string PluginGuid = "com.janky.ballisticslab";
-        internal const string PluginName = "Janky-BallisticsLab";
-        internal const string PluginVersion = "0.2.3";
+        internal const string PluginGuid = LabBuild.PluginGuid;
+        internal const string PluginName = LabBuild.PluginName;
+        internal const string PluginVersion = LabBuild.PluginVersion;
 
         private CollisionCapturePatch _collisionCapturePatch;
         private FragmentContinuationPatch _fragmentContinuationPatch;
