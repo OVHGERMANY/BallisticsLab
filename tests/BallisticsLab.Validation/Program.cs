@@ -33,6 +33,9 @@ Check(Math.Abs(LabPolicies.ImpactAngleDegrees(0f) - 90f) < 0.0001f, "grazing imp
 Check(Math.Abs(LabPolicies.ImpactAngleDegrees(-0.5f) - 60f) < 0.0001f, "back-face angle folds into zero-to-ninety range");
 Check(LabPolicies.Csv("a,b") == "\"a,b\"", "CSV escaping");
 Check(LabPolicies.Json("a\n\"b") == "\"a\\n\\\"b\"", "JSON escaping");
+Check(ReportPairValidator.ParserHandlesQuotedFields(), "CSV report parser handles commas, quotes, and embedded newlines");
+Check(ReportPairValidator.ValidatorMatchesSyntheticPair(), "CSV and JSON report validator accepts a matching schema-3 pair");
+Check(ReportPairValidator.ValidatorRejectsSyntheticMismatch(), "CSV and JSON report validator rejects a field mismatch");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 Check(
     LabPolicies.RequiresFixtureContinuationCorrection(1)
@@ -267,6 +270,12 @@ if (!string.IsNullOrEmpty(reportsPath))
             string.IsNullOrEmpty(identityFailure)
                 ? "latest report ammo identity and speed match the installed live template"
                 : "latest report ammo identity mismatch: " + identityFailure);
+        bool pairMatches = ReportPairValidator.Validate(latestReport, out string pairFailure);
+        Check(
+            pairMatches,
+            pairMatches
+                ? "latest CSV and JSON exports match field for field"
+                : "latest CSV and JSON export mismatch: " + pairFailure);
         Console.WriteLine("Latest report: " + Path.GetFileName(latestReport));
     }
 }
