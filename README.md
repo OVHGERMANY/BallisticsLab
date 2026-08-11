@@ -2,6 +2,8 @@
 
 BallisticsLab is an opt-in SPT 4.1.2 client-side range and telemetry plugin for repeatable terminal-ballistics testing.
 
+The verified baseline, historical evidence, remaining acceptance gates, and deferred stages are tracked in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
+
 It creates disposable plate fixtures from EFT's own armor templates, supports one-to-six physical layers, angle and spacing controls, game-labelled Granit BR4 and BR5 presets, armored-steel stacks, quick material selection, bot selection and freeze controls, shot-chain visualization, and CSV/JSON reports. It never inserts test items into the profile, stash, or inventory.
 
 The plugin is disabled by default and installs no game patches while disabled. Set `Enabled = true` in `BepInEx\config\com.janky.ballisticslab.cfg`, restart the game, enter the hideout shooting range or an offline local raid, then press `Left Ctrl + F10`. A lab session exists only after the panel's explicit **Start Lab Session** action and is destroyed on world change or plugin shutdown.
