@@ -8,7 +8,7 @@ The plugin is disabled by default and installs no game patches while disabled. S
 
 Fixture plates use generic ballistic colliders so separate physical layers cannot be suppressed as overlapping body-part colliders. For penetrated fixture hits, the lab applies EFT's otherwise body-collider-only child-shot damage, penetration, deviation-velocity, future-outcome, and armor-CF factors before the child reaches the next layer. Telemetry records the original and corrected values for every continuation in the chain.
 
-The BR4 and BR5 buttons select EFT database templates bearing those names. They are repeatable game-data presets, not a claim of real-world certification. Plate thickness controls physical collider geometry; armor class, durability, material resistance, and penetration chance come from the selected EFT template.
+The BR4 and BR5 buttons select EFT database templates bearing those names. They are repeatable game-data presets, not a claim of real-world certification. Layer spacing is the physical air gap from the back face of one collider to the front face of the next. Plate thickness controls physical collider geometry; armor class, durability, material resistance, and penetration chance come from the selected EFT template.
 
 Normal `Build` does not alter the live installation. Explicit deployment:
 

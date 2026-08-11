@@ -82,6 +82,35 @@ Check(
     && LabPolicies.ShouldDisplayBodyTelemetry(0f, 0f, "armor 40.00->35.00")
     && !LabPolicies.ShouldDisplayBodyTelemetry(0f, 0f, string.Empty),
     "postmortem armor changes remain visible at zero body health");
+float fixtureGap = 0.15f;
+float fixtureThickness = 0.0127f;
+bool exactFaceGaps = true;
+for (int layer = 1; layer < LabPolicies.MaximumLayers; layer++)
+{
+    float previousBackFace = LabPolicies.LayerCenterOffset(
+        layer - 1,
+        fixtureGap,
+        fixtureThickness) + fixtureThickness * 0.5f;
+    float currentFrontFace = LabPolicies.LayerCenterOffset(
+        layer,
+        fixtureGap,
+        fixtureThickness) - fixtureThickness * 0.5f;
+    exactFaceGaps &= Nearly(currentFrontFace - previousBackFace, fixtureGap);
+}
+Check(exactFaceGaps, "one-to-six-layer geometry preserves the configured face gap");
+float lastPlateBackFace = LabPolicies.LayerCenterOffset(
+    LabPolicies.MaximumLayers - 1,
+    fixtureGap,
+    fixtureThickness) + fixtureThickness * 0.5f;
+float backstopFrontFace = LabPolicies.BackstopCenterOffset(
+    LabPolicies.MaximumLayers,
+    fixtureGap,
+    fixtureThickness,
+    1f,
+    0.08f) - 0.04f;
+Check(
+    Nearly(backstopFrontFace - lastPlateBackFace, 1f),
+    "six-layer backstop retains one meter of face clearance");
 Check(LabPolicies.MaximumLayers == 6, "fixture layer limit remains six");
 
 if (!File.Exists(itemsPath))

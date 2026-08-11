@@ -5,12 +5,16 @@ using Comfort.Common;
 using EFT;
 using EFT.Ballistics;
 using EFT.InventoryLogic;
+using BallisticsLab.Core;
 using UnityEngine;
 
 namespace BallisticsLab.Runtime.Fixtures
 {
     internal sealed class FixtureRig : IDisposable
     {
+        private const float BackstopFaceClearance = 1f;
+        private const float BackstopThickness = 0.08f;
+
         private static long _nextFixtureId;
 
         private readonly GameObject _root;
@@ -110,7 +114,10 @@ namespace BallisticsLab.Runtime.Fixtures
                 plate.hideFlags = HideFlags.HideAndDontSave;
                 plate.layer = ballisticLayer;
                 plate.transform.SetParent(_root.transform, false);
-                plate.transform.localPosition = new Vector3(0f, 0f, index * spacing);
+                plate.transform.localPosition = new Vector3(
+                    0f,
+                    0f,
+                    LabPolicies.LayerCenterOffset(index, spacing, thickness));
                 plate.transform.localRotation = Quaternion.identity;
                 plate.transform.localScale = new Vector3(1f, 1.5f, thickness);
 
@@ -132,8 +139,16 @@ namespace BallisticsLab.Runtime.Fixtures
                 backstop.hideFlags = HideFlags.HideAndDontSave;
                 backstop.layer = ballisticLayer;
                 backstop.transform.SetParent(_root.transform, false);
-                backstop.transform.localPosition = new Vector3(0f, 0f, presets.Count * spacing + 1f);
-                backstop.transform.localScale = new Vector3(2f, 2.2f, 0.08f);
+                backstop.transform.localPosition = new Vector3(
+                    0f,
+                    0f,
+                    LabPolicies.BackstopCenterOffset(
+                        presets.Count,
+                        spacing,
+                        thickness,
+                        BackstopFaceClearance,
+                        BackstopThickness));
+                backstop.transform.localScale = new Vector3(2f, 2.2f, BackstopThickness);
 
                 Material material = CreateMaterial(new Color(0.16f, 0.16f, 0.18f, 1f));
                 _materials.Add(material);

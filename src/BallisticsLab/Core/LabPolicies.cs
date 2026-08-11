@@ -31,6 +31,28 @@ namespace BallisticsLab.Core
                 || !string.IsNullOrWhiteSpace(armorChanges);
         }
 
+        public static float LayerCenterOffset(
+            int layerIndex,
+            float faceGap,
+            float plateThickness)
+        {
+            return Math.Max(0, layerIndex) * (faceGap + plateThickness);
+        }
+
+        public static float BackstopCenterOffset(
+            int layerCount,
+            float faceGap,
+            float plateThickness,
+            float faceClearance,
+            float backstopThickness)
+        {
+            int lastLayerIndex = Math.Max(0, layerCount - 1);
+            return LayerCenterOffset(lastLayerIndex, faceGap, plateThickness)
+                + plateThickness * 0.5f
+                + faceClearance
+                + backstopThickness * 0.5f;
+        }
+
         public static float ImpactAngleDegrees(float directionDotNormal)
         {
             float cosine = Math.Abs(directionDotNormal);

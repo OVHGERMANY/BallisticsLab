@@ -18,7 +18,7 @@ namespace BallisticsLab
     {
         internal const string PluginGuid = "com.janky.ballisticslab";
         internal const string PluginName = "Janky-BallisticsLab";
-        internal const string PluginVersion = "0.2.2";
+        internal const string PluginVersion = "0.2.3";
 
         private CollisionCapturePatch _collisionCapturePatch;
         private FragmentContinuationPatch _fragmentContinuationPatch;
