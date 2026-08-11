@@ -14,6 +14,25 @@ Snapshot date: 2026-08-11
 
 The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.4`.
 
+## Current-build evidence recorded
+
+`BallisticsLab-20260811-233928` is the first current-build export:
+
+- JSON schema `3`, plugin version `0.2.4`.
+- 19 records across 13 shot chains.
+- Matching 19-row CSV; every shared CSV and JSON field is equal.
+- 12 live 5.45x39 ammunition templates; every reported template ID, internal name, and base
+  speed matches the installed database.
+- One-layer class-6 steel impacts, durability loss, armor blocks, penetrations, and backstop stops.
+- Three deviated-child records with continuation factors and contiguous parent/root lineage.
+- Every ordinary collision reproduces the configured damage and penetration curves from its
+  reported incoming values and collision-point speed.
+- All reported values are finite and non-negative, durability never increases, and every trajectory
+  ends at its reported hit point.
+
+The deviated children in this export revisit the single source plate and then reach the backstop.
+They do not strike a later armor layer, so later-layer fragment/deviation continuation remains open.
+
 ## Verified automated and startup gates
 
 - Release solution build: 0 warnings, 0 errors.
@@ -48,10 +67,8 @@ These reports remain useful regression evidence, but they do not identify their 
 
 ## Current-build manual evidence still required
 
-The schema-3 report can directly establish:
+The schema-3 report can directly establish the remaining cases below:
 
-- At least one nonempty export from version `0.2.4`.
-- Current ammo template ID, internal name, and base speed match the installed template.
 - Complete four-layer chain.
 - Complete five-layer chain.
 - Complete six-layer chain.
@@ -59,8 +76,7 @@ The schema-3 report can directly establish:
 - Bot body-health change.
 - Bot equipped-armor durability change.
 - Covered post-death armor durability change at zero body health.
-- Fragment or deviated-shot continuation into a later collision.
-- Matching CSV and JSON record counts.
+- Fragment or deviated-shot continuation into a later armor layer.
 
 The following require direct observation or combined report and code evidence. Version `0.2.4`
 does not export the struck body part, loot-screen state, armor-application call order, or death-event
