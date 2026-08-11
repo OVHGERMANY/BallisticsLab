@@ -76,7 +76,8 @@ The schema-3 report can directly establish the remaining cases below:
 - Bot body-health change.
 - Bot equipped-armor durability change.
 - Covered post-death armor durability change at zero body health.
-- Fragment or deviated-shot continuation into a later armor layer.
+- Deviated-shot continuation into a later armor layer.
+- Fragment continuation into a later armor layer.
 
 The following require direct observation or combined report and code evidence. Version `0.2.4`
 does not export the struck body part, loot-screen state, armor-application call order, or death-event
