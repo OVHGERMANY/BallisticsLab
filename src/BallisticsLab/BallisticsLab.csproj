@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>BallisticsLab</AssemblyName>
+    <RootNamespace>BallisticsLab</RootNamespace>
+    <Version>0.2.0</Version>
+    <SptRoot Condition="'$(SptRoot)' == '' and '$(SPT_ROOT)' != ''">$(SPT_ROOT)</SptRoot>
+    <SptRoot Condition="'$(SptRoot)' == ''">E:\Games\SPT</SptRoot>
+    <DeployRoot Condition="'$(DeployRoot)' == ''">$(SptRoot)</DeployRoot>
+    <DeployDirectory>$(DeployRoot)\BepInEx\plugins\BallisticsLab</DeployDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(SptRoot)\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(SptRoot)\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="spt-reflection">
+      <HintPath>$(SptRoot)\BepInEx\plugins\spt\spt-reflection.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(SptRoot)\EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Comfort">
+      <HintPath>$(SptRoot)\EscapeFromTarkov_Data\Managed\Comfort.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ItemComponent.Types">
+      <HintPath>$(SptRoot)\EscapeFromTarkov_Data\Managed\ItemComponent.Types.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(SptRoot)\EscapeFromTarkov_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(SptRoot)\EscapeFromTarkov_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(SptRoot)\EscapeFromTarkov_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(SptRoot)\EscapeFromTarkov_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(SptRoot)\EscapeFromTarkov_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="ValidateSptReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(SptRoot)\BepInEx\core\BepInEx.dll')" Text="BepInEx.dll was not found under SptRoot: $(SptRoot)" />
+    <Error Condition="!Exists('$(SptRoot)\BepInEx\core\0Harmony.dll')" Text="0Harmony.dll was not found under SptRoot: $(SptRoot)" />
+    <Error Condition="!Exists('$(SptRoot)\BepInEx\plugins\spt\spt-reflection.dll')" Text="spt-reflection.dll was not found under SptRoot: $(SptRoot)" />
+    <Error Condition="!Exists('$(SptRoot)\EscapeFromTarkov_Data\Managed\Assembly-CSharp.dll')" Text="Assembly-CSharp.dll was not found under SptRoot: $(SptRoot)" />
+    <Error Condition="!Exists('$(SptRoot)\EscapeFromTarkov_Data\Managed\Comfort.dll')" Text="Comfort.dll was not found under SptRoot: $(SptRoot)" />
+    <Error Condition="!Exists('$(SptRoot)\EscapeFromTarkov_Data\Managed\ItemComponent.Types.dll')" Text="ItemComponent.Types.dll was not found under SptRoot: $(SptRoot)" />
+    <Error Condition="!Exists('$(SptRoot)\EscapeFromTarkov_Data\Managed\UnityEngine.CoreModule.dll')" Text="UnityEngine.CoreModule.dll was not found under SptRoot: $(SptRoot)" />
+    <Error Condition="!Exists('$(SptRoot)\EscapeFromTarkov_Data\Managed\UnityEngine.PhysicsModule.dll')" Text="UnityEngine.PhysicsModule.dll was not found under SptRoot: $(SptRoot)" />
+    <Error Condition="!Exists('$(SptRoot)\EscapeFromTarkov_Data\Managed\UnityEngine.IMGUIModule.dll')" Text="UnityEngine.IMGUIModule.dll was not found under SptRoot: $(SptRoot)" />
+    <Error Condition="!Exists('$(SptRoot)\EscapeFromTarkov_Data\Managed\UnityEngine.InputLegacyModule.dll')" Text="UnityEngine.InputLegacyModule.dll was not found under SptRoot: $(SptRoot)" />
+  </Target>
+
+  <Target Name="Deploy" DependsOnTargets="Build">
+    <MakeDir Directories="$(DeployDirectory)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(DeployDirectory)\$(TargetFileName)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
