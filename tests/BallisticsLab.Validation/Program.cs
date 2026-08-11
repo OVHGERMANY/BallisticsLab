@@ -77,6 +77,11 @@ Check(
         == "5c0d688c86f77413ae3407b2"
     && LabPolicies.AuthoritativeAmmoValue(null, null) == string.Empty,
     "runtime ammo template identity overrides stale item identity");
+Check(
+    LabPolicies.ShouldDisplayBodyTelemetry(50f, 10f, string.Empty)
+    && LabPolicies.ShouldDisplayBodyTelemetry(0f, 0f, "armor 40.00->35.00")
+    && !LabPolicies.ShouldDisplayBodyTelemetry(0f, 0f, string.Empty),
+    "postmortem armor changes remain visible at zero body health");
 Check(LabPolicies.MaximumLayers == 6, "fixture layer limit remains six");
 
 if (!File.Exists(itemsPath))

@@ -486,7 +486,10 @@ namespace BallisticsLab.Runtime
                         + " | calculated penetration chance " + record.PenetrationChancePercent.ToString("F1") + "%");
                 }
             }
-            if (record.BodyHealthBefore > 0f || record.BodyHealthAfter > 0f)
+            if (LabPolicies.ShouldDisplayBodyTelemetry(
+                    record.BodyHealthBefore,
+                    record.BodyHealthAfter,
+                    record.ArmorChanges))
             {
                 GUILayout.Label(
                     "Body health " + record.BodyHealthBefore.ToString("F2") + " -> " + record.BodyHealthAfter.ToString("F2")

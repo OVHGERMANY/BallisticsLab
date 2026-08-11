@@ -21,6 +21,16 @@ namespace BallisticsLab.Core
                 : itemValue ?? string.Empty;
         }
 
+        public static bool ShouldDisplayBodyTelemetry(
+            float healthBefore,
+            float healthAfter,
+            string armorChanges)
+        {
+            return healthBefore > 0f
+                || healthAfter > 0f
+                || !string.IsNullOrWhiteSpace(armorChanges);
+        }
+
         public static float ImpactAngleDegrees(float directionDotNormal)
         {
             float cosine = Math.Abs(directionDotNormal);
