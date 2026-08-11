@@ -14,6 +14,13 @@ namespace BallisticsLab.Core
             return !float.IsNaN(value) && !float.IsInfinity(value) && value >= 0f;
         }
 
+        public static string AuthoritativeAmmoValue(string templateValue, string itemValue)
+        {
+            return !string.IsNullOrWhiteSpace(templateValue)
+                ? templateValue
+                : itemValue ?? string.Empty;
+        }
+
         public static float ImpactAngleDegrees(float directionDotNormal)
         {
             float cosine = Math.Abs(directionDotNormal);

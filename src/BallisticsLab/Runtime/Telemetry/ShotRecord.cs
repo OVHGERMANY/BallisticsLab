@@ -77,8 +77,12 @@ namespace BallisticsLab.Runtime.Telemetry
                 ParentDepth = state.ParentDepth,
                 RootRandomSeed = state.RootRandomSeed,
                 IsForwardHit = state.IsForwardHit,
-                AmmoTemplateId = shot.Ammo?.TemplateId ?? string.Empty,
-                AmmoName = shot.Ammo?.ShortName ?? string.Empty,
+                AmmoTemplateId = LabPolicies.AuthoritativeAmmoValue(
+                    ammoTemplate?.StringId,
+                    shot.Ammo?.TemplateId),
+                AmmoName = LabPolicies.AuthoritativeAmmoValue(
+                    ammoTemplate?._name,
+                    shot.Ammo?.ShortName),
                 ShooterProfileId = shot.Player?.iPlayer?.ProfileId ?? shot.PlayerProfileID ?? string.Empty,
                 Target = state.TargetName,
                 TargetKind = state.TargetKind,

@@ -16,7 +16,7 @@ Normal `Build` does not alter the live installation. Explicit deployment:
 dotnet msbuild .\src\BallisticsLab\BallisticsLab.csproj -t:Deploy -p:Configuration=Release -p:SptRoot=E:\Games\SPT
 ```
 
-Reports are written under `BepInEx\plugins\BallisticsLab\Reports` only when the user presses an export button. Reports include fixture identity and geometry, template/material/class data, calculated resistance and penetration chance, incoming and decision values, child continuation factors, parent/root shot identity, target state, armor durability changes, and the complete recorded shot chain.
+Reports are written under `BepInEx\plugins\BallisticsLab\Reports` only when the user presses an export button. Ammunition identity and physical values are read from the same live `AmmoTemplate`; pooled item identity is used only when no template is available. Reports include fixture identity and geometry, template/material/class data, calculated resistance and penetration chance, incoming and decision values, child continuation factors, parent/root shot identity, target state, armor durability changes, and the complete recorded shot chain.
 
 ## Manual acceptance
 

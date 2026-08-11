@@ -66,6 +66,13 @@ Check(
     LabPolicies.ShotChainId("profile", 17, 42) != LabPolicies.ShotChainId("profile", 18, 42)
     && LabPolicies.ShotChainId("profile", 17, 42) != LabPolicies.ShotChainId("profile", 17, 43),
     "shot chain identity separates different fires and root seeds");
+Check(
+    LabPolicies.AuthoritativeAmmoValue("5c0d5e4486f77478390952fe", "5c0d688c86f77413ae3407b2")
+        == "5c0d5e4486f77478390952fe"
+    && LabPolicies.AuthoritativeAmmoValue(string.Empty, "5c0d688c86f77413ae3407b2")
+        == "5c0d688c86f77413ae3407b2"
+    && LabPolicies.AuthoritativeAmmoValue(null, null) == string.Empty,
+    "runtime ammo template identity overrides stale item identity");
 Check(LabPolicies.MaximumLayers == 6, "fixture layer limit remains six");
 
 if (!File.Exists(itemsPath))
