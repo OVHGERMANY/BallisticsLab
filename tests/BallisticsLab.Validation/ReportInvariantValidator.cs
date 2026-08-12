@@ -39,6 +39,13 @@ internal static class ReportInvariantValidator
             && failure.Contains("forward-hit state", StringComparison.OrdinalIgnoreCase);
     }
 
+    internal static string SyntheticReportJson(bool corruptPenetration, string pluginVersion)
+    {
+        return CreateSyntheticReportJson(
+            corruptPenetration ? SyntheticCorruption.Penetration : SyntheticCorruption.None,
+            pluginVersion);
+    }
+
     internal static bool Validate(string jsonPath, out string failure)
     {
         failure = string.Empty;
@@ -216,73 +223,86 @@ internal static class ReportInvariantValidator
         Directory.CreateDirectory(directory);
         try
         {
-            const double impactSpeed = 500d;
-            const double templateSpeed = 1000d;
-            const double incomingDamage = 100d;
-            const double incomingPenetration = 50d;
-            double fraction = impactSpeed / templateSpeed;
-            double decisionDamage = incomingDamage * Math.Pow(fraction, 0.4d);
-            double decisionPenetration = incomingPenetration * Math.Pow(fraction, 1.4d);
-            if (corruption == SyntheticCorruption.Penetration)
-            {
-                decisionPenetration += 10d;
-            }
-
-            double[] hitPoint = { 1d, 2d, 3d };
-            double[] pathEnd = corruption == SyntheticCorruption.Path
-                ? new[] { 4d, 5d, 6d }
-                : hitPoint;
-            Dictionary<string, object> record = new(StringComparer.Ordinal)
-            {
-                ["sequence"] = 1,
-                ["chainId"] = "synthetic:1:1",
-                ["fragmentCount"] = 0,
-                ["parentDepth"] = 0,
-                ["isForwardHit"] = true,
-                ["targetKind"] = "FIXTURE PLATE",
-                ["angleDegrees"] = 0d,
-                ["impactSpeed"] = impactSpeed,
-                ["templateSpeed"] = templateSpeed,
-                ["fraction"] = fraction,
-                ["incomingDamage"] = incomingDamage,
-                ["incomingPenetration"] = incomingPenetration,
-                ["decisionDamage"] = decisionDamage,
-                ["decisionPenetration"] = decisionPenetration,
-                ["armorRealResistance"] = 30d,
-                ["armorClassResistance"] = 30d,
-                ["armorCf"] = 0.8d,
-                ["penetrationChancePercent"] = 50d,
-                ["durabilityBefore"] = 50d,
-                ["durabilityAfter"] = 49d,
-                ["fixtureMaximumDurability"] = 50d,
-                ["bodyHealthBefore"] = 0d,
-                ["bodyHealthAfter"] = 0d,
-                ["layerSpacing"] = 0.15d,
-                ["colliderThickness"] = 0.0127d,
-                ["continuationKind"] = string.Empty,
-                ["continuationPenetrationFactor"] = 1d,
-                ["continuationVelocityFactor"] = 1d,
-                ["continuationOutcomeFactor"] = 1d,
-                ["continuationArmorCf"] = 1d,
-                ["continuationDamageBefore"] = 0d,
-                ["continuationPenetrationBefore"] = 0d,
-                ["continuationDamageAfter"] = 0d,
-                ["continuationPenetrationAfter"] = 0d,
-                ["hitPoint"] = hitPoint,
-                ["path"] = new[] { new[] { 0d, 2d, 3d }, pathEnd }
-            };
-            if (corruption == SyntheticCorruption.ForwardState)
-            {
-                record.Remove("isForwardHit");
-            }
             string path = Path.Combine(directory, "BallisticsLab-synthetic.json");
-            File.WriteAllText(path, JsonSerializer.Serialize(new { records = new[] { record } }));
+            File.WriteAllText(path, CreateSyntheticReportJson(corruption, "0.2.6"));
             return Validate(path, out failure);
         }
         finally
         {
             Directory.Delete(directory, true);
         }
+    }
+
+    private static string CreateSyntheticReportJson(
+        SyntheticCorruption corruption,
+        string pluginVersion)
+    {
+        const double impactSpeed = 500d;
+        const double templateSpeed = 1000d;
+        const double incomingDamage = 100d;
+        const double incomingPenetration = 50d;
+        double fraction = impactSpeed / templateSpeed;
+        double decisionDamage = incomingDamage * Math.Pow(fraction, 0.4d);
+        double decisionPenetration = incomingPenetration * Math.Pow(fraction, 1.4d);
+        if (corruption == SyntheticCorruption.Penetration)
+        {
+            decisionPenetration += 10d;
+        }
+
+        double[] hitPoint = { 1d, 2d, 3d };
+        double[] pathEnd = corruption == SyntheticCorruption.Path
+            ? new[] { 4d, 5d, 6d }
+            : hitPoint;
+        Dictionary<string, object> record = new(StringComparer.Ordinal)
+        {
+            ["sequence"] = 1,
+            ["chainId"] = "synthetic:1:1",
+            ["fragmentCount"] = 0,
+            ["parentDepth"] = 0,
+            ["isForwardHit"] = true,
+            ["targetKind"] = "FIXTURE PLATE",
+            ["angleDegrees"] = 0d,
+            ["impactSpeed"] = impactSpeed,
+            ["templateSpeed"] = templateSpeed,
+            ["fraction"] = fraction,
+            ["incomingDamage"] = incomingDamage,
+            ["incomingPenetration"] = incomingPenetration,
+            ["decisionDamage"] = decisionDamage,
+            ["decisionPenetration"] = decisionPenetration,
+            ["armorRealResistance"] = 30d,
+            ["armorClassResistance"] = 30d,
+            ["armorCf"] = 0.8d,
+            ["penetrationChancePercent"] = 50d,
+            ["durabilityBefore"] = 50d,
+            ["durabilityAfter"] = 49d,
+            ["fixtureMaximumDurability"] = 50d,
+            ["bodyHealthBefore"] = 0d,
+            ["bodyHealthAfter"] = 0d,
+            ["layerSpacing"] = 0.15d,
+            ["colliderThickness"] = 0.0127d,
+            ["continuationKind"] = string.Empty,
+            ["continuationPenetrationFactor"] = 1d,
+            ["continuationVelocityFactor"] = 1d,
+            ["continuationOutcomeFactor"] = 1d,
+            ["continuationArmorCf"] = 1d,
+            ["continuationDamageBefore"] = 0d,
+            ["continuationPenetrationBefore"] = 0d,
+            ["continuationDamageAfter"] = 0d,
+            ["continuationPenetrationAfter"] = 0d,
+            ["hitPoint"] = hitPoint,
+            ["path"] = new[] { new[] { 0d, 2d, 3d }, pathEnd }
+        };
+        if (corruption == SyntheticCorruption.ForwardState)
+        {
+            record.Remove("isForwardHit");
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            schema = 3,
+            pluginVersion,
+            records = new[] { record }
+        });
     }
 
     private static string Row(int row, string message)

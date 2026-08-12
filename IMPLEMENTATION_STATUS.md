@@ -63,8 +63,9 @@ a later armor layer.
 ## Verified automated and startup gates
 
 - Release solution build: 0 warnings, 0 errors.
-- Pure and installed-database validation: 41 checks passed.
-- Current-report validation: 48 checks passed against `BallisticsLab-20260812-002449`.
+- Pure and installed-database validation: 43 checks passed.
+- Current-report validation: 50 checks passed across both current-build exports through
+  `BallisticsLab-20260812-002449`.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Layer limit: one through six.
 - Six-layer geometry preserves the configured face-to-face air gap.
@@ -76,7 +77,9 @@ a later armor layer.
   broken continuation inputs, detached trajectory endpoints, and incomplete recorded continuation
   lineage. Every nonempty schema-3 report from the current plugin version is checked because the
   acceptance watcher aggregates current-build coverage across exports; validating only the latest
-  file would leave earlier contributing records unverified.
+  file would leave earlier contributing records unverified. A two-report regression rejects an
+  incorrect earlier current-build report even when the latest report is valid, while an equally
+  incorrect historical-version report is correctly excluded from current acceptance.
 - Local and deployed `0.2.6` assemblies are byte-identical.
 - Disabled startup: the plugin reports disabled and installs zero of its four patches.
 - Enabled startup: all four intended patches install exactly once.

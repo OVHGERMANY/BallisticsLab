@@ -40,6 +40,8 @@ Check(ReportInvariantValidator.AcceptsSyntheticReport(), "report invariants acce
 Check(ReportInvariantValidator.RejectsIncorrectFalloff(), "report invariants reject incorrect penetration falloff");
 Check(ReportInvariantValidator.RejectsDetachedTrajectoryEndpoint(), "report invariants reject a detached trajectory endpoint");
 Check(ReportInvariantValidator.RejectsMissingForwardHitState(), "report invariants reject a missing forward-hit state");
+Check(CurrentReportSetValidator.RejectsCorruptEarlierCurrentReport(), "current-report gate rejects corruption in an earlier contributing export");
+Check(CurrentReportSetValidator.IgnoresCorruptHistoricalReport(), "current-report gate excludes historical versions from current acceptance");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 float[] installedBodyArmorPreset = { 0f, 0.097f, 0.378f, 0.249f, 0.28f, 0.463f };
 LabColliderBallisticSettings liveBodyArmorSettings =
@@ -253,42 +255,24 @@ if (!string.IsNullOrEmpty(reportsPath))
             && recordsElement.GetArrayLength() > 0;
         Check(hasRecords, "latest BallisticsLab report contains shot records");
 
-        List<string> currentReports = new();
-        foreach (string reportFile in reportFiles)
-        {
-            using JsonDocument candidate = JsonDocument.Parse(File.ReadAllText(reportFile));
-            bool candidateSchema = candidate.RootElement.TryGetProperty(
-                    "schema",
-                    out JsonElement candidateSchemaElement)
-                && candidateSchemaElement.TryGetInt32(out int candidateSchemaValue)
-                && candidateSchemaValue == LabBuild.ReportSchema;
-            string candidateVersion = candidate.RootElement.TryGetProperty(
-                    "pluginVersion",
-                    out JsonElement candidateVersionElement)
-                ? candidateVersionElement.GetString() ?? string.Empty
-                : string.Empty;
-            bool candidateHasRecords = candidate.RootElement.TryGetProperty(
-                    "records",
-                    out JsonElement candidateRecords)
-                && candidateRecords.ValueKind == JsonValueKind.Array
-                && candidateRecords.GetArrayLength() > 0;
-            if (candidateSchema
-                && candidateHasRecords
-                && string.Equals(candidateVersion, LabBuild.PluginVersion, StringComparison.Ordinal))
-            {
-                currentReports.Add(reportFile);
-            }
-        }
+        IReadOnlyList<string> currentReports = CurrentReportSetValidator.Select(
+            reportFiles,
+            LabBuild.ReportSchema,
+            LabBuild.PluginVersion);
 
         string identityFailure = string.Empty;
         string pairFailure = string.Empty;
-        string invariantFailure = string.Empty;
+        bool invariantsValid = CurrentReportSetValidator.ValidateInvariants(
+            reportFiles,
+            LabBuild.ReportSchema,
+            LabBuild.PluginVersion,
+            out int invariantReportCount,
+            out string invariantFailure);
         if (currentReports.Count == 0)
         {
             const string noCurrentReport = "no nonempty current-build reports were found";
             identityFailure = noCurrentReport;
             pairFailure = noCurrentReport;
-            invariantFailure = noCurrentReport;
         }
         foreach (string currentReport in currentReports)
         {
@@ -331,12 +315,6 @@ if (!string.IsNullOrEmpty(reportsPath))
             {
                 pairFailure = reportName + ": " + currentPairFailure;
             }
-            if (string.IsNullOrEmpty(invariantFailure)
-                && !ReportInvariantValidator.Validate(currentReport, out string currentInvariantFailure))
-            {
-                invariantFailure = reportName + ": " + currentInvariantFailure;
-            }
-
             if (!string.IsNullOrEmpty(identityFailure))
             {
                 break;
@@ -354,8 +332,8 @@ if (!string.IsNullOrEmpty(reportsPath))
                 ? "all current-build CSV and JSON exports match field for field"
                 : "current-build CSV and JSON export mismatch: " + pairFailure);
         Check(
-            currentReports.Count > 0 && string.IsNullOrEmpty(invariantFailure),
-            string.IsNullOrEmpty(invariantFailure)
+            invariantsValid && invariantReportCount == currentReports.Count,
+            invariantsValid && invariantReportCount == currentReports.Count
                 ? "all current-build reports satisfy ballistic, durability, trajectory, and lineage invariants"
                 : "current-build report invariant failure: " + invariantFailure);
         Console.WriteLine(
