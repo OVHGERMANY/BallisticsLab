@@ -17,9 +17,11 @@ The current candidate is not tagged as an accepted baseline. Tagging requires cu
 Development build `0.2.7` retains schema `3` and adds automatic nonempty report capture plus a
 larger task-oriented panel. Quick fixture actions build, place, and close the panel in one click;
 advanced geometry and catalog controls remain behind one disclosure. The manual `0.2.6` reports
-below remain authoritative until `0.2.7` is deployed and exercised. Its Release build currently
-passes 49 pure/database checks with zero compiler warnings or errors; artifact acceptance remains
-pending deployment and restart.
+below remain authoritative until `0.2.7` is exercised. Its Release build passes 49 pure/database
+checks with zero compiler warnings or errors. The deployed and local Release DLLs are byte-identical
+at SHA-256 `C1EC7610C1BAB46936E445F74B5C894B2C711455DAF680CFF033766D1259BB6D`;
+one responsive Tarkov process loaded `0.2.7`, enabled the four intended Lab patches, and reported no
+Lab startup error. Automatic report creation and the revised panel still require direct acceptance.
 
 ## Previous-candidate evidence recorded
 
