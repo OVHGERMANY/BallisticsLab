@@ -21,7 +21,22 @@ below remain authoritative until `0.2.7` is exercised. Its Release build passes 
 checks with zero compiler warnings or errors. The deployed and local Release DLLs are byte-identical
 at SHA-256 `C1EC7610C1BAB46936E445F74B5C894B2C711455DAF680CFF033766D1259BB6D`;
 one responsive Tarkov process loaded `0.2.7`, enabled the four intended Lab patches, and reported no
-Lab startup error. Automatic report creation and the revised panel still require direct acceptance.
+Lab startup error.
+
+Direct `0.2.7` acceptance confirmed that the revised quick buttons correctly created and placed all
+six named fixtures and returned control to shooting. Automatic saving produced matching nonempty
+schema-3 CSV/JSON pairs without a manual export. Thirteen automatic/manual checkpoints through
+`BallisticsLab-20260812-022036-750-012-auto` passed 56 validation checks. The evidence directly adds:
+
+- One-layer class-6 armored steel.
+- Two-layer class-3 armored steel with both layers struck.
+- Granit BR4 and Granit BR5 game-template presets.
+- A real `FragmentationHit` child from layer 1 subsequently striking layer 2.
+
+The three-layer class-4 and class-6 buttons were exercised, but those shots reached only layer 1 and
+do not complete either chain. Sustained all-session recording also exposed a `0.2.7` checkpoint
+efficiency defect: it repeatedly serializes the complete accumulated session, producing many large
+cumulative files. The next build must export only new chain-complete evidence before baseline tagging.
 
 ## Previous-candidate evidence recorded
 
@@ -135,14 +150,11 @@ The schema-3 report can directly establish the remaining cases below:
 - Complete four-layer chain.
 - Complete five-layer chain.
 - Complete six-layer chain.
-- Complete one-layer class-6 steel chain.
 - Complete three-layer class-4 steel chain.
 - Complete three-layer class-6 steel chain.
-- Granit BR5 game-template preset.
 - Bot body-health change.
 - Bot equipped-armor durability change.
 - Covered post-death armor durability change at zero body health.
-- Fragment continuation into a later armor layer.
 
 The following require direct observation or combined report and code evidence. Version `0.2.6`
 does not export the struck body part, loot-screen state, armor-application call order, or death-event
