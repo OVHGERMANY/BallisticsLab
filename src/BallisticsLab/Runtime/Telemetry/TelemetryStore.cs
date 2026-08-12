@@ -16,6 +16,7 @@ namespace BallisticsLab.Runtime.Telemetry
         private static long _sequence;
         private static long _revision;
         private static long _savedRevision;
+        private static long _savedSequence;
         private static DateTime _lastRecordUtc;
         private static DateTime _nextAutomaticAttemptUtc;
         private static int _captureOrdinal;
@@ -94,6 +95,7 @@ namespace BallisticsLab.Runtime.Telemetry
                 Interlocked.Exchange(ref _sequence, 0L);
                 _revision = 0L;
                 _savedRevision = 0L;
+                _savedSequence = 0L;
                 _lastRecordUtc = DateTime.MinValue;
                 _nextAutomaticAttemptUtc = DateTime.MinValue;
             }
@@ -120,6 +122,7 @@ namespace BallisticsLab.Runtime.Telemetry
                 if (revision > _savedRevision)
                 {
                     _savedRevision = revision;
+                    _savedSequence = records.Max(record => record.Sequence);
                 }
             }
             return result;
@@ -140,7 +143,15 @@ namespace BallisticsLab.Runtime.Telemetry
                     return null;
                 }
 
-                records = Records.ToArray();
+                records = LabPolicies.SelectChangedChains(
+                    Records,
+                    _savedSequence,
+                    record => record.Sequence,
+                    record => record.ChainId);
+                if (records.Count == 0)
+                {
+                    return null;
+                }
                 revision = _revision;
                 _captureOrdinal++;
                 stem = LabPolicies.ReportStem(now, _captureOrdinal) + "-auto";
@@ -153,6 +164,11 @@ namespace BallisticsLab.Runtime.Telemetry
                 if (revision > _savedRevision)
                 {
                     _savedRevision = revision;
+                    long savedSequence = records.Max(record => record.Sequence);
+                    if (savedSequence > _savedSequence)
+                    {
+                        _savedSequence = savedSequence;
+                    }
                 }
             }
             return result;

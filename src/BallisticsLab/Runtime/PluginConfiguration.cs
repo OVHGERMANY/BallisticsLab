@@ -61,7 +61,7 @@ namespace BallisticsLab.Runtime
                 "Telemetry",
                 "Automatic Report Saving",
                 true,
-                "Saves a new nonempty CSV/JSON checkpoint after a completed shot burst and when the session or world ends.");
+                "Saves each changed shot-chain batch as a nonempty CSV/JSON pair after a completed burst and when the session or world ends.");
         }
 
         internal ConfigEntry<bool> Enabled { get; }

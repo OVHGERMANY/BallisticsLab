@@ -47,6 +47,42 @@ namespace BallisticsLab.Core
             return recordCount > 0 && revision > savedRevision;
         }
 
+        public static IReadOnlyList<T> SelectChangedChains<T>(
+            IReadOnlyList<T> records,
+            long savedSequence,
+            Func<T, long> sequence,
+            Func<T, string> chainId)
+        {
+            if (records == null || records.Count == 0 || sequence == null || chainId == null)
+            {
+                return Array.Empty<T>();
+            }
+
+            HashSet<string> changedChains = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < records.Count; index++)
+            {
+                T record = records[index];
+                string id = chainId(record);
+                if (sequence(record) > savedSequence && !string.IsNullOrEmpty(id))
+                {
+                    changedChains.Add(id);
+                }
+            }
+
+            List<T> selected = new List<T>();
+            for (int index = 0; index < records.Count; index++)
+            {
+                T record = records[index];
+                string id = chainId(record);
+                if ((!string.IsNullOrEmpty(id) && changedChains.Contains(id))
+                    || (string.IsNullOrEmpty(id) && sequence(record) > savedSequence))
+                {
+                    selected.Add(record);
+                }
+            }
+            return selected;
+        }
+
         public static string ReportStem(DateTime utc, int captureOrdinal)
         {
             return "BallisticsLab-"

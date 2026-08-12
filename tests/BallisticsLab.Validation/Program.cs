@@ -20,7 +20,7 @@ Dictionary<string, AmmoRow> ammunition = new(StringComparer.Ordinal);
 Check(
     LabBuild.PluginGuid == "com.janky.ballisticslab"
     && LabBuild.PluginName == "Janky-BallisticsLab"
-    && LabBuild.PluginVersion == "0.2.7"
+    && LabBuild.PluginVersion == "0.2.8"
     && LabBuild.ReportSchema == 3,
     "report provenance constants match the current plugin build");
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
@@ -54,6 +54,9 @@ Check(
     LabPolicies.ReportStem(new DateTime(2026, 8, 12, 1, 2, 3, 456, DateTimeKind.Utc), 7)
         == "BallisticsLab-20260812-010203-456-007",
     "automatic report stem is stable and capture-specific");
+Check(ChangedChainBatchKeepsParents(), "automatic batch keeps full ancestry for every changed chain");
+Check(ChangedChainBatchExcludesSavedChains(), "automatic batch omits unchanged chains");
+Check(ChangedChainBatchKeepsUnchainedRecordsSeparate(), "automatic batch does not merge unrelated unchained records");
 Check(ReportPairWriterCreatesOnlyACompletePair(), "report writer commits one complete UTF-8 pair");
 Check(ReportPairWriterRejectsExistingStem(), "report writer never overwrites an existing checkpoint");
 float[] installedBodyArmorPreset = { 0f, 0.097f, 0.378f, 0.249f, 0.28f, 0.463f };
@@ -471,5 +474,53 @@ bool ReportPairWriterRejectsExistingStem()
     }
 }
 
+bool ChangedChainBatchKeepsParents()
+{
+    BatchRow[] records =
+    {
+        new(1, "chain-a"),
+        new(2, "chain-a"),
+        new(3, "chain-b"),
+        new(4, "chain-a")
+    };
+    IReadOnlyList<BatchRow> batch = LabPolicies.SelectChangedChains(
+        records,
+        3,
+        record => record.Sequence,
+        record => record.ChainId);
+    return batch.Select(record => record.Sequence).SequenceEqual(new long[] { 1, 2, 4 });
+}
+
+bool ChangedChainBatchExcludesSavedChains()
+{
+    BatchRow[] records =
+    {
+        new(1, "chain-a"),
+        new(2, "chain-b")
+    };
+    return LabPolicies.SelectChangedChains(
+            records,
+            2,
+            record => record.Sequence,
+            record => record.ChainId).Count == 0;
+}
+
+bool ChangedChainBatchKeepsUnchainedRecordsSeparate()
+{
+    BatchRow[] records =
+    {
+        new(1, string.Empty),
+        new(2, null),
+        new(3, "chain-a")
+    };
+    IReadOnlyList<BatchRow> batch = LabPolicies.SelectChangedChains(
+        records,
+        1,
+        record => record.Sequence,
+        record => record.ChainId);
+    return batch.Select(record => record.Sequence).SequenceEqual(new long[] { 2, 3 });
+}
+
 internal sealed record PlateRow(string Id, string Name, int ArmorClass, string Material, int Durability);
 internal sealed record AmmoRow(string Name, float InitialSpeed);
+internal sealed record BatchRow(long Sequence, string ChainId);

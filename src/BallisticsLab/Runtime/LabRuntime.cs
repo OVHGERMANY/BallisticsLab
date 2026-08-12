@@ -262,7 +262,7 @@ namespace BallisticsLab.Runtime
             GUILayout.Label("REPORTS", _sectionStyle);
             GUILayout.Label(
                 Plugin.Configuration.AutomaticReportSaving.Value
-                    ? "Automatic saving is ON. A timestamped CSV/JSON checkpoint is saved after each shot burst and when the session ends."
+                    ? "Automatic saving is ON. Each changed shot-chain batch is saved after a burst and when the session ends."
                     : "Automatic saving is OFF. Use the manual export button before ending the session.");
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("SAVE REPORT NOW", _buttonStyle, GUILayout.Height(42f)))
@@ -725,7 +725,7 @@ namespace BallisticsLab.Runtime
                 string result = TelemetryStore.ExportAutomatic(force);
                 if (!string.IsNullOrEmpty(result) && !force)
                 {
-                    _status = "Automatic report saved. Keep shooting or choose the next fixture.";
+                    _status = "Changed shot chains saved. Keep shooting or choose the next fixture.";
                 }
             }
             catch (Exception exception)

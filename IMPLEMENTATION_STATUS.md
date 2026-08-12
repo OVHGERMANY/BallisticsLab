@@ -4,20 +4,19 @@ Snapshot date: 2026-08-11
 
 ## Current baseline candidate
 
-- Plugin version: `0.2.6`
+- Plugin version: `0.2.8`
 - Report schema: `3`
-- Runtime build source commit: `7224221`
+- Runtime build source commit: pending final commit
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
-- Deployed DLL SHA-256: `1899DE605E93A06A9E8E0E99F922AE7369F5DAC661FB970D1AF373CB3A2E77BC`
+- Deployed DLL SHA-256: pending final build and deployment
 - Default configuration: disabled
 
-The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.6`.
+The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.8`.
 
-Development build `0.2.7` retains schema `3` and adds automatic nonempty report capture plus a
+Accepted development evidence from `0.2.7` retains schema `3` and covers automatic nonempty report capture plus a
 larger task-oriented panel. Quick fixture actions build, place, and close the panel in one click;
-advanced geometry and catalog controls remain behind one disclosure. The manual `0.2.6` reports
-below remain authoritative until `0.2.7` is exercised. Its Release build passes 49 pure/database
+advanced geometry and catalog controls remain behind one disclosure. Its Release build passes 52 pure/database
 checks with zero compiler warnings or errors. The deployed and local Release DLLs are byte-identical
 at SHA-256 `C1EC7610C1BAB46936E445F74B5C894B2C711455DAF680CFF033766D1259BB6D`;
 one responsive Tarkov process loaded `0.2.7`, enabled the four intended Lab patches, and reported no
@@ -35,8 +34,10 @@ schema-3 CSV/JSON pairs without a manual export. Thirteen automatic/manual check
 
 The three-layer class-4 and class-6 buttons were exercised, but those shots reached only layer 1 and
 do not complete either chain. Sustained all-session recording also exposed a `0.2.7` checkpoint
-efficiency defect: it repeatedly serializes the complete accumulated session, producing many large
-cumulative files. The next build must export only new chain-complete evidence before baseline tagging.
+efficiency defect: it repeatedly serialized the complete accumulated session, producing many large
+cumulative files. Version `0.2.8` fixes this by exporting only changed chains plus their required
+parent records. Manual saves remain complete session snapshots. This keeps each automatic pair
+independently valid without repeatedly copying unrelated evidence.
 
 ## Previous-candidate evidence recorded
 
