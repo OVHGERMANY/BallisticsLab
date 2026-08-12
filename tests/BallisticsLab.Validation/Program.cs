@@ -40,6 +40,8 @@ Check(ReportInvariantValidator.AcceptsSyntheticReport(), "report invariants acce
 Check(ReportInvariantValidator.RejectsIncorrectFalloff(), "report invariants reject incorrect penetration falloff");
 Check(ReportInvariantValidator.RejectsDetachedTrajectoryEndpoint(), "report invariants reject a detached trajectory endpoint");
 Check(ReportInvariantValidator.RejectsMissingForwardHitState(), "report invariants reject a missing forward-hit state");
+Check(ReportInvariantValidator.RejectsMismatchedContinuationSource(), "report invariants reject a continuation attached to the wrong source collision");
+Check(ReportInvariantValidator.RejectsChangedRootIdentity(), "report invariants reject a changed root identity inside one chain");
 Check(CurrentReportSetValidator.RejectsCorruptEarlierCurrentReport(), "current-report gate rejects corruption in an earlier contributing export");
 Check(CurrentReportSetValidator.IgnoresCorruptHistoricalReport(), "current-report gate excludes historical versions from current acceptance");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");

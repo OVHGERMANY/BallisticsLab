@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 internal static class ReportInvariantValidator
 {
@@ -37,6 +38,24 @@ internal static class ReportInvariantValidator
     {
         return !ValidateSyntheticReport(SyntheticCorruption.ForwardState, out string failure)
             && failure.Contains("forward-hit state", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool RejectsMismatchedContinuationSource()
+    {
+        return !ValidateSyntheticLineage(
+                mismatchedSource: true,
+                mismatchedRootSeed: false,
+                out string failure)
+            && failure.Contains("continuation source", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool RejectsChangedRootIdentity()
+    {
+        return !ValidateSyntheticLineage(
+                mismatchedSource: false,
+                mismatchedRootSeed: true,
+                out string failure)
+            && failure.Contains("root random seed", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static string SyntheticReportJson(bool corruptPenetration, string pluginVersion)
@@ -79,6 +98,31 @@ internal static class ReportInvariantValidator
                 if (!TryInt32(record, "fragmentCount", out int fragmentCount) || fragmentCount < 0)
                 {
                     failure = Row(row, "fragment count is invalid");
+                    return false;
+                }
+                if (!TryInt32(record, "fireIndex", out int fireIndex) || fireIndex < 0)
+                {
+                    failure = Row(row, "fire index is invalid");
+                    return false;
+                }
+                if (!TryInt32(record, "fragmentIndex", out int fragmentIndex) || fragmentIndex < 0)
+                {
+                    failure = Row(row, "fragment index is invalid");
+                    return false;
+                }
+                if (!TryInt32(record, "rootRandomSeed", out int rootRandomSeed) || rootRandomSeed < 0)
+                {
+                    failure = Row(row, "root random seed is invalid");
+                    return false;
+                }
+                if (!TryInt32(record, "fixtureId", out int fixtureId) || fixtureId < 0)
+                {
+                    failure = Row(row, "fixture identity is invalid");
+                    return false;
+                }
+                if (!TryInt32(record, "layer", out int layer) || layer < -1)
+                {
+                    failure = Row(row, "fixture layer is invalid");
                     return false;
                 }
 
@@ -141,6 +185,8 @@ internal static class ReportInvariantValidator
                 }
 
                 string continuationKind = String(record, "continuationKind");
+                int continuationSourceFixtureId = 0;
+                int continuationSourceLayer = -1;
                 if (!string.IsNullOrEmpty(continuationKind))
                 {
                     if (parentDepth <= 0)
@@ -154,6 +200,20 @@ internal static class ReportInvariantValidator
                             Required(record, "continuationPenetrationAfter")))
                     {
                         failure = Row(row, "continuation input differs from the corrected child output");
+                        return false;
+                    }
+                    if (!TryInt32(
+                            record,
+                            "continuationSourceFixtureId",
+                            out continuationSourceFixtureId)
+                        || continuationSourceFixtureId <= 0
+                        || !TryInt32(
+                            record,
+                            "continuationSourceLayer",
+                            out continuationSourceLayer)
+                        || continuationSourceLayer < 0)
+                    {
+                        failure = Row(row, "continuation source fixture or layer is invalid");
                         return false;
                     }
                 }
@@ -182,12 +242,32 @@ internal static class ReportInvariantValidator
                     chain = new List<ChainLink>();
                     chains.Add(chainId, chain);
                 }
-                chain.Add(new ChainLink(sequence, parentDepth, continuationKind));
+                chain.Add(new ChainLink(
+                    sequence,
+                    parentDepth,
+                    continuationKind,
+                    fireIndex,
+                    fragmentIndex,
+                    rootRandomSeed,
+                    fixtureId,
+                    layer,
+                    continuationSourceFixtureId,
+                    continuationSourceLayer));
             }
 
             foreach (KeyValuePair<string, List<ChainLink>> pair in chains)
             {
                 List<ChainLink> links = pair.Value.OrderBy(link => link.Sequence).ToList();
+                if (links.Select(link => link.FireIndex).Distinct().Count() != 1)
+                {
+                    failure = "chain " + pair.Key + " changes fire index";
+                    return false;
+                }
+                if (links.Select(link => link.RootRandomSeed).Distinct().Count() != 1)
+                {
+                    failure = "chain " + pair.Key + " changes root random seed";
+                    return false;
+                }
                 foreach (ChainLink link in links)
                 {
                     if (link.ParentDepth == 0 || string.IsNullOrEmpty(link.ContinuationKind))
@@ -196,11 +276,13 @@ internal static class ReportInvariantValidator
                     }
                     if (!links.Any(candidate =>
                             candidate.Sequence < link.Sequence
-                            && candidate.ParentDepth == link.ParentDepth - 1))
+                            && candidate.ParentDepth == link.ParentDepth - 1
+                            && candidate.FixtureId == link.ContinuationSourceFixtureId
+                            && candidate.Layer == link.ContinuationSourceLayer))
                     {
                         failure = "chain " + pair.Key + " has depth "
                             + link.ParentDepth.ToString(CultureInfo.InvariantCulture)
-                            + " without an earlier parent depth";
+                            + " without an earlier parent matching its continuation source";
                         return false;
                     }
                 }
@@ -233,6 +315,50 @@ internal static class ReportInvariantValidator
         }
     }
 
+    private static bool ValidateSyntheticLineage(
+        bool mismatchedSource,
+        bool mismatchedRootSeed,
+        out string failure)
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "BallisticsLab.Lineage." + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            JsonObject root = JsonNode.Parse(CreateSyntheticReportJson(
+                    SyntheticCorruption.None,
+                    "0.2.6"))?.AsObject()
+                ?? throw new InvalidDataException("synthetic report root is missing");
+            JsonArray records = root["records"]?.AsArray()
+                ?? throw new InvalidDataException("synthetic report records are missing");
+            JsonObject child = records[0]?.DeepClone().AsObject()
+                ?? throw new InvalidDataException("synthetic parent record is missing");
+            child["sequence"] = 2;
+            child["parentDepth"] = 1;
+            child["continuationKind"] = "DeviationHit";
+            child["fixtureId"] = 2;
+            child["layer"] = 1;
+            child["continuationSourceFixtureId"] = mismatchedSource ? 99 : 1;
+            child["continuationSourceLayer"] = 0;
+            child["continuationDamageAfter"] = 100d;
+            child["continuationPenetrationAfter"] = 50d;
+            if (mismatchedRootSeed)
+            {
+                child["rootRandomSeed"] = 8;
+            }
+            records.Add(child);
+
+            string path = Path.Combine(directory, "BallisticsLab-lineage.json");
+            File.WriteAllText(path, root.ToJsonString());
+            return Validate(path, out failure);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     private static string CreateSyntheticReportJson(
         SyntheticCorruption corruption,
         string pluginVersion)
@@ -257,10 +383,15 @@ internal static class ReportInvariantValidator
         {
             ["sequence"] = 1,
             ["chainId"] = "synthetic:1:1",
+            ["fireIndex"] = 1,
+            ["fragmentIndex"] = 0,
             ["fragmentCount"] = 0,
             ["parentDepth"] = 0,
+            ["rootRandomSeed"] = 7,
             ["isForwardHit"] = true,
             ["targetKind"] = "FIXTURE PLATE",
+            ["fixtureId"] = 1,
+            ["layer"] = 0,
             ["angleDegrees"] = 0d,
             ["impactSpeed"] = impactSpeed,
             ["templateSpeed"] = templateSpeed,
@@ -281,6 +412,8 @@ internal static class ReportInvariantValidator
             ["layerSpacing"] = 0.15d,
             ["colliderThickness"] = 0.0127d,
             ["continuationKind"] = string.Empty,
+            ["continuationSourceFixtureId"] = 0,
+            ["continuationSourceLayer"] = -1,
             ["continuationPenetrationFactor"] = 1d,
             ["continuationVelocityFactor"] = 1d,
             ["continuationOutcomeFactor"] = 1d,
@@ -387,5 +520,15 @@ internal static class ReportInvariantValidator
     }
 
     private readonly record struct Point3(double X, double Y, double Z);
-    private readonly record struct ChainLink(long Sequence, int ParentDepth, string ContinuationKind);
+    private readonly record struct ChainLink(
+        long Sequence,
+        int ParentDepth,
+        string ContinuationKind,
+        int FireIndex,
+        int FragmentIndex,
+        int RootRandomSeed,
+        int FixtureId,
+        int Layer,
+        int ContinuationSourceFixtureId,
+        int ContinuationSourceLayer);
 }

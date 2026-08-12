@@ -63,8 +63,8 @@ a later armor layer.
 ## Verified automated and startup gates
 
 - Release solution build: 0 warnings, 0 errors.
-- Pure and installed-database validation: 43 checks passed.
-- Current-report validation: 50 checks passed across both current-build exports through
+- Pure and installed-database validation: 45 checks passed.
+- Current-report validation: 52 checks passed across both current-build exports through
   `BallisticsLab-20260812-002449`.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Layer limit: one through six.
@@ -80,6 +80,10 @@ a later armor layer.
   file would leave earlier contributing records unverified. A two-report regression rejects an
   incorrect earlier current-build report even when the latest report is valid, while an equally
   incorrect historical-version report is correctly excluded from current acceptance.
+- Chain validation requires a stable fire index and root random seed, non-negative fragment indices,
+  and an earlier parent collision whose fixture and layer exactly match each continuation's reported
+  source. Negative regressions reject both a changed root identity and a child attached to the wrong
+  source collision.
 - Local and deployed `0.2.6` assemblies are byte-identical.
 - Disabled startup: the plugin reports disabled and installs zero of its four patches.
 - Enabled startup: all four intended patches install exactly once.
