@@ -24,9 +24,11 @@ Reports are written under `BepInEx\plugins\BallisticsLab\Reports` only when the 
 
 1. Set `Enabled = true` and restart the game. Confirm the BepInEx log reports four BallisticsLab patches.
 2. Enter the hideout or an offline local raid, press `Left Ctrl + F10`, and choose **Start Lab Session**.
-3. Place a single Granit BR4 or BR5 fixture and fire at the red center mark. Confirm the panel records the selected template, class, material, resistance, penetration chance, durability change, and terminal outcome.
-4. Place the two-layer class-3 and three-layer class-4/class-6 steel presets. Confirm each physical layer receives its own record and all records share one chain ID. A deviated or fragmented continuation must show its penetration, velocity, future-outcome, and armor-CF factors before the next layer.
-5. Change angle, spacing, collider thickness, material, and backstop state; rebuild the fixture and confirm the new geometry and template values appear in the next record.
-6. In an offline raid, aim at a live AI target, select it, and use **Hold Movement + Fire**. Confirm body health and equipped-armor durability changes are recorded. A dead target remains selected for postmortem armor telemetry until **Clear Selection** is pressed.
-7. Export CSV and JSON and confirm both files appear under `BepInEx\plugins\BallisticsLab\Reports` with the current shot chain.
-8. End the session, set `Enabled = false`, and restart. The log must say no game methods were patched.
+3. Test one Granit BR4 fixture and one Granit BR5 fixture. Fire at the red center mark and confirm the panel records the selected template, class, material, resistance, penetration chance, durability change, and terminal outcome.
+4. Record complete one-, two-, three-, four-, five-, and six-layer chains. Include the one-layer class-6, two-layer class-3, three-layer class-4, and three-layer class-6 steel presets. Each struck layer must receive its own record under one chain ID. No particular cartridge is mandated; use ammunition capable of reaching the requested later layers.
+5. Record at least one complete multi-layer chain with a nonzero face-to-face air gap. Change angle, spacing, collider thickness, material, and backstop state; rebuild the fixture and confirm the new geometry and template values appear in the next record.
+6. On a multi-layer fixture, capture one `DeviationHit` child and one `FragmentationHit` child striking a later armor layer. Their records must show corrected penetration, velocity, future-outcome, and armor-CF factors with contiguous parent/root lineage. A valid fragmentation event may produce zero children, so only a record with an actual child satisfies this continuation check.
+7. In an offline raid, aim at a live bot, select it, and use **Hold Movement + Fire**. Confirm body health and equipped-armor durability changes are recorded. Confirm ordinary live hits do not apply armor durability damage twice.
+8. Keep the dead target selected and test covered and uncovered post-death hits. Covered armor must lose durability at zero body health; an uncovered zone must not change armor. If several armor pieces match, confirm the existing game order is retained. Loot the armor and confirm the changed durability persists, with no repeated body-health or death event.
+9. Export CSV and JSON once after the test batch. Confirm both files appear under `BepInEx\plugins\BallisticsLab\Reports`; exporting does not clear accumulated records.
+10. End the session, set `Enabled = false`, and restart. The log must say no game methods were patched.
