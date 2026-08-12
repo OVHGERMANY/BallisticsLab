@@ -37,10 +37,10 @@ the ammunition's fragmentation chance.
 
 ## Current-candidate evidence recorded
 
-`BallisticsLab-20260812-002316` and `BallisticsLab-20260812-002449` are schema-3 exports from
-plugin version `0.2.6`:
+`BallisticsLab-20260812-002316`, `BallisticsLab-20260812-002449`, and
+`BallisticsLab-20260812-012345` are schema-3 exports from plugin version `0.2.6`:
 
-- The reports contain 26 current-build records across 12 shot chains. Both CSV/JSON pairs have
+- The reports contain 29 current-build records across 13 shot chains. All three CSV/JSON pairs have
   equal row counts and match field for field; the one-record pair also verifies scalar-row handling
   in the external acceptance watcher.
 - The 25-record report contains 11 chains produced with the installed
@@ -53,6 +53,11 @@ plugin version `0.2.6`:
 - Six forward plate hits create children with `continuationKind = DeviationHit`. The fragment and
   deviated children preserve their corrected continuation damage and penetration, re-contact the
   back face of the source plate, and then terminate at the backstop at parent depth `2`.
+- The latest three-record chain uses the installed `patron_545x39_BS` template and records a
+  forward penetration/deviation through the final durability of a one-layer class-4 NewSphereTech
+  plate, the deviated child re-contacting that plate's back face, and the same child terminating at
+  the backstop. Its ammunition identity, collision-point speed, locked falloff values, and complete
+  parent/root lineage pass the same validators.
 - Every record passes the automatic finite/non-negative, velocity-fraction, locked damage and
   penetration curve, durability, trajectory-endpoint, and lineage checks.
 
@@ -64,8 +69,8 @@ a later armor layer.
 
 - Release solution build: 0 warnings, 0 errors.
 - Pure and installed-database validation: 45 checks passed.
-- Current-report validation: 52 checks passed across both current-build exports through
-  `BallisticsLab-20260812-002449`.
+- Current-report validation: 52 checks passed across all three current-build exports through
+  `BallisticsLab-20260812-012345`.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Layer limit: one through six.
 - Six-layer geometry preserves the configured face-to-face air gap.
