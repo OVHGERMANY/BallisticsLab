@@ -53,6 +53,17 @@ one new chain: their chain IDs were disjoint and their sequence ranges advanced 
 `11-15`, `16-22`, `23`, and `24-34`, proving that later batches did not recopy earlier unrelated
 chains. The evidence includes both real fragmentation and deviation continuation plus a backstop hit.
 
+The same live session subsequently produced 59 automatic pairs through
+`BallisticsLab-20260812-232311-445-059-auto`, containing 2,873 unique invariant-valid records across
+1,793 chains. Every CSV/JSON pair has equal rows and equal shared fields. A Windows PowerShell 5.1
+verification false positive on Cyrillic bot names was isolated to implicit ANSI decoding in the
+external watcher; explicit UTF-8 reads now validate the original files without changing them. This
+extended evidence completes the current-build report gates for one-layer class-6 armored steel, bot
+body-health telemetry, equipped-armor durability telemetry, covered post-death armor durability at
+zero body health, Granit BR4, fragment continuation, deviation continuation, and backstop termination.
+It does not yet complete the two-through-six-layer fixture chains, spaced armor, two-layer class-3
+steel, three-layer class-4 or class-6 steel, or Granit BR5.
+
 ## Previous-candidate evidence recorded
 
 `BallisticsLab-20260811-233928` is the final `0.2.4` export:
