@@ -6,8 +6,10 @@ Snapshot date: 2026-08-11
 
 - Plugin version: `0.2.6`
 - Report schema: `3`
+- Runtime build source commit: `7224221`
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
+- Deployed DLL SHA-256: `1899DE605E93A06A9E8E0E99F922AE7369F5DAC661FB970D1AF373CB3A2E77BC`
 - Default configuration: disabled
 
 The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.6`.
@@ -43,7 +45,7 @@ the ammunition's fragmentation chance.
 - Six-layer backstop preserves one meter of face clearance after the final plate.
 - Ammunition identity, internal name, and base speed are sourced from the same live template.
 - The newest acceptance report is rejected unless its schema and plugin version match the current build.
-- The final `0.2.6` local/deployed artifact-parity check is pending deployment.
+- Local and deployed `0.2.6` assemblies are byte-identical.
 - Disabled startup: the plugin reports disabled and installs zero of its four patches.
 - Enabled startup: all four intended patches install exactly once.
 - Exact SPT version and game-assembly compatibility checks remain active.
