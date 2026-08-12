@@ -16,8 +16,8 @@ The current candidate is not tagged as an accepted baseline. Tagging requires cu
 
 Accepted development evidence from `0.2.7` retains schema `3` and covers automatic nonempty report capture plus a
 larger task-oriented panel. Quick fixture actions build, place, and close the panel in one click;
-advanced geometry and catalog controls remain behind one disclosure. Its Release build passes 52 pure/database
-checks with zero compiler warnings or errors. The deployed and local Release DLLs are byte-identical
+advanced geometry and catalog controls remain behind one disclosure. Its Release build passed 49 pure/database
+checks with zero compiler warnings or errors. The deployed and local `0.2.7` Release DLLs are byte-identical
 at SHA-256 `C1EC7610C1BAB46936E445F74B5C894B2C711455DAF680CFF033766D1259BB6D`;
 one responsive Tarkov process loaded `0.2.7`, enabled the four intended Lab patches, and reported no
 Lab startup error.
@@ -37,7 +37,8 @@ do not complete either chain. Sustained all-session recording also exposed a `0.
 efficiency defect: it repeatedly serialized the complete accumulated session, producing many large
 cumulative files. Version `0.2.8` fixes this by exporting only changed chains plus their required
 parent records. Manual saves remain complete session snapshots. This keeps each automatic pair
-independently valid without repeatedly copying unrelated evidence.
+independently valid without repeatedly copying unrelated evidence. The current `0.2.8` Release build
+passes 52 pure/database checks with zero compiler warnings or errors.
 
 ## Previous-candidate evidence recorded
 
