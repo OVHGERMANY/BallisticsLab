@@ -43,7 +43,15 @@ to that Release artifact at the SHA-256 above. A disabled-mode guarded relaunch 
 `Janky-BallisticsLab 0.2.8`, reported that no game methods were patched, and logged no startup error.
 The setting was then restored to enabled and a second guarded relaunch produced exactly one Tarkov
 process, PID `7244`; BepInEx loaded `0.2.8`, enabled its intended Lab patches, and logged no startup
-error. Runtime acceptance of the changed-chain report batches is still pending.
+error.
+
+Runtime acceptance of changed-chain automatic saving passed with the first six `0.2.8` automatic
+report pairs, `BallisticsLab-20260812-231152-284-001-auto` through
+`BallisticsLab-20260812-231350-960-006-auto`. Every CSV/JSON pair matched field for field and all
+34 records passed the current schema/version and telemetry invariants. Each pair contained exactly
+one new chain: their chain IDs were disjoint and their sequence ranges advanced from `1-5`, `6-10`,
+`11-15`, `16-22`, `23`, and `24-34`, proving that later batches did not recopy earlier unrelated
+chains. The evidence includes both real fragmentation and deviation continuation plus a backstop hit.
 
 ## Previous-candidate evidence recorded
 
