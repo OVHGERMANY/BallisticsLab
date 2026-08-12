@@ -1,6 +1,6 @@
 # BallisticsLab implementation status
 
-Snapshot date: 2026-08-11
+Snapshot date: 2026-08-12
 
 ## Current baseline candidate
 
@@ -39,9 +39,11 @@ cumulative files. Version `0.2.8` fixes this by exporting only changed chains pl
 parent records. Manual saves remain complete session snapshots. This keeps each automatic pair
 independently valid without repeatedly copying unrelated evidence. The current `0.2.8` Release build
 passes 52 pure/database checks with zero compiler warnings or errors. The deployed DLL is byte-identical
-to that Release artifact at the SHA-256 above. A guarded relaunch produced exactly one responsive Tarkov
-process, PID `30364`; BepInEx loaded `Janky-BallisticsLab 0.2.8`, enabled its four intended patches, and
-logged no Lab startup error. Runtime acceptance of the changed-chain report batches is still pending.
+to that Release artifact at the SHA-256 above. A disabled-mode guarded relaunch loaded
+`Janky-BallisticsLab 0.2.8`, reported that no game methods were patched, and logged no startup error.
+The setting was then restored to enabled and a second guarded relaunch produced exactly one Tarkov
+process, PID `7244`; BepInEx loaded `0.2.8`, enabled its intended Lab patches, and logged no startup
+error. Runtime acceptance of the changed-chain report batches is still pending.
 
 ## Previous-candidate evidence recorded
 
