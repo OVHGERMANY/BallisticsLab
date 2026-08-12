@@ -4,19 +4,17 @@ Snapshot date: 2026-08-11
 
 ## Current baseline candidate
 
-- Plugin version: `0.2.4`
+- Plugin version: `0.2.5`
 - Report schema: `3`
-- Runtime build source commit: `b199b2d`
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
-- Deployed DLL SHA-256: `4D363678F18A381689776D37830EFF662C17DC7976564E666995C483D4559B08`
 - Default configuration: disabled
 
-The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.4`.
+The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.5`.
 
-## Current-build evidence recorded
+## Previous-candidate evidence recorded
 
-`BallisticsLab-20260811-233928` is the first current-build export:
+`BallisticsLab-20260811-233928` is the final `0.2.4` export:
 
 - JSON schema `3`, plugin version `0.2.4`.
 - 19 records across 13 shot chains.
@@ -31,19 +29,21 @@ The current candidate is not tagged as an accepted baseline. Tagging requires cu
   ends at its reported hit point.
 
 The deviated children in this export revisit the single source plate and then reach the backstop.
-They do not strike a later armor layer, so later-layer fragment/deviation continuation remains open.
+They do not strike a later armor layer. The export also proved that the fixture collider had no
+fragmentation contribution, which made EFT fragmentation impossible on Lab plates regardless of
+the ammunition's fragmentation chance.
 
 ## Verified automated and startup gates
 
 - Release solution build: 0 warnings, 0 errors.
-- Pure and installed-database validation: 32 checks passed.
+- Pure and installed-database validation: 36 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Layer limit: one through six.
 - Six-layer geometry preserves the configured face-to-face air gap.
 - Six-layer backstop preserves one meter of face clearance after the final plate.
 - Ammunition identity, internal name, and base speed are sourced from the same live template.
 - The newest acceptance report is rejected unless its schema and plugin version match the current build.
-- Local and deployed plugin assemblies are byte-identical.
+- The final `0.2.5` local/deployed artifact-parity check is pending deployment.
 - Disabled startup: the plugin reports disabled and installs zero of its four patches.
 - Enabled startup: all four intended patches install exactly once.
 - Exact SPT version and game-assembly compatibility checks remain active.
@@ -63,7 +63,7 @@ Schema-2 reports from an earlier build demonstrate these runtime paths:
 - Backstop termination.
 - Matching CSV and JSON record counts.
 
-These reports remain useful regression evidence, but they do not identify their plugin version. Their ammunition-name field also predates the live-template identity correction, and their spacing value predates the exact face-gap correction. They therefore do not prove final acceptance of `0.2.4`.
+These reports remain useful regression evidence, but they do not identify their plugin version. Their ammunition-name field also predates the live-template identity correction, and their spacing value predates the exact face-gap correction. They therefore do not prove final acceptance of `0.2.5`.
 
 ## Current-build manual evidence still required
 
@@ -79,7 +79,7 @@ The schema-3 report can directly establish the remaining cases below:
 - Deviated-shot continuation into a later armor layer.
 - Fragment continuation into a later armor layer.
 
-The following require direct observation or combined report and code evidence. Version `0.2.4`
+The following require direct observation or combined report and code evidence. Version `0.2.5`
 does not export the struck body part, loot-screen state, armor-application call order, or death-event
 count, so the report alone cannot prove them:
 
@@ -97,6 +97,10 @@ count, so the report alone cannot prove them:
 - Layer spacing now means the physical air gap between plate faces.
 - Backstop placement is derived from the final plate face.
 - Reports carry exact schema and plugin-version provenance.
+- Lab plates now load EFT's installed `BodyArmor` fragmentation contribution. The supported build's
+  serialized value is `0.249`; a finite positive game value is preserved, while the exact installed
+  value is the fail-safe if settings are unavailable. Penetration and ricochet collider values stay
+  zero because those decisions remain owned by the fixture's armor component.
 
 ## Deliberately not started
 

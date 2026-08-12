@@ -4,7 +4,7 @@ namespace BallisticsLab.Core
     {
         public const string PluginGuid = "com.janky.ballisticslab";
         public const string PluginName = "Janky-BallisticsLab";
-        public const string PluginVersion = "0.2.4";
+        public const string PluginVersion = "0.2.5";
         public const int ReportSchema = 3;
     }
 }

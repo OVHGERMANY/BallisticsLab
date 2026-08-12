@@ -8,10 +8,20 @@ namespace BallisticsLab.Core
     {
         public const int MaximumLayers = 6;
         public const int MaximumRecords = 500;
+        public const float InstalledBodyArmorFragmentationChance = 0.249f;
 
         public static bool IsFiniteNonNegative(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value) && value >= 0f;
+        }
+
+        public static float ResolveBodyArmorFragmentationChance(float presetValue)
+        {
+            return IsFiniteNonNegative(presetValue)
+                && presetValue > 0f
+                && presetValue <= 1f
+                    ? presetValue
+                    : InstalledBodyArmorFragmentationChance;
         }
 
         public static string AuthoritativeAmmoValue(string templateValue, string itemValue)

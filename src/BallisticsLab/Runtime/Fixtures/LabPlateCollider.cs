@@ -1,6 +1,7 @@
 using EFT;
 using EFT.Ballistics;
 using UnityEngine;
+using BallisticsLab.Core;
 
 namespace BallisticsLab.Runtime.Fixtures
 {
@@ -15,10 +16,31 @@ namespace BallisticsLab.Runtime.Fixtures
             PenetrationLevel = 0f;
             PenetrationChance = 0f;
             RicochetChance = 0f;
-            FragmentationChance = 0f;
+            FragmentationChance = LabPolicies.ResolveBodyArmorFragmentationChance(
+                ReadBodyArmorFragmentationChance());
             TrajectoryDeviationChance = 0f;
             TrajectoryDeviation = 0f;
             Associate(TypeOfMaterial);
+        }
+
+        private static float ReadBodyArmorFragmentationChance()
+        {
+            BallisticPreset[] presets = EFTHardSettings.Instance?.ColliderPresets;
+            if (presets != null)
+            {
+                foreach (BallisticPreset preset in presets)
+                {
+                    if (preset != null
+                        && preset.MaterialType == MaterialType.BodyArmor
+                        && preset.values != null
+                        && preset.values.Length > 3)
+                    {
+                        return preset[3];
+                    }
+                }
+            }
+
+            return float.NaN;
         }
 
         public override bool Deflects(
