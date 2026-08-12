@@ -30,7 +30,7 @@ namespace BallisticsLab.Runtime
         private static bool _enteredShootingRange;
         private static PlateCatalog _catalog;
         private static FixtureRig _rig;
-        private static Rect _window = new Rect(40f, 60f, 720f, 820f);
+        private static Rect _window = new Rect(40f, 60f, 840f, 900f);
         private static Vector2 _scroll;
         private static int _layerCount = 1;
         private static int _selectedLayer;
@@ -47,6 +47,12 @@ namespace BallisticsLab.Runtime
         private static Material _traceMaterial;
         private static ShotRecord _latestRecord;
         private static float _traceUntil;
+        private static bool _showAdvancedFixtureControls;
+        private static bool _showShotDetails;
+        private static GUIStyle _titleStyle;
+        private static GUIStyle _sectionStyle;
+        private static GUIStyle _statusStyle;
+        private static GUIStyle _buttonStyle;
 
         internal static bool IsSessionActive => _sessionActive;
 
@@ -122,6 +128,7 @@ namespace BallisticsLab.Runtime
                 BotController.Update();
                 RefreshHideoutShootingModeStatus();
                 UpdateTrace();
+                SaveAutomaticReport(false);
             }
         }
 
@@ -191,37 +198,74 @@ namespace BallisticsLab.Runtime
 
         private static void DrawWindow(int windowId)
         {
-            GUILayout.BeginVertical();
-            GUILayout.Label("Master is enabled. Fixtures and bot controls remain inert until a session is started.");
+            if (_titleStyle == null)
+            {
+                _titleStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 20,
+                    wordWrap = true
+                };
+                _sectionStyle = new GUIStyle(GUI.skin.label)
+                {
+                    fontSize = 16
+                };
+                _statusStyle = new GUIStyle(GUI.skin.box)
+                {
+                    fontSize = 14,
+                    wordWrap = true,
+                    padding = new RectOffset(12, 12, 10, 10)
+                };
+                _buttonStyle = new GUIStyle(GUI.skin.button)
+                {
+                    fontSize = 15,
+                    wordWrap = true,
+                    padding = new RectOffset(10, 10, 8, 8)
+                };
+            }
+
+            GUILayout.BeginVertical(GUILayout.ExpandHeight(true));
+            GUILayout.Label("BALLISTICS LAB", _titleStyle);
             GUILayout.Label("World: " + DescribeWorld());
 
             if (!_sessionActive)
             {
-                if (GUILayout.Button("Start Lab Session", GUILayout.Height(34f)))
+                GUILayout.Space(10f);
+                if (GUILayout.Button("START LAB SESSION", _buttonStyle, GUILayout.Height(52f)))
                 {
                     StartSession();
                 }
-                GUILayout.Label(_status);
+                GUILayout.Space(8f);
+                GUILayout.Box(_status, _statusStyle, GUILayout.ExpandWidth(true));
                 GUILayout.EndVertical();
                 GUI.DragWindow(new Rect(0f, 0f, 10000f, 28f));
                 return;
             }
 
             _scroll = GUILayout.BeginScrollView(_scroll);
-            GUILayout.Label("SESSION ACTIVE | " + TelemetryStore.Count + " recorded shots");
-            GUILayout.Label(_status);
+            GUILayout.Label("SESSION ACTIVE | " + TelemetryStore.Count + " recorded shots", _sectionStyle);
+            GUILayout.Box(_status, _statusStyle, GUILayout.ExpandWidth(true));
             if (_world is HideoutGameWorld)
             {
                 GUILayout.Label("Hideout shooting mode: " + _shootingModeStatus);
             }
 
-            DrawFixtureControls();
-            DrawBotControls();
-            DrawLatestShot();
-            DrawRecentShots();
+            if (GUILayout.Button("CLOSE PANEL / RETURN TO SHOOTING", _buttonStyle, GUILayout.Height(48f)))
+            {
+                SetPanelVisible(false);
+            }
 
+            DrawFixtureControls(_sectionStyle, _buttonStyle);
+            DrawBotControls(_sectionStyle, _buttonStyle);
+            DrawLatestShot();
+
+            GUILayout.Space(10f);
+            GUILayout.Label("REPORTS", _sectionStyle);
+            GUILayout.Label(
+                Plugin.Configuration.AutomaticReportSaving.Value
+                    ? "Automatic saving is ON. A timestamped CSV/JSON checkpoint is saved after each shot burst and when the session ends."
+                    : "Automatic saving is OFF. Use the manual export button before ending the session.");
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Export CSV + JSON"))
+            if (GUILayout.Button("SAVE REPORT NOW", _buttonStyle, GUILayout.Height(42f)))
             {
                 try
                 {
@@ -232,8 +276,9 @@ namespace BallisticsLab.Runtime
                     _status = "Export failed: " + exception.Message;
                 }
             }
-            if (GUILayout.Button("Clear Records"))
+            if (GUILayout.Button("CLEAR RECORDS", _buttonStyle, GUILayout.Height(42f)))
             {
+                SaveAutomaticReport(true);
                 TelemetryStore.Clear();
                 _latestRecord = null;
                 HideTrace();
@@ -241,7 +286,7 @@ namespace BallisticsLab.Runtime
             }
             GUILayout.EndHorizontal();
 
-            if (GUILayout.Button("End Lab Session", GUILayout.Height(32f)))
+            if (GUILayout.Button("END SESSION", _buttonStyle, GUILayout.Height(48f)))
             {
                 EndSession("Session ended by user.");
             }
@@ -250,10 +295,102 @@ namespace BallisticsLab.Runtime
             GUI.DragWindow(new Rect(0f, 0f, 10000f, 28f));
         }
 
-        private static void DrawFixtureControls()
+        private static void DrawFixtureControls(GUIStyle sectionStyle, GUIStyle buttonStyle)
         {
+            GUILayout.Space(12f);
+            GUILayout.Label("QUICK FIXTURES - ONE CLICK BUILDS, PLACES, AND CLOSES", sectionStyle);
+            GUILayout.Label("Pick a fixture and shoot its center. Open the panel again only when you want the next fixture.");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("1 LAYER\nSTEEL C6", buttonStyle, GUILayout.Height(58f)))
+            {
+                ApplyPresetAndPlace(_catalog.FindSteel(6), 1, "one-layer class-6 steel");
+            }
+            if (GUILayout.Button("2 LAYERS\nSTEEL C3", buttonStyle, GUILayout.Height(58f)))
+            {
+                ApplyPresetAndPlace(_catalog.FindSteel(3), 2, "two-layer class-3 steel");
+            }
+            if (GUILayout.Button("3 LAYERS\nSTEEL C4", buttonStyle, GUILayout.Height(58f)))
+            {
+                ApplyPresetAndPlace(_catalog.FindSteel(4), 3, "three-layer class-4 steel");
+            }
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("3 LAYERS\nSTEEL C6", buttonStyle, GUILayout.Height(58f)))
+            {
+                ApplyPresetAndPlace(_catalog.FindSteel(6), 3, "three-layer class-6 steel");
+            }
+            if (GUILayout.Button("GRANIT BR4\nGAME PRESET", buttonStyle, GUILayout.Height(58f)))
+            {
+                ApplyPresetAndPlace(
+                    _catalog.FindByTemplateId(PlateCatalog.GranitBr4TemplateId),
+                    1,
+                    "Granit BR4 game preset");
+            }
+            if (GUILayout.Button("GRANIT BR5\nGAME PRESET", buttonStyle, GUILayout.Height(58f)))
+            {
+                ApplyPresetAndPlace(
+                    _catalog.FindByTemplateId(PlateCatalog.GranitBr5TemplateId),
+                    1,
+                    "Granit BR5 game preset");
+            }
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("SAME PLATE, CHOOSE LAYERS:", GUILayout.Width(220f));
+            for (int layers = 1; layers <= LabPolicies.MaximumLayers; layers++)
+            {
+                int requestedLayers = layers;
+                if (GUILayout.Button(
+                        requestedLayers.ToString(),
+                        buttonStyle,
+                        GUILayout.Height(44f),
+                        GUILayout.MinWidth(54f)))
+                {
+                    ApplyPresetAndPlace(
+                        ClampPresetIndex(PresetIndices[_selectedLayer]),
+                        requestedLayers,
+                        requestedLayers + "-layer custom fixture");
+                }
+            }
+            GUILayout.EndHorizontal();
+
+            if (_rig != null)
+            {
+                string durability = string.Join(
+                    " | ",
+                    _rig.Plates.Select(
+                        plate => "L" + (plate.LayerIndex + 1) + " "
+                            + plate.Durability.ToString("F1") + "/" + plate.MaximumDurability.ToString("F1")));
+                GUILayout.Box(
+                    "ACTIVE FIXTURE #" + _rig.FixtureId + " | " + _rig.Plates.Count + " layer(s)\n"
+                    + durability,
+                    GUILayout.ExpandWidth(true));
+            }
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("REBUILD CURRENT", buttonStyle, GUILayout.Height(44f)))
+            {
+                PlaceFixture();
+            }
+            if (GUILayout.Button("RESET DURABILITY", buttonStyle, GUILayout.Height(44f)))
+            {
+                ResetFixtureDurability(false);
+            }
+            GUILayout.EndHorizontal();
+
+            _showAdvancedFixtureControls = GUILayout.Toggle(
+                _showAdvancedFixtureControls,
+                "SHOW ADVANCED FIXTURE CONTROLS",
+                buttonStyle,
+                GUILayout.Height(42f));
+            if (!_showAdvancedFixtureControls)
+            {
+                return;
+            }
+
             GUILayout.Space(8f);
-            GUILayout.Label("FIXTURE");
+            GUILayout.Label("ADVANCED FIXTURE CONTROLS", sectionStyle);
             GUILayout.BeginHorizontal();
             GUILayout.Label("Layers: " + _layerCount, GUILayout.Width(120f));
             if (GUILayout.Button("-", GUILayout.Width(40f)))
@@ -290,36 +427,6 @@ namespace BallisticsLab.Runtime
             if (GUILayout.Button("matching preset >"))
             {
                 PresetIndices[_selectedLayer] = CycleMatch(matches, currentIndex, 1);
-            }
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Granit BR4 (game GOST preset)"))
-            {
-                SetAllPresets(_catalog.FindByTemplateId(PlateCatalog.GranitBr4TemplateId), 1);
-            }
-            if (GUILayout.Button("Granit BR5 (game GOST preset)"))
-            {
-                SetAllPresets(_catalog.FindByTemplateId(PlateCatalog.GranitBr5TemplateId), 1);
-            }
-            if (GUILayout.Button("1-layer steel C6"))
-            {
-                SetAllPresets(_catalog.FindSteel(6), 1);
-            }
-            GUILayout.EndHorizontal();
-
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("2-layer steel C3"))
-            {
-                SetAllPresets(_catalog.FindSteel(3), 2);
-            }
-            if (GUILayout.Button("3-layer steel C4"))
-            {
-                SetAllPresets(_catalog.FindSteel(4), 3);
-            }
-            if (GUILayout.Button("3-layer steel C6"))
-            {
-                SetAllPresets(_catalog.FindSteel(6), 3);
             }
             GUILayout.EndHorizontal();
 
@@ -388,8 +495,7 @@ namespace BallisticsLab.Runtime
                 }
                 else
                 {
-                    _rig.ResetDurability();
-                    _status = "Fixture durability restored to maximum.";
+                    ResetFixtureDurability(false);
                 }
             }
             if (GUILayout.Button("Reset Durability + Clear Records", GUILayout.Height(32f)))
@@ -400,45 +506,32 @@ namespace BallisticsLab.Runtime
                 }
                 else
                 {
-                    _rig.ResetDurability();
-                    TelemetryStore.Clear();
-                    _latestRecord = null;
-                    HideTrace();
-                    _status = "Fixture durability restored and shot records cleared.";
+                    ResetFixtureDurability(true);
                 }
             }
             GUILayout.EndHorizontal();
 
-            if (_rig != null)
-            {
-                string durability = string.Join(
-                    " | ",
-                    _rig.Plates.Select(
-                        plate => "L" + (plate.LayerIndex + 1) + " "
-                            + plate.Durability.ToString("F1") + "/" + plate.MaximumDurability.ToString("F1")));
-                GUILayout.Label("Fixture #" + _rig.FixtureId + " live durability: " + durability);
-            }
         }
 
-        private static void DrawBotControls()
+        private static void DrawBotControls(GUIStyle sectionStyle, GUIStyle buttonStyle)
         {
-            GUILayout.Space(8f);
-            GUILayout.Label("BOT TARGET");
-            GUILayout.Label(BotController.Describe());
+            GUILayout.Space(12f);
+            GUILayout.Label("BOT TARGET", sectionStyle);
+            GUILayout.Box(BotController.Describe(), GUILayout.ExpandWidth(true));
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Select Bot Under Crosshair"))
+            if (GUILayout.Button("SELECT BOT\nUNDER CROSSHAIR", buttonStyle, GUILayout.Height(52f)))
             {
                 _status = BotController.SelectUnderCrosshair(_world);
             }
-            if (GUILayout.Button("Hold Movement + Fire"))
+            if (GUILayout.Button("HOLD BOT\nMOVEMENT + FIRE", buttonStyle, GUILayout.Height(52f)))
             {
                 _status = BotController.Freeze();
             }
-            if (GUILayout.Button("Release Hold"))
+            if (GUILayout.Button("RELEASE\nBOT HOLD", buttonStyle, GUILayout.Height(52f)))
             {
                 _status = BotController.ReleaseHold();
             }
-            if (GUILayout.Button("Clear Selection"))
+            if (GUILayout.Button("CLEAR BOT\nSELECTION", buttonStyle, GUILayout.Height(52f)))
             {
                 _status = BotController.ClearSelection();
             }
@@ -448,8 +541,8 @@ namespace BallisticsLab.Runtime
 
         private static void DrawLatestShot()
         {
-            GUILayout.Space(8f);
-            GUILayout.Label("LATEST SHOT");
+            GUILayout.Space(12f);
+            GUILayout.Label("LATEST SHOT", _sectionStyle);
             ShotRecord record = _latestRecord ?? TelemetryStore.Latest;
             if (record == null)
             {
@@ -457,7 +550,26 @@ namespace BallisticsLab.Runtime
                 return;
             }
 
-            GUILayout.Label("#" + record.Sequence + " " + record.Outcome + " | " + record.Target + " | " + record.Material);
+            string targetLayer = record.LayerIndex >= 0
+                ? "L" + (record.LayerIndex + 1) + "/" + record.FixtureLayerCount
+                : record.TargetKind;
+            GUILayout.Box(
+                "#" + record.Sequence + "  " + record.Outcome + "\n"
+                + targetLayer + " | " + record.ImpactSpeed.ToString("F0") + " m/s"
+                + " | penetration " + record.DecisionPenetration.ToString("F1"),
+                _statusStyle,
+                GUILayout.ExpandWidth(true));
+            _showShotDetails = GUILayout.Toggle(
+                _showShotDetails,
+                "SHOW TECHNICAL SHOT DETAILS",
+                _buttonStyle,
+                GUILayout.Height(40f));
+            if (!_showShotDetails)
+            {
+                return;
+            }
+
+            GUILayout.Label(record.Target + " | " + record.Material);
             GUILayout.Label(
                 "Chain " + record.ChainId + " | fire " + record.FireIndex
                 + " | fragment " + record.FragmentIndex + " | depth " + record.ParentDepth
@@ -590,6 +702,7 @@ namespace BallisticsLab.Runtime
 
         private static void EndSession(string status)
         {
+            SaveAutomaticReport(true);
             BotController.ClearSelection();
             _rig?.Dispose();
             _rig = null;
@@ -598,6 +711,28 @@ namespace BallisticsLab.Runtime
             _sessionActive = false;
             _latestRecord = null;
             _status = status;
+        }
+
+        private static void SaveAutomaticReport(bool force)
+        {
+            if (Plugin.Configuration?.AutomaticReportSaving.Value != true)
+            {
+                return;
+            }
+
+            try
+            {
+                string result = TelemetryStore.ExportAutomatic(force);
+                if (!string.IsNullOrEmpty(result) && !force)
+                {
+                    _status = "Automatic report saved. Keep shooting or choose the next fixture.";
+                }
+            }
+            catch (Exception exception)
+            {
+                _status = "Automatic report failed: " + exception.Message;
+                Plugin.Log?.LogWarning(_status);
+            }
         }
 
         private static void EnterHideoutShootingRangeIfNeeded()
@@ -802,6 +937,44 @@ namespace BallisticsLab.Runtime
             {
                 PresetIndices[index] = presetIndex;
             }
+        }
+
+        private static void ApplyPresetAndPlace(int presetIndex, int layers, string label)
+        {
+            if (presetIndex < 0)
+            {
+                _status = "Requested preset was not present in this database.";
+                return;
+            }
+
+            SetAllPresets(presetIndex, layers);
+            if (PlaceFixture())
+            {
+                _status = "READY: " + label + " placed. Shoot the center; reports save automatically.";
+                SetPanelVisible(false);
+            }
+        }
+
+        private static void ResetFixtureDurability(bool clearRecords)
+        {
+            if (_rig == null)
+            {
+                _status = "No fixture exists.";
+                return;
+            }
+
+            _rig.ResetDurability();
+            if (!clearRecords)
+            {
+                _status = "Fixture durability restored to maximum.";
+                return;
+            }
+
+            SaveAutomaticReport(true);
+            TelemetryStore.Clear();
+            _latestRecord = null;
+            HideTrace();
+            _status = "Fixture durability restored and shot records cleared.";
         }
 
         private static void SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial material)

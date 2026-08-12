@@ -20,7 +20,7 @@ Dictionary<string, AmmoRow> ammunition = new(StringComparer.Ordinal);
 Check(
     LabBuild.PluginGuid == "com.janky.ballisticslab"
     && LabBuild.PluginName == "Janky-BallisticsLab"
-    && LabBuild.PluginVersion == "0.2.6"
+    && LabBuild.PluginVersion == "0.2.7"
     && LabBuild.ReportSchema == 3,
     "report provenance constants match the current plugin build");
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
@@ -45,6 +45,17 @@ Check(ReportInvariantValidator.RejectsChangedRootIdentity(), "report invariants 
 Check(CurrentReportSetValidator.RejectsCorruptEarlierCurrentReport(), "current-report gate rejects corruption in an earlier contributing export");
 Check(CurrentReportSetValidator.IgnoresCorruptHistoricalReport(), "current-report gate excludes historical versions from current acceptance");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
+Check(
+    !LabPolicies.ShouldSaveReport(0, 1, 0)
+    && !LabPolicies.ShouldSaveReport(1, 1, 1)
+    && LabPolicies.ShouldSaveReport(1, 2, 1),
+    "automatic reports save only nonempty changed captures");
+Check(
+    LabPolicies.ReportStem(new DateTime(2026, 8, 12, 1, 2, 3, 456, DateTimeKind.Utc), 7)
+        == "BallisticsLab-20260812-010203-456-007",
+    "automatic report stem is stable and capture-specific");
+Check(ReportPairWriterCreatesOnlyACompletePair(), "report writer commits one complete UTF-8 pair");
+Check(ReportPairWriterRejectsExistingStem(), "report writer never overwrites an existing checkpoint");
 float[] installedBodyArmorPreset = { 0f, 0.097f, 0.378f, 0.249f, 0.28f, 0.463f };
 LabColliderBallisticSettings liveBodyArmorSettings =
     LabPolicies.ResolveBodyArmorBallisticSettings(installedBodyArmorPreset);
@@ -411,6 +422,53 @@ bool Nearly(float actual, float expected)
 bool NearlyWithin(float actual, float expected, float tolerance)
 {
     return Math.Abs(actual - expected) <= tolerance;
+}
+
+bool ReportPairWriterCreatesOnlyACompletePair()
+{
+    string directory = Path.Combine(Path.GetTempPath(), "BallisticsLab.Pair." + Guid.NewGuid().ToString("N"));
+    try
+    {
+        ReportPairPaths paths = ReportPairWriter.Write(directory, "capture", "a,b\n1,2\n", "{\"records\":[]}");
+        string[] files = Directory.GetFiles(directory).Select(Path.GetFileName).OrderBy(name => name).ToArray();
+        return files.SequenceEqual(new[] { "capture.csv", "capture.json" }, StringComparer.Ordinal)
+            && File.ReadAllText(paths.CsvPath) == "a,b\n1,2\n"
+            && File.ReadAllText(paths.JsonPath) == "{\"records\":[]}"
+            && !File.ReadAllBytes(paths.CsvPath).Take(3).SequenceEqual(new byte[] { 0xEF, 0xBB, 0xBF });
+    }
+    finally
+    {
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+}
+
+bool ReportPairWriterRejectsExistingStem()
+{
+    string directory = Path.Combine(Path.GetTempPath(), "BallisticsLab.Collision." + Guid.NewGuid().ToString("N"));
+    try
+    {
+        ReportPairWriter.Write(directory, "capture", "first", "first");
+        try
+        {
+            ReportPairWriter.Write(directory, "capture", "second", "second");
+            return false;
+        }
+        catch (IOException)
+        {
+            return File.ReadAllText(Path.Combine(directory, "capture.csv")) == "first"
+                && File.ReadAllText(Path.Combine(directory, "capture.json")) == "first";
+        }
+    }
+    finally
+    {
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, true);
+        }
+    }
 }
 
 internal sealed record PlateRow(string Id, string Name, int ArmorClass, string Material, int Durability);

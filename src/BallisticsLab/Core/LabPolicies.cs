@@ -42,6 +42,19 @@ namespace BallisticsLab.Core
         public const float InstalledBodyArmorTrajectoryDeviationChance = 0.28f;
         public const float InstalledBodyArmorTrajectoryDeviation = 0.463f;
 
+        public static bool ShouldSaveReport(int recordCount, long revision, long savedRevision)
+        {
+            return recordCount > 0 && revision > savedRevision;
+        }
+
+        public static string ReportStem(DateTime utc, int captureOrdinal)
+        {
+            return "BallisticsLab-"
+                + utc.ToUniversalTime().ToString("yyyyMMdd-HHmmss-fff", CultureInfo.InvariantCulture)
+                + "-"
+                + Math.Max(1, captureOrdinal).ToString("D3", CultureInfo.InvariantCulture);
+        }
+
         public static bool IsFiniteNonNegative(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value) && value >= 0f;

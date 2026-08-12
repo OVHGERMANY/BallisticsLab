@@ -57,6 +57,11 @@ namespace BallisticsLab.Runtime
                 "Record All Session Shots",
                 true,
                 "Records shots outside a fixture while the lab session is active, including selected bot hits.");
+            AutomaticReportSaving = config.Bind(
+                "Telemetry",
+                "Automatic Report Saving",
+                true,
+                "Saves a new nonempty CSV/JSON checkpoint after a completed shot burst and when the session or world ends.");
         }
 
         internal ConfigEntry<bool> Enabled { get; }
@@ -69,5 +74,6 @@ namespace BallisticsLab.Runtime
         internal ConfigEntry<bool> TraceEnabled { get; }
         internal ConfigEntry<float> TraceLifetime { get; }
         internal ConfigEntry<bool> RecordAllSessionShots { get; }
+        internal ConfigEntry<bool> AutomaticReportSaving { get; }
     }
 }

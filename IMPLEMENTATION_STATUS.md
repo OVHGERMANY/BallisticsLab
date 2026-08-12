@@ -14,6 +14,13 @@ Snapshot date: 2026-08-11
 
 The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.6`.
 
+Development build `0.2.7` retains schema `3` and adds automatic nonempty report capture plus a
+larger task-oriented panel. Quick fixture actions build, place, and close the panel in one click;
+advanced geometry and catalog controls remain behind one disclosure. The manual `0.2.6` reports
+below remain authoritative until `0.2.7` is deployed and exercised. Its Release build currently
+passes 49 pure/database checks with zero compiler warnings or errors; artifact acceptance remains
+pending deployment and restart.
+
 ## Previous-candidate evidence recorded
 
 `BallisticsLab-20260811-233928` is the final `0.2.4` export:

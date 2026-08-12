@@ -14,6 +14,12 @@ namespace BallisticsLab.Runtime.Telemetry
         private static readonly object Sync = new object();
         private static readonly List<ShotRecord> Records = new List<ShotRecord>();
         private static long _sequence;
+        private static long _revision;
+        private static long _savedRevision;
+        private static DateTime _lastRecordUtc;
+        private static DateTime _nextAutomaticAttemptUtc;
+        private static int _captureOrdinal;
+        private static int _manualExportOrdinal;
 
         internal static ShotRecord Latest
         {
@@ -52,6 +58,8 @@ namespace BallisticsLab.Runtime.Telemetry
                 {
                     Records.RemoveAt(0);
                 }
+                _revision++;
+                _lastRecordUtc = DateTime.UtcNow;
             }
 
             LabRuntime.NotifyRecord(record);
@@ -84,21 +92,82 @@ namespace BallisticsLab.Runtime.Telemetry
             {
                 Records.Clear();
                 Interlocked.Exchange(ref _sequence, 0L);
+                _revision = 0L;
+                _savedRevision = 0L;
+                _lastRecordUtc = DateTime.MinValue;
+                _nextAutomaticAttemptUtc = DateTime.MinValue;
             }
         }
 
         internal static string Export()
         {
-            IReadOnlyList<ShotRecord> records = Snapshot();
+            IReadOnlyList<ShotRecord> records;
+            long revision;
+            lock (Sync)
+            {
+                if (Records.Count == 0)
+                {
+                    throw new InvalidOperationException("No shot records are available to export.");
+                }
+                records = Records.ToArray();
+                revision = _revision;
+            }
+            int ordinal = Interlocked.Increment(ref _manualExportOrdinal);
+            string stem = LabPolicies.ReportStem(DateTime.UtcNow, ordinal);
+            string result = WriteReportPair(records, stem);
+            lock (Sync)
+            {
+                if (revision > _savedRevision)
+                {
+                    _savedRevision = revision;
+                }
+            }
+            return result;
+        }
+
+        internal static string ExportAutomatic(bool force)
+        {
+            IReadOnlyList<ShotRecord> records;
+            string stem;
+            long revision;
+            DateTime now = DateTime.UtcNow;
+            lock (Sync)
+            {
+                if (!LabPolicies.ShouldSaveReport(Records.Count, _revision, _savedRevision)
+                    || (!force && now < _lastRecordUtc.AddSeconds(1.25))
+                    || (!force && now < _nextAutomaticAttemptUtc))
+                {
+                    return null;
+                }
+
+                records = Records.ToArray();
+                revision = _revision;
+                _captureOrdinal++;
+                stem = LabPolicies.ReportStem(now, _captureOrdinal) + "-auto";
+                _nextAutomaticAttemptUtc = now.AddSeconds(5.0);
+            }
+
+            string result = WriteReportPair(records, stem);
+            lock (Sync)
+            {
+                if (revision > _savedRevision)
+                {
+                    _savedRevision = revision;
+                }
+            }
+            return result;
+        }
+
+        private static string WriteReportPair(IReadOnlyList<ShotRecord> records, string stem)
+        {
             string pluginDirectory = Path.GetDirectoryName(typeof(Plugin).Assembly.Location);
             string reports = Path.Combine(pluginDirectory ?? string.Empty, "Reports");
             Directory.CreateDirectory(reports);
-            string stem = "BallisticsLab-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
-            string csvPath = Path.Combine(reports, stem + ".csv");
-            string jsonPath = Path.Combine(reports, stem + ".json");
-            File.WriteAllText(csvPath, BuildCsv(records), new UTF8Encoding(false));
-            File.WriteAllText(jsonPath, BuildJson(records), new UTF8Encoding(false));
-            return csvPath + " | " + jsonPath;
+            return ReportPairWriter.Write(
+                reports,
+                stem,
+                BuildCsv(records),
+                BuildJson(records)).ToString();
         }
 
         private static string BuildCsv(IReadOnlyList<ShotRecord> records)
