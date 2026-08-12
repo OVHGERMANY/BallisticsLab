@@ -20,6 +20,20 @@ dotnet msbuild .\src\BallisticsLab\BallisticsLab.csproj -t:Deploy -p:Configurati
 
 Reports are written under `BepInEx\plugins\BallisticsLab\Reports` automatically while a nonempty session changes, at teardown, or when the user requests an immediate save. Automatic pairs contain only changed chains plus the parent records required to validate those chains; manual saves remain full-session snapshots. JSON metadata and every CSV row identify the exact plugin version and report schema that produced the evidence. Ammunition identity and physical values are read from the same live `AmmoTemplate`; pooled item identity is used only when no template is available. Reports include fixture identity and geometry, template/material/class data, calculated resistance and penetration chance, incoming and decision values, child continuation factors, parent/root shot identity, target state, armor durability changes, and the complete recorded shot chain. Post-death armor changes remain visible in the latest-shot panel even when body health is already zero.
 
+## Armor testing and controlled acceptance
+
+For ordinary armor testing, use any weapon and ammunition. Build the plate or stack you want, fire at it, and read the resulting penetration, stop, deviation, fragmentation, durability, and chain telemetry. No prescribed cartridge or manual export is required.
+
+Controlled acceptance is separate. Only a shot fired through a known Lab fixture can satisfy a fixture-chain gate; unrelated raid and bot records cannot. When a reproducible gate is needed, use the exact fixture named in the checklist and ammunition capable of reaching its final layer. Automatic saving captures the result without interrupting the session.
+
+The validation console reports controlled coverage without treating missing manual evidence as a calculation failure:
+
+```powershell
+dotnet run --project .\tests\BallisticsLab.Validation\BallisticsLab.Validation.csproj -c Release --no-build -- E:\Games\SPT\SPT_Runtime\SPT_Data\database\templates\items.json E:\Games\SPT\BepInEx\plugins\BallisticsLab\Reports
+```
+
+Add `--require-report-coverage` only at the final report-evidence gate. It exits with code `1` while any controlled report item is still missing. Direct corpse observations listed below remain separate because reports cannot prove the loot screen, armor call order, or absence of repeated death events.
+
 ## Manual acceptance
 
 1. Set `Enabled = true` and restart the game. Confirm the BepInEx log reports four BallisticsLab patches.

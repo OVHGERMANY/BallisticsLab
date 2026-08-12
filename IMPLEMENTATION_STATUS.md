@@ -6,217 +6,106 @@ Snapshot date: 2026-08-12
 
 - Plugin version: `0.2.8`
 - Report schema: `3`
-- Runtime build source commit: `e3dc463`
+- Runtime code source commit: `e3dc463`
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
-- Deployed DLL SHA-256: `3C4BAAA940FB61CD557CC173B61A55FBAA9860A651DBEFA3A33A4DEC0171B5E6`
+- Playtested deployed DLL SHA-256: `3C4BAAA940FB61CD557CC173B61A55FBAA9860A651DBEFA3A33A4DEC0171B5E6`
 - Default configuration: disabled
 
-The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.8`.
+The runtime source has not changed since `e3dc463`; later commits record build, startup, and runtime evidence. The candidate is not tagged as an accepted baseline. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
 
-Accepted development evidence from `0.2.7` retains schema `3` and covers automatic nonempty report capture plus a
-larger task-oriented panel. Quick fixture actions build, place, and close the panel in one click;
-advanced geometry and catalog controls remain behind one disclosure. Its Release build passed 49 pure/database
-checks with zero compiler warnings or errors. The deployed and local `0.2.7` Release DLLs are byte-identical
-at SHA-256 `C1EC7610C1BAB46936E445F74B5C894B2C711455DAF680CFF033766D1259BB6D`;
-one responsive Tarkov process loaded `0.2.7`, enabled the four intended Lab patches, and reported no
-Lab startup error.
-
-Direct `0.2.7` acceptance confirmed that the revised quick buttons correctly created and placed all
-six named fixtures and returned control to shooting. Automatic saving produced matching nonempty
-schema-3 CSV/JSON pairs without a manual export. Thirteen automatic/manual checkpoints through
-`BallisticsLab-20260812-022036-750-012-auto` passed 56 validation checks. The evidence directly adds:
-
-- One-layer class-6 armored steel.
-- Two-layer class-3 armored steel with both layers struck.
-- Granit BR4 and Granit BR5 game-template presets.
-- A real `FragmentationHit` child from layer 1 subsequently striking layer 2.
-
-The three-layer class-4 and class-6 buttons were exercised, but those shots reached only layer 1 and
-do not complete either chain. Sustained all-session recording also exposed a `0.2.7` checkpoint
-efficiency defect: it repeatedly serialized the complete accumulated session, producing many large
-cumulative files. Version `0.2.8` fixes this by exporting only changed chains plus their required
-parent records. Manual saves remain complete session snapshots. This keeps each automatic pair
-independently valid without repeatedly copying unrelated evidence. The current `0.2.8` Release build
-passes 52 pure/database checks with zero compiler warnings or errors. The deployed DLL is byte-identical
-to that Release artifact at the SHA-256 above. A disabled-mode guarded relaunch loaded
-`Janky-BallisticsLab 0.2.8`, reported that no game methods were patched, and logged no startup error.
-The setting was then restored to enabled and a second guarded relaunch produced exactly one Tarkov
-process, PID `7244`; BepInEx loaded `0.2.8`, enabled its intended Lab patches, and logged no startup
-error.
-
-Runtime acceptance of changed-chain automatic saving passed with the first six `0.2.8` automatic
-report pairs, `BallisticsLab-20260812-231152-284-001-auto` through
-`BallisticsLab-20260812-231350-960-006-auto`. Every CSV/JSON pair matched field for field and all
-34 records passed the current schema/version and telemetry invariants. Each pair contained exactly
-one new chain: their chain IDs were disjoint and their sequence ranges advanced from `1-5`, `6-10`,
-`11-15`, `16-22`, `23`, and `24-34`, proving that later batches did not recopy earlier unrelated
-chains. The evidence includes both real fragmentation and deviation continuation plus a backstop hit.
-
-The same live session subsequently produced 59 automatic pairs through
-`BallisticsLab-20260812-232311-445-059-auto`, containing 2,873 unique invariant-valid records across
-1,793 chains. Every CSV/JSON pair has equal rows and equal shared fields. A Windows PowerShell 5.1
-verification false positive on Cyrillic bot names was isolated to implicit ANSI decoding in the
-external watcher; explicit UTF-8 reads now validate the original files without changing them. This
-extended evidence completes the current-build report gates for one-layer class-6 armored steel, bot
-body-health telemetry, equipped-armor durability telemetry, covered post-death armor durability at
-zero body health, Granit BR4, fragment continuation, deviation continuation, and backstop termination.
-It does not yet complete the two-through-six-layer fixture chains, spaced armor, two-layer class-3
-steel, three-layer class-4 or class-6 steel, or Granit BR5.
-
-## Previous-candidate evidence recorded
-
-`BallisticsLab-20260811-233928` is the final `0.2.4` export:
-
-- JSON schema `3`, plugin version `0.2.4`.
-- 19 records across 13 shot chains.
-- Matching 19-row CSV; every shared CSV and JSON field is equal.
-- 12 live 5.45x39 ammunition templates; every reported template ID, internal name, and base
-  speed matches the installed database.
-- One-layer class-6 steel impacts, durability loss, armor blocks, penetrations, and backstop stops.
-- Three deviated-child records with continuation factors and contiguous parent/root lineage.
-- Every ordinary collision reproduces the configured damage and penetration curves from its
-  reported incoming values and collision-point speed.
-- All reported values are finite and non-negative, durability never increases, and every trajectory
-  ends at its reported hit point.
-
-The deviated children in this export revisit the single source plate and then reach the backstop.
-They do not strike a later armor layer. The export also proved that the fixture collider had no
-fragmentation contribution, which made EFT fragmentation impossible on Lab plates regardless of
-the ammunition's fragmentation chance.
-
-## Current-candidate evidence recorded
-
-`BallisticsLab-20260812-002316`, `BallisticsLab-20260812-002449`,
-`BallisticsLab-20260812-012345`, and `BallisticsLab-20260812-014330` are schema-3 exports
-from plugin version `0.2.6`:
-
-- The reports contain 32 current-build records across 14 shot chains. All four CSV/JSON pairs have
-  equal row counts and match field for field; the one-record pair also verifies scalar-row handling
-  in the external acceptance watcher.
-- The 25-record report contains 11 chains produced with the installed
-  `patron_1143x23_acp_ap` template. Its reported template identity and base speed match the installed
-  database.
-- Four shots are stopped by the Granit BR4 armor plate. The later hits consume its remaining
-  durability without any reported durability increase.
-- One forward plate hit reports `PENETRATED / FRAGMENTED` and creates a real child with
-  `continuationKind = FragmentationHit`, fragment index `1`, and parent depth `1`.
-- Six forward plate hits create children with `continuationKind = DeviationHit`. The fragment and
-  deviated children preserve their corrected continuation damage and penetration, re-contact the
-  back face of the source plate, and then terminate at the backstop at parent depth `2`.
-- The latest three-record chain uses the installed `patron_545x39_BS` template and records a
-  forward penetration/deviation through the final durability of a one-layer class-4 NewSphereTech
-  plate, the deviated child re-contacting that plate's back face, and the same child terminating at
-  the backstop. Its ammunition identity, collision-point speed, locked falloff values, and complete
-  parent/root lineage pass the same validators.
-- A second three-record chain uses the installed `patron_545x39_7n40` template against the
-  two-layer class-3 armored-steel preset with a `0.02 m` face gap. The parent penetrates layer 1,
-  its deviated child re-contacts the source plate's back face, and that same child reaches layer 2,
-  where the armor blocks it. This is the first current-build proof of a complete two-layer chain,
-  physically spaced armor, the two-layer class-3 steel preset, and deviated continuation into a
-  later armor layer.
-- Every record passes the automatic finite/non-negative, velocity-fraction, locked damage and
-  penetration curve, durability, trajectory-endpoint, and lineage checks.
-
-This proves that version `0.2.6` restores EFT fragment and deviation child construction on the Lab
-plate. Because the fixture had only one armor layer, it does not yet prove either child type entering
-a later armor layer.
-
-## Verified automated and startup gates
+## Automated and startup verification
 
 - Release solution build: 0 warnings, 0 errors.
-- Pure and installed-database validation: 45 checks passed.
-- Current-report validation: 52 checks passed across all four current-build exports through
-  `BallisticsLab-20260812-014330`.
+- Pure and installed-database validation: 55 checks passed.
+- Validation with all current reports: 62 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
-- Layer limit: one through six.
-- Six-layer geometry preserves the configured face-to-face air gap.
-- Six-layer backstop preserves one meter of face clearance after the final plate.
-- Ammunition identity, internal name, and base speed are sourced from the same live template.
-- The newest acceptance report is rejected unless its schema and plugin version match the current build.
-- Automatic report validation rejects duplicate sequences, missing forward-hit state, non-finite or
-  negative telemetry, incorrect speed fractions or falloff curves, increasing fixture durability,
-  broken continuation inputs, detached trajectory endpoints, and incomplete recorded continuation
-  lineage. Every nonempty schema-3 report from the current plugin version is checked because the
-  acceptance watcher aggregates current-build coverage across exports; validating only the latest
-  file would leave earlier contributing records unverified. A two-report regression rejects an
-  incorrect earlier current-build report even when the latest report is valid, while an equally
-  incorrect historical-version report is correctly excluded from current acceptance.
-- Chain validation requires a stable fire index and root random seed, non-negative fragment indices,
-  and an earlier parent collision whose fixture and layer exactly match each continuation's reported
-  source. Negative regressions reject both a changed root identity and a child attached to the wrong
-  source collision.
-- Local and deployed `0.2.6` assemblies are byte-identical.
-- Disabled startup: the plugin reports disabled and installs zero of its four patches.
+- Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
 - Exact SPT version and game-assembly compatibility checks remain active.
+- The source default remains disabled.
+- Automatic saving emits nonempty changed-chain batches only. A later continuation includes its required parents but does not recopy unrelated saved chains.
+- Every admitted report must have schema `3`, plugin version `0.2.8`, a matching CSV partner, exact field equality, and valid ammunition identity, falloff, durability, trajectory, and lineage data.
+- The tracked coverage evaluator separates casual bot traffic from controlled fixture evidence. Synthetic regressions prove that bot records cannot satisfy a fixture gate and duplicate automatic batches cannot inflate coverage.
 
-## Historical manual evidence
+The current SDK rebuild and the deployed playtested DLL are not byte-identical because the SDK embeds build provenance and the repository advanced through evidence-only commits. No runtime source changed, and no rebuilt DLL was deployed. Before the baseline is tagged, the final candidate must be built once, deployed from that exact output, restarted, and rechecked for byte parity.
 
-Schema-2 reports from an earlier build demonstrate these runtime paths:
+## Current-build runtime evidence
 
-- Single-plate fixtures.
-- Complete one-, two-, and three-layer chains.
-- Physically separated plate colliders.
-- One-layer class-6 steel.
-- Two-layer class-3 steel.
-- Three-layer class-4 steel.
-- Granit BR4 and BR5 game-template presets.
-- Deviated child-shot continuation into a later physical layer.
+The admitted `0.2.8` set contains 104 automatic CSV/JSON pairs through `BallisticsLab-20260812-233342-265-104-auto.json`:
+
+- 5,133 unique records.
+- 3,370 shot chains.
+- All 104 CSV/JSON pairs match field for field.
+- All records pass the current ballistic, durability, trajectory, and lineage invariants.
+- The first six changed-chain batches contain disjoint chain IDs and advancing sequence ranges, proving that later automatic saves do not recopy earlier unrelated chains.
+
+Current report gates passed:
+
+- Single-plate and one-layer chains.
+- One-layer class-6 armored steel.
+- Granit BR4 game-template preset.
+- Bot body-health telemetry.
+- Bot equipped-armor durability telemetry.
+- Covered post-death armor durability loss while body health remains zero.
+- Deviated-shot continuation into a later layer.
+- Fragment continuation into a later layer.
 - Backstop termination.
-- Matching CSV and JSON record counts.
+- Automatic CSV and JSON export.
 
-These reports remain useful regression evidence, but they do not identify their plugin version. Their ammunition-name field also predates the live-template identity correction, and their spacing value predates the exact face-gap correction. They therefore do not prove final acceptance of `0.2.6`.
+Current controlled report gates still missing:
 
-## Current-build manual evidence still required
-
-The schema-3 report can directly establish the remaining cases below:
-
+- Complete two-layer chain.
 - Complete three-layer chain.
 - Complete four-layer chain.
 - Complete five-layer chain.
 - Complete six-layer chain.
-- Complete three-layer class-4 steel chain.
-- Complete three-layer class-6 steel chain.
-- Bot body-health change.
-- Bot equipped-armor durability change.
-- Covered post-death armor durability change at zero body health.
+- Complete spaced-armor chain.
+- Complete two-layer class-3 armored-steel chain.
+- Complete three-layer class-4 armored-steel chain.
+- Complete three-layer class-6 armored-steel chain.
+- Granit BR5 game-template evidence.
 
-The following require direct observation or combined report and code evidence. Version `0.2.6`
-does not export the struck body part, loot-screen state, armor-application call order, or death-event
-count, so the report alone cannot prove them:
+Ordinary raids may continue producing useful telemetry, but they do not satisfy these fixture gates. No particular cartridge is mandated; a controlled shot must simply traverse every requested physical layer under one chain ID.
+
+## Direct observations still required
+
+Version `0.2.8` does not export struck body-part coverage, loot-screen state, armor-application call order, or death-event count. Reports alone therefore cannot prove:
 
 - An uncovered post-death hit leaves armor unchanged.
-- Living armor is not double-damaged.
-- Multiple matching armor layers follow the existing game order.
-- Looted armor retains its changed durability.
+- Ordinary living-target armor is not double-damaged.
+- Multiple matching armor pieces follow the existing EFT order.
+- Looted armor retains the post-death durability change.
 - Corpse health and death events are not replayed.
 
-## Stabilization fixes completed after the first baseline
+Covered post-death durability loss at zero body health is already present in current reports and does not need to be rediscovered. The remaining items require one deliberate observation session, not more random combat telemetry.
 
-- Live ammunition-template identity replaces stale pooled-item identity in telemetry.
-- Live report validation rejects stale ammunition identity.
-- Post-death armor changes remain visible when health is already zero.
-- Layer spacing now means the physical air gap between plate faces.
-- Backstop placement is derived from the final plate face.
-- Reports carry exact schema and plugin-version provenance.
-- The external acceptance watcher admits only schema-3 records whose plugin version equals the
-  current candidate. Historical reports remain visible as reference counts but cannot satisfy any
-  current-build gate. CSV and JSON fields must match individually; equal row counts alone are not
-  accepted. A deliberate `decisionPenetration` mismatch was rejected while its row count still matched.
-- Lab plates now load all six fields from EFT's installed `BodyArmor` ballistic preset. The supported
-  build serializes penetration level/chance, ricochet chance, fragmentation chance, deviation chance,
-  and deviation magnitude as `0`, `0.097`, `0.378`, `0.249`, `0.28`, and `0.463`. The exact values are
-  also the fail-safe if settings are unavailable or invalid. The fixture's armor component still owns
-  the actual block, penetration, and deflection decision; these collider fields supply EFT's original
-  fragment spread and continuation-child construction after that decision.
-- Candidate `0.2.5` was superseded before acceptance because it restored only the fragmentation gate.
-  Its fragment and deviation children still had zero spread, and its deviation continuation used zero
-  collider outcome values. No `0.2.5` report was accepted.
+## Stabilized systems
+
+- One-to-six independent physical armor layers.
+- Adjustable face-to-face spacing, collider thickness, angle, and backstop state.
+- EFT armor-template catalog plus armored-steel and Granit BR4/BR5 quick presets.
+- Live ammunition-template identity and base speed.
+- Exact collision-point telemetry and locked damage/penetration curves.
+- Fragment and deviation child construction with corrected continuation factors and parent/root lineage.
+- Bot selection, reversible movement/fire controls, health telemetry, armor telemetry, and covered post-death durability telemetry.
+- Automatic changed-chain CSV/JSON capture and manual full-session checkpoints.
+- UTF-8-safe external report inspection for non-ASCII bot names.
+- Disabled-by-default startup with zero patches while disabled.
+
+## Superseded evidence
+
+- Schema-2 reports remain historical reference only because they lack exact plugin-version provenance.
+- `0.2.4` exposed missing fixture fragmentation contribution.
+- `0.2.5` was superseded because it restored the fragmentation gate without valid child spread and deviation inputs.
+- `0.2.6` restored fragment and deviation construction and produced a valid two-layer class-3 chain, but that evidence belongs to an older binary.
+- `0.2.7` proved the larger task-oriented panel, all quick-fixture buttons, Granit BR4/BR5 placement, and automatic saving. Its cumulative-save behavior was superseded by `0.2.8` changed-chain batches.
+
+Historical evidence does not satisfy a missing `0.2.8` gate.
 
 ## Deliberately not started
 
-The following stages remain gated behind acceptance of the current Lab baseline:
+The following stages remain gated behind a stable, versioned, manually accepted Lab baseline:
 
 - Explicit physical state for intact, deformed, fragmented, and spall projectiles.
 - Projectile deformation and material-response calculations.
@@ -226,4 +115,4 @@ The following stages remain gated behind acceptance of the current Lab baseline:
 - Automated campaigns, deterministic seeds, reset control, and result matrices.
 - Formal GOST-style protocols and standardized reports.
 
-Existing game-template BR4 and BR5 labels are repeatable catalog presets only. They are not certification tests.
+Existing Granit BR4 and BR5 labels are repeatable EFT database presets only. They are not certification tests.

@@ -6,11 +6,17 @@ const string plateParent = "644120aa86ffbe10ee032b6f";
 const string granitBr4 = "65573fa5655447403702a816";
 const string granitBr5 = "64afc71497cf3a403c01ff38";
 
-string itemsPath = args.Length > 0
-    ? Path.GetFullPath(args[0])
+string[] positionalArguments = args
+    .Where(argument => !argument.StartsWith("--", StringComparison.Ordinal))
+    .ToArray();
+bool requireReportCoverage = args.Contains(
+    "--require-report-coverage",
+    StringComparer.OrdinalIgnoreCase);
+string itemsPath = positionalArguments.Length > 0
+    ? Path.GetFullPath(positionalArguments[0])
     : @"E:\Games\SPT\SPT_Runtime\SPT_Data\database\templates\items.json";
-string reportsPath = args.Length > 1
-    ? Path.GetFullPath(args[1])
+string reportsPath = positionalArguments.Length > 1
+    ? Path.GetFullPath(positionalArguments[1])
     : string.Empty;
 
 List<string> failures = new();
@@ -44,6 +50,9 @@ Check(ReportInvariantValidator.RejectsMismatchedContinuationSource(), "report in
 Check(ReportInvariantValidator.RejectsChangedRootIdentity(), "report invariants reject a changed root identity inside one chain");
 Check(CurrentReportSetValidator.RejectsCorruptEarlierCurrentReport(), "current-report gate rejects corruption in an earlier contributing export");
 Check(CurrentReportSetValidator.IgnoresCorruptHistoricalReport(), "current-report gate excludes historical versions from current acceptance");
+Check(AcceptanceCoverageEvaluator.CompleteSyntheticCoveragePasses(), "report coverage accepts a complete controlled fixture matrix");
+Check(AcceptanceCoverageEvaluator.CasualBotTrafficCannotSatisfyFixtureCoverage(), "casual bot traffic cannot satisfy controlled fixture gates");
+Check(AcceptanceCoverageEvaluator.DuplicateBatchesDoNotInflateCoverage(), "duplicate automatic batches do not inflate acceptance coverage");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 Check(
     !LabPolicies.ShouldSaveReport(0, 1, 0)
@@ -352,11 +361,43 @@ if (!string.IsNullOrEmpty(reportsPath))
             invariantsValid && invariantReportCount == currentReports.Count
                 ? "all current-build reports satisfy ballistic, durability, trajectory, and lineage invariants"
                 : "current-build report invariant failure: " + invariantFailure);
+        AcceptanceReportCoverage coverage = AcceptanceCoverageEvaluator.Evaluate(
+            reportFiles,
+            LabBuild.ReportSchema,
+            LabBuild.PluginVersion);
         Console.WriteLine(
             "Current reports validated: "
             + currentReports.Count.ToString(CultureInfo.InvariantCulture)
             + "; latest: "
             + Path.GetFileName(latestReport));
+        Console.WriteLine(
+            "Controlled report coverage: "
+            + coverage.UniqueRecords.ToString(CultureInfo.InvariantCulture)
+            + " unique records in "
+            + coverage.UniqueChains.ToString(CultureInfo.InvariantCulture)
+            + " chains.");
+        foreach (AcceptanceCoverageCheck coverageCheck in coverage.Checks)
+        {
+            Console.WriteLine(
+                "  "
+                + coverageCheck.Name.PadRight(30)
+                + (coverageCheck.Passed ? "PASS" : "MISSING"));
+        }
+        if (coverage.Missing.Count > 0)
+        {
+            Console.WriteLine(
+                "Missing controlled report gates: "
+                + string.Join(", ", coverage.Missing));
+        }
+        if (requireReportCoverage)
+        {
+            Check(
+                coverage.Complete,
+                coverage.Complete
+                    ? "all controlled current-build report gates are complete"
+                    : "controlled current-build report gates are incomplete: "
+                        + string.Join(", ", coverage.Missing));
+        }
     }
 }
 
