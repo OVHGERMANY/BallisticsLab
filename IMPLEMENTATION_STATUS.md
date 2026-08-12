@@ -99,6 +99,10 @@ count, so the report alone cannot prove them:
 - Layer spacing now means the physical air gap between plate faces.
 - Backstop placement is derived from the final plate face.
 - Reports carry exact schema and plugin-version provenance.
+- The external acceptance watcher admits only schema-3 records whose plugin version equals the
+  current candidate. Historical reports remain visible as reference counts but cannot satisfy any
+  current-build gate. CSV and JSON fields must match individually; equal row counts alone are not
+  accepted. A deliberate `decisionPenetration` mismatch was rejected while its row count still matched.
 - Lab plates now load all six fields from EFT's installed `BodyArmor` ballistic preset. The supported
   build serializes penetration level/chance, ricochet chance, fragmentation chance, deviation chance,
   and deviation magnitude as `0`, `0.097`, `0.378`, `0.249`, `0.28`, and `0.463`. The exact values are
