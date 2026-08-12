@@ -35,16 +35,46 @@ They do not strike a later armor layer. The export also proved that the fixture 
 fragmentation contribution, which made EFT fragmentation impossible on Lab plates regardless of
 the ammunition's fragmentation chance.
 
+## Current-candidate evidence recorded
+
+`BallisticsLab-20260812-002316` and `BallisticsLab-20260812-002449` are schema-3 exports from
+plugin version `0.2.6`:
+
+- The reports contain 26 current-build records across 12 shot chains. Both CSV/JSON pairs have
+  equal row counts and match field for field; the one-record pair also verifies scalar-row handling
+  in the external acceptance watcher.
+- The 25-record report contains 11 chains produced with the installed
+  `patron_1143x23_acp_ap` template. Its reported template identity and base speed match the installed
+  database.
+- Four shots are stopped by the Granit BR4 armor plate. The later hits consume its remaining
+  durability without any reported durability increase.
+- One forward plate hit reports `PENETRATED / FRAGMENTED` and creates a real child with
+  `continuationKind = FragmentationHit`, fragment index `1`, and parent depth `1`.
+- Six forward plate hits create children with `continuationKind = DeviationHit`. The fragment and
+  deviated children preserve their corrected continuation damage and penetration, re-contact the
+  back face of the source plate, and then terminate at the backstop at parent depth `2`.
+- Every record passes the automatic finite/non-negative, velocity-fraction, locked damage and
+  penetration curve, durability, trajectory-endpoint, and lineage checks.
+
+This proves that version `0.2.6` restores EFT fragment and deviation child construction on the Lab
+plate. Because the fixture had only one armor layer, it does not yet prove either child type entering
+a later armor layer.
+
 ## Verified automated and startup gates
 
 - Release solution build: 0 warnings, 0 errors.
-- Pure and installed-database validation: 37 checks passed.
+- Pure and installed-database validation: 41 checks passed.
+- Current-report validation: 48 checks passed against `BallisticsLab-20260812-002449`.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Layer limit: one through six.
 - Six-layer geometry preserves the configured face-to-face air gap.
 - Six-layer backstop preserves one meter of face clearance after the final plate.
 - Ammunition identity, internal name, and base speed are sourced from the same live template.
 - The newest acceptance report is rejected unless its schema and plugin version match the current build.
+- Automatic report validation rejects duplicate sequences, missing forward-hit state, non-finite or
+  negative telemetry, incorrect speed fractions or falloff curves, increasing fixture durability,
+  broken continuation inputs, detached trajectory endpoints, and incomplete recorded continuation
+  lineage.
 - Local and deployed `0.2.6` assemblies are byte-identical.
 - Disabled startup: the plugin reports disabled and installs zero of its four patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -71,10 +101,17 @@ These reports remain useful regression evidence, but they do not identify their 
 
 The schema-3 report can directly establish the remaining cases below:
 
+- Complete two-layer chain.
+- Complete three-layer chain.
 - Complete four-layer chain.
 - Complete five-layer chain.
 - Complete six-layer chain.
+- A complete multi-layer chain with a nonzero physical air gap.
+- Complete one-layer class-6 steel chain.
+- Complete two-layer class-3 steel chain.
+- Complete three-layer class-4 steel chain.
 - Complete three-layer class-6 steel chain.
+- Granit BR5 game-template preset.
 - Bot body-health change.
 - Bot equipped-armor durability change.
 - Covered post-death armor durability change at zero body health.

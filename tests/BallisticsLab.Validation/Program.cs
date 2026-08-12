@@ -36,6 +36,10 @@ Check(LabPolicies.Json("a\n\"b") == "\"a\\n\\\"b\"", "JSON escaping");
 Check(ReportPairValidator.ParserHandlesQuotedFields(), "CSV report parser handles commas, quotes, and embedded newlines");
 Check(ReportPairValidator.ValidatorMatchesSyntheticPair(), "CSV and JSON report validator accepts a matching schema-3 pair");
 Check(ReportPairValidator.ValidatorRejectsSyntheticMismatch(), "CSV and JSON report validator rejects a field mismatch");
+Check(ReportInvariantValidator.AcceptsSyntheticReport(), "report invariants accept a valid collision record");
+Check(ReportInvariantValidator.RejectsIncorrectFalloff(), "report invariants reject incorrect penetration falloff");
+Check(ReportInvariantValidator.RejectsDetachedTrajectoryEndpoint(), "report invariants reject a detached trajectory endpoint");
+Check(ReportInvariantValidator.RejectsMissingForwardHitState(), "report invariants reject a missing forward-hit state");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 float[] installedBodyArmorPreset = { 0f, 0.097f, 0.378f, 0.249f, 0.28f, 0.463f };
 LabColliderBallisticSettings liveBodyArmorSettings =
@@ -297,6 +301,12 @@ if (!string.IsNullOrEmpty(reportsPath))
             pairMatches
                 ? "latest CSV and JSON exports match field for field"
                 : "latest CSV and JSON export mismatch: " + pairFailure);
+        bool invariantsMatch = ReportInvariantValidator.Validate(latestReport, out string invariantFailure);
+        Check(
+            invariantsMatch,
+            invariantsMatch
+                ? "latest report satisfies ballistic, durability, trajectory, and lineage invariants"
+                : "latest report invariant failure: " + invariantFailure);
         Console.WriteLine("Latest report: " + Path.GetFileName(latestReport));
     }
 }
