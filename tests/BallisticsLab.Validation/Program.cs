@@ -20,7 +20,7 @@ Dictionary<string, AmmoRow> ammunition = new(StringComparer.Ordinal);
 Check(
     LabBuild.PluginGuid == "com.janky.ballisticslab"
     && LabBuild.PluginName == "Janky-BallisticsLab"
-    && LabBuild.PluginVersion == "0.2.5"
+    && LabBuild.PluginVersion == "0.2.6"
     && LabBuild.ReportSchema == 3,
     "report provenance constants match the current plugin build");
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
@@ -37,19 +37,27 @@ Check(ReportPairValidator.ParserHandlesQuotedFields(), "CSV report parser handle
 Check(ReportPairValidator.ValidatorMatchesSyntheticPair(), "CSV and JSON report validator accepts a matching schema-3 pair");
 Check(ReportPairValidator.ValidatorRejectsSyntheticMismatch(), "CSV and JSON report validator rejects a field mismatch");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
+float[] installedBodyArmorPreset = { 0f, 0.097f, 0.378f, 0.249f, 0.28f, 0.463f };
+LabColliderBallisticSettings liveBodyArmorSettings =
+    LabPolicies.ResolveBodyArmorBallisticSettings(installedBodyArmorPreset);
 Check(
-    Nearly(LabPolicies.ResolveBodyArmorFragmentationChance(0.249f), 0.249f)
-    && Nearly(LabPolicies.ResolveBodyArmorFragmentationChance(0.5f), 0.5f)
-    && Nearly(
-        LabPolicies.ResolveBodyArmorFragmentationChance(0f),
+    Nearly(liveBodyArmorSettings.PenetrationLevel, 0f)
+    && Nearly(liveBodyArmorSettings.PenetrationChance, 0.097f)
+    && Nearly(liveBodyArmorSettings.RicochetChance, 0.378f)
+    && Nearly(liveBodyArmorSettings.FragmentationChance, 0.249f)
+    && Nearly(liveBodyArmorSettings.TrajectoryDeviationChance, 0.28f)
+    && Nearly(liveBodyArmorSettings.TrajectoryDeviation, 0.463f),
+    "Lab plates preserve all six installed BodyArmor ballistic fields");
+LabColliderBallisticSettings fallbackBodyArmorSettings =
+    LabPolicies.ResolveBodyArmorBallisticSettings(new[] { 0f, 0.097f, 0.378f, 0f, 0.28f, 0.463f });
+Check(
+    Nearly(
+        fallbackBodyArmorSettings.FragmentationChance,
         LabPolicies.InstalledBodyArmorFragmentationChance)
     && Nearly(
-        LabPolicies.ResolveBodyArmorFragmentationChance(float.NaN),
-        LabPolicies.InstalledBodyArmorFragmentationChance)
-    && Nearly(
-        LabPolicies.ResolveBodyArmorFragmentationChance(1.01f),
-        LabPolicies.InstalledBodyArmorFragmentationChance),
-    "Lab plates preserve the installed BodyArmor fragmentation gate");
+        fallbackBodyArmorSettings.TrajectoryDeviation,
+        LabPolicies.InstalledBodyArmorTrajectoryDeviation),
+    "invalid BodyArmor preset data selects the exact supported-build fallback");
 Check(
     LabPolicies.RequiresFixtureContinuationCorrection(1)
     && LabPolicies.RequiresFixtureContinuationCorrection(3)

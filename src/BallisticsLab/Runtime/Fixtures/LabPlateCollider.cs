@@ -13,17 +13,18 @@ namespace BallisticsLab.Runtime.Fixtures
         {
             Runtime = runtime;
             TypeOfMaterial = MaterialType.BodyArmor;
-            PenetrationLevel = 0f;
-            PenetrationChance = 0f;
-            RicochetChance = 0f;
-            FragmentationChance = LabPolicies.ResolveBodyArmorFragmentationChance(
-                ReadBodyArmorFragmentationChance());
-            TrajectoryDeviationChance = 0f;
-            TrajectoryDeviation = 0f;
+            LabColliderBallisticSettings settings = LabPolicies.ResolveBodyArmorBallisticSettings(
+                ReadBodyArmorPresetValues());
+            PenetrationLevel = settings.PenetrationLevel;
+            PenetrationChance = settings.PenetrationChance;
+            RicochetChance = settings.RicochetChance;
+            FragmentationChance = settings.FragmentationChance;
+            TrajectoryDeviationChance = settings.TrajectoryDeviationChance;
+            TrajectoryDeviation = settings.TrajectoryDeviation;
             Associate(TypeOfMaterial);
         }
 
-        private static float ReadBodyArmorFragmentationChance()
+        private static float[] ReadBodyArmorPresetValues()
         {
             BallisticPreset[] presets = EFTHardSettings.Instance?.ColliderPresets;
             if (presets != null)
@@ -33,14 +34,14 @@ namespace BallisticsLab.Runtime.Fixtures
                     if (preset != null
                         && preset.MaterialType == MaterialType.BodyArmor
                         && preset.values != null
-                        && preset.values.Length > 3)
+                        && preset.values.Length >= 6)
                     {
-                        return preset[3];
+                        return preset.values;
                     }
                 }
             }
 
-            return float.NaN;
+            return null;
         }
 
         public override bool Deflects(

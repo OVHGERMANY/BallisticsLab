@@ -1,27 +1,80 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
 namespace BallisticsLab.Core
 {
+    public readonly struct LabColliderBallisticSettings
+    {
+        public LabColliderBallisticSettings(
+            float penetrationLevel,
+            float penetrationChance,
+            float ricochetChance,
+            float fragmentationChance,
+            float trajectoryDeviationChance,
+            float trajectoryDeviation)
+        {
+            PenetrationLevel = penetrationLevel;
+            PenetrationChance = penetrationChance;
+            RicochetChance = ricochetChance;
+            FragmentationChance = fragmentationChance;
+            TrajectoryDeviationChance = trajectoryDeviationChance;
+            TrajectoryDeviation = trajectoryDeviation;
+        }
+
+        public float PenetrationLevel { get; }
+        public float PenetrationChance { get; }
+        public float RicochetChance { get; }
+        public float FragmentationChance { get; }
+        public float TrajectoryDeviationChance { get; }
+        public float TrajectoryDeviation { get; }
+    }
+
     public static class LabPolicies
     {
         public const int MaximumLayers = 6;
         public const int MaximumRecords = 500;
+        public const float InstalledBodyArmorPenetrationLevel = 0f;
+        public const float InstalledBodyArmorPenetrationChance = 0.097f;
+        public const float InstalledBodyArmorRicochetChance = 0.378f;
         public const float InstalledBodyArmorFragmentationChance = 0.249f;
+        public const float InstalledBodyArmorTrajectoryDeviationChance = 0.28f;
+        public const float InstalledBodyArmorTrajectoryDeviation = 0.463f;
 
         public static bool IsFiniteNonNegative(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value) && value >= 0f;
         }
 
-        public static float ResolveBodyArmorFragmentationChance(float presetValue)
+        public static LabColliderBallisticSettings ResolveBodyArmorBallisticSettings(
+            IReadOnlyList<float> presetValues)
         {
-            return IsFiniteNonNegative(presetValue)
-                && presetValue > 0f
-                && presetValue <= 1f
-                    ? presetValue
-                    : InstalledBodyArmorFragmentationChance;
+            if (presetValues != null
+                && presetValues.Count >= 6
+                && IsFiniteNonNegative(presetValues[0])
+                && IsProbability(presetValues[1])
+                && IsProbability(presetValues[2])
+                && IsPositiveProbability(presetValues[3])
+                && IsProbability(presetValues[4])
+                && IsProbability(presetValues[5]))
+            {
+                return new LabColliderBallisticSettings(
+                    presetValues[0],
+                    presetValues[1],
+                    presetValues[2],
+                    presetValues[3],
+                    presetValues[4],
+                    presetValues[5]);
+            }
+
+            return new LabColliderBallisticSettings(
+                InstalledBodyArmorPenetrationLevel,
+                InstalledBodyArmorPenetrationChance,
+                InstalledBodyArmorRicochetChance,
+                InstalledBodyArmorFragmentationChance,
+                InstalledBodyArmorTrajectoryDeviationChance,
+                InstalledBodyArmorTrajectoryDeviation);
         }
 
         public static string AuthoritativeAmmoValue(string templateValue, string itemValue)
@@ -200,6 +253,16 @@ namespace BallisticsLab.Core
             }
 
             return value;
+        }
+
+        private static bool IsProbability(float value)
+        {
+            return IsFiniteNonNegative(value) && value <= 1f;
+        }
+
+        private static bool IsPositiveProbability(float value)
+        {
+            return IsProbability(value) && value > 0f;
         }
     }
 }

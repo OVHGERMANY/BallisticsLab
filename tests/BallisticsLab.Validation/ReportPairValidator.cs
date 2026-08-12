@@ -59,7 +59,7 @@ internal static class ReportPairValidator
                 }
                 else if (column == "pluginVersion")
                 {
-                    csvValues[index] = "0.2.5";
+                    csvValues[index] = "0.2.6";
                 }
                 else if (column == "fragments")
                 {
@@ -104,7 +104,7 @@ internal static class ReportPairValidator
             Dictionary<string, object> root = new(StringComparer.Ordinal)
             {
                 ["schema"] = 3,
-                ["pluginVersion"] = "0.2.5",
+                ["pluginVersion"] = "0.2.6",
                 ["records"] = new[] { record }
             };
 

@@ -4,15 +4,13 @@ Snapshot date: 2026-08-11
 
 ## Current baseline candidate
 
-- Plugin version: `0.2.5`
+- Plugin version: `0.2.6`
 - Report schema: `3`
-- Runtime build source commit: `d6f0339`
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
-- Deployed DLL SHA-256: `C15466821B6AE44F7FB5AA0895AF58CCD5B457D0AF7045D278E2AAA65B144ED9`
 - Default configuration: disabled
 
-The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.5`.
+The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.6`.
 
 ## Previous-candidate evidence recorded
 
@@ -38,14 +36,14 @@ the ammunition's fragmentation chance.
 ## Verified automated and startup gates
 
 - Release solution build: 0 warnings, 0 errors.
-- Pure and installed-database validation: 36 checks passed.
+- Pure and installed-database validation: 37 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Layer limit: one through six.
 - Six-layer geometry preserves the configured face-to-face air gap.
 - Six-layer backstop preserves one meter of face clearance after the final plate.
 - Ammunition identity, internal name, and base speed are sourced from the same live template.
 - The newest acceptance report is rejected unless its schema and plugin version match the current build.
-- Local and deployed `0.2.5` assemblies are byte-identical.
+- The final `0.2.6` local/deployed artifact-parity check is pending deployment.
 - Disabled startup: the plugin reports disabled and installs zero of its four patches.
 - Enabled startup: all four intended patches install exactly once.
 - Exact SPT version and game-assembly compatibility checks remain active.
@@ -65,7 +63,7 @@ Schema-2 reports from an earlier build demonstrate these runtime paths:
 - Backstop termination.
 - Matching CSV and JSON record counts.
 
-These reports remain useful regression evidence, but they do not identify their plugin version. Their ammunition-name field also predates the live-template identity correction, and their spacing value predates the exact face-gap correction. They therefore do not prove final acceptance of `0.2.5`.
+These reports remain useful regression evidence, but they do not identify their plugin version. Their ammunition-name field also predates the live-template identity correction, and their spacing value predates the exact face-gap correction. They therefore do not prove final acceptance of `0.2.6`.
 
 ## Current-build manual evidence still required
 
@@ -81,7 +79,7 @@ The schema-3 report can directly establish the remaining cases below:
 - Deviated-shot continuation into a later armor layer.
 - Fragment continuation into a later armor layer.
 
-The following require direct observation or combined report and code evidence. Version `0.2.5`
+The following require direct observation or combined report and code evidence. Version `0.2.6`
 does not export the struck body part, loot-screen state, armor-application call order, or death-event
 count, so the report alone cannot prove them:
 
@@ -99,10 +97,15 @@ count, so the report alone cannot prove them:
 - Layer spacing now means the physical air gap between plate faces.
 - Backstop placement is derived from the final plate face.
 - Reports carry exact schema and plugin-version provenance.
-- Lab plates now load EFT's installed `BodyArmor` fragmentation contribution. The supported build's
-  serialized value is `0.249`; a finite positive game value is preserved, while the exact installed
-  value is the fail-safe if settings are unavailable. Penetration and ricochet collider values stay
-  zero because those decisions remain owned by the fixture's armor component.
+- Lab plates now load all six fields from EFT's installed `BodyArmor` ballistic preset. The supported
+  build serializes penetration level/chance, ricochet chance, fragmentation chance, deviation chance,
+  and deviation magnitude as `0`, `0.097`, `0.378`, `0.249`, `0.28`, and `0.463`. The exact values are
+  also the fail-safe if settings are unavailable or invalid. The fixture's armor component still owns
+  the actual block, penetration, and deflection decision; these collider fields supply EFT's original
+  fragment spread and continuation-child construction after that decision.
+- Candidate `0.2.5` was superseded before acceptance because it restored only the fragmentation gate.
+  Its fragment and deviation children still had zero spread, and its deviation continuation used zero
+  collider outcome values. No `0.2.5` report was accepted.
 
 ## Deliberately not started
 
