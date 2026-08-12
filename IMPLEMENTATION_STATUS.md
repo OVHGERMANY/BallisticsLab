@@ -28,7 +28,7 @@ The runtime source has not changed since `e3dc463`; later commits record build, 
 - Every admitted report must have schema `3`, plugin version `0.2.8`, a matching CSV partner, exact field equality, and valid ammunition identity, falloff, durability, trajectory, and lineage data.
 - The tracked coverage evaluator separates casual bot traffic from controlled fixture evidence. Synthetic regressions prove that bot records cannot satisfy a fixture gate and duplicate automatic batches cannot inflate coverage.
 
-The current SDK rebuild and the deployed playtested DLL are not byte-identical because the SDK embeds build provenance and the repository advanced through evidence-only commits. No runtime source changed, and no rebuilt DLL was deployed. Before the baseline is tagged, the final candidate must be built once, deployed from that exact output, restarted, and rechecked for byte parity.
+A fresh rebuild and the deployed playtested DLL are not byte-identical. Rebuilding with `SourceRevisionId` pinned to `e3dc463` and with SDK `10.0.204` still did not reproduce the deployed hash, so the exact source of the binary drift is not established. No runtime source changed, and no rebuilt DLL was deployed. Before the baseline is tagged, the final candidate must be built once, deployed from that exact output, restarted, and rechecked for byte parity.
 
 ## Current-build runtime evidence
 
