@@ -6,10 +6,10 @@ Snapshot date: 2026-08-11
 
 - Plugin version: `0.2.8`
 - Report schema: `3`
-- Runtime build source commit: pending final commit
+- Runtime build source commit: `e3dc463`
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
-- Deployed DLL SHA-256: pending final build and deployment
+- Deployed DLL SHA-256: `3C4BAAA940FB61CD557CC173B61A55FBAA9860A651DBEFA3A33A4DEC0171B5E6`
 - Default configuration: disabled
 
 The current candidate is not tagged as an accepted baseline. Tagging requires current-build manual evidence with JSON `schema = 3` and `pluginVersion = 0.2.8`.
@@ -38,7 +38,10 @@ efficiency defect: it repeatedly serialized the complete accumulated session, pr
 cumulative files. Version `0.2.8` fixes this by exporting only changed chains plus their required
 parent records. Manual saves remain complete session snapshots. This keeps each automatic pair
 independently valid without repeatedly copying unrelated evidence. The current `0.2.8` Release build
-passes 52 pure/database checks with zero compiler warnings or errors.
+passes 52 pure/database checks with zero compiler warnings or errors. The deployed DLL is byte-identical
+to that Release artifact at the SHA-256 above. A guarded relaunch produced exactly one responsive Tarkov
+process, PID `30364`; BepInEx loaded `Janky-BallisticsLab 0.2.8`, enabled its four intended patches, and
+logged no Lab startup error. Runtime acceptance of the changed-chain report batches is still pending.
 
 ## Previous-candidate evidence recorded
 
