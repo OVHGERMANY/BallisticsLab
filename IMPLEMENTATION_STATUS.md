@@ -37,10 +37,11 @@ the ammunition's fragmentation chance.
 
 ## Current-candidate evidence recorded
 
-`BallisticsLab-20260812-002316`, `BallisticsLab-20260812-002449`, and
-`BallisticsLab-20260812-012345` are schema-3 exports from plugin version `0.2.6`:
+`BallisticsLab-20260812-002316`, `BallisticsLab-20260812-002449`,
+`BallisticsLab-20260812-012345`, and `BallisticsLab-20260812-014330` are schema-3 exports
+from plugin version `0.2.6`:
 
-- The reports contain 29 current-build records across 13 shot chains. All three CSV/JSON pairs have
+- The reports contain 32 current-build records across 14 shot chains. All four CSV/JSON pairs have
   equal row counts and match field for field; the one-record pair also verifies scalar-row handling
   in the external acceptance watcher.
 - The 25-record report contains 11 chains produced with the installed
@@ -58,6 +59,12 @@ the ammunition's fragmentation chance.
   plate, the deviated child re-contacting that plate's back face, and the same child terminating at
   the backstop. Its ammunition identity, collision-point speed, locked falloff values, and complete
   parent/root lineage pass the same validators.
+- A second three-record chain uses the installed `patron_545x39_7n40` template against the
+  two-layer class-3 armored-steel preset with a `0.02 m` face gap. The parent penetrates layer 1,
+  its deviated child re-contacts the source plate's back face, and that same child reaches layer 2,
+  where the armor blocks it. This is the first current-build proof of a complete two-layer chain,
+  physically spaced armor, the two-layer class-3 steel preset, and deviated continuation into a
+  later armor layer.
 - Every record passes the automatic finite/non-negative, velocity-fraction, locked damage and
   penetration curve, durability, trajectory-endpoint, and lineage checks.
 
@@ -69,8 +76,8 @@ a later armor layer.
 
 - Release solution build: 0 warnings, 0 errors.
 - Pure and installed-database validation: 45 checks passed.
-- Current-report validation: 52 checks passed across all three current-build exports through
-  `BallisticsLab-20260812-012345`.
+- Current-report validation: 52 checks passed across all four current-build exports through
+  `BallisticsLab-20260812-014330`.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Layer limit: one through six.
 - Six-layer geometry preserves the configured face-to-face air gap.
@@ -115,21 +122,17 @@ These reports remain useful regression evidence, but they do not identify their 
 
 The schema-3 report can directly establish the remaining cases below:
 
-- Complete two-layer chain.
 - Complete three-layer chain.
 - Complete four-layer chain.
 - Complete five-layer chain.
 - Complete six-layer chain.
-- A complete multi-layer chain with a nonzero physical air gap.
 - Complete one-layer class-6 steel chain.
-- Complete two-layer class-3 steel chain.
 - Complete three-layer class-4 steel chain.
 - Complete three-layer class-6 steel chain.
 - Granit BR5 game-template preset.
 - Bot body-health change.
 - Bot equipped-armor durability change.
 - Covered post-death armor durability change at zero body health.
-- Deviated-shot continuation into a later armor layer.
 - Fragment continuation into a later armor layer.
 
 The following require direct observation or combined report and code evidence. Version `0.2.6`
