@@ -74,7 +74,9 @@ a later armor layer.
 - Automatic report validation rejects duplicate sequences, missing forward-hit state, non-finite or
   negative telemetry, incorrect speed fractions or falloff curves, increasing fixture durability,
   broken continuation inputs, detached trajectory endpoints, and incomplete recorded continuation
-  lineage.
+  lineage. Every nonempty schema-3 report from the current plugin version is checked because the
+  acceptance watcher aggregates current-build coverage across exports; validating only the latest
+  file would leave earlier contributing records unverified.
 - Local and deployed `0.2.6` assemblies are byte-identical.
 - Disabled startup: the plugin reports disabled and installs zero of its four patches.
 - Enabled startup: all four intended patches install exactly once.

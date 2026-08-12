@@ -221,12 +221,13 @@ else
 
 if (!string.IsNullOrEmpty(reportsPath))
 {
-    string latestReport = Directory.Exists(reportsPath)
+    string[] reportFiles = Directory.Exists(reportsPath)
         ? Directory.GetFiles(reportsPath, "BallisticsLab-*.json", SearchOption.TopDirectoryOnly)
             .OrderBy(File.GetLastWriteTimeUtc)
             .ThenBy(path => path, StringComparer.Ordinal)
-            .LastOrDefault() ?? string.Empty
-        : string.Empty;
+            .ToArray()
+        : Array.Empty<string>();
+    string latestReport = reportFiles.LastOrDefault() ?? string.Empty;
     Check(!string.IsNullOrEmpty(latestReport), "latest BallisticsLab report exists");
 
     if (!string.IsNullOrEmpty(latestReport))
@@ -252,10 +253,49 @@ if (!string.IsNullOrEmpty(reportsPath))
             && recordsElement.GetArrayLength() > 0;
         Check(hasRecords, "latest BallisticsLab report contains shot records");
 
-        string identityFailure = string.Empty;
-        if (hasRecords)
+        List<string> currentReports = new();
+        foreach (string reportFile in reportFiles)
         {
-            foreach (JsonElement record in recordsElement.EnumerateArray())
+            using JsonDocument candidate = JsonDocument.Parse(File.ReadAllText(reportFile));
+            bool candidateSchema = candidate.RootElement.TryGetProperty(
+                    "schema",
+                    out JsonElement candidateSchemaElement)
+                && candidateSchemaElement.TryGetInt32(out int candidateSchemaValue)
+                && candidateSchemaValue == LabBuild.ReportSchema;
+            string candidateVersion = candidate.RootElement.TryGetProperty(
+                    "pluginVersion",
+                    out JsonElement candidateVersionElement)
+                ? candidateVersionElement.GetString() ?? string.Empty
+                : string.Empty;
+            bool candidateHasRecords = candidate.RootElement.TryGetProperty(
+                    "records",
+                    out JsonElement candidateRecords)
+                && candidateRecords.ValueKind == JsonValueKind.Array
+                && candidateRecords.GetArrayLength() > 0;
+            if (candidateSchema
+                && candidateHasRecords
+                && string.Equals(candidateVersion, LabBuild.PluginVersion, StringComparison.Ordinal))
+            {
+                currentReports.Add(reportFile);
+            }
+        }
+
+        string identityFailure = string.Empty;
+        string pairFailure = string.Empty;
+        string invariantFailure = string.Empty;
+        if (currentReports.Count == 0)
+        {
+            const string noCurrentReport = "no nonempty current-build reports were found";
+            identityFailure = noCurrentReport;
+            pairFailure = noCurrentReport;
+            invariantFailure = noCurrentReport;
+        }
+        foreach (string currentReport in currentReports)
+        {
+            string reportName = Path.GetFileName(currentReport);
+            using JsonDocument current = JsonDocument.Parse(File.ReadAllText(currentReport));
+            JsonElement currentRecords = current.RootElement.GetProperty("records");
+            foreach (JsonElement record in currentRecords.EnumerateArray())
             {
                 string templateId = record.TryGetProperty("ammoTemplateId", out JsonElement idElement)
                     ? idElement.GetString() ?? string.Empty
@@ -269,45 +309,60 @@ if (!string.IsNullOrEmpty(reportsPath))
 
                 if (!ammunition.TryGetValue(templateId, out AmmoRow expected))
                 {
-                    identityFailure = "unknown template " + templateId;
+                    identityFailure = reportName + ": unknown template " + templateId;
                     break;
                 }
                 if (!string.Equals(reportedName, expected.Name, StringComparison.Ordinal))
                 {
-                    identityFailure = templateId + " reports name " + reportedName
+                    identityFailure = reportName + ": " + templateId + " reports name " + reportedName
                         + " but the installed template is " + expected.Name;
                     break;
                 }
                 if (!hasReportedSpeed || !NearlyWithin(reportedSpeed, expected.InitialSpeed, 0.001f))
                 {
-                    identityFailure = templateId + " reports a template speed that differs from the installed template";
+                    identityFailure = reportName + ": " + templateId
+                        + " reports a template speed that differs from the installed template";
                     break;
                 }
             }
-        }
-        else
-        {
-            identityFailure = "report contains no records";
+
+            if (string.IsNullOrEmpty(pairFailure)
+                && !ReportPairValidator.Validate(currentReport, out string currentPairFailure))
+            {
+                pairFailure = reportName + ": " + currentPairFailure;
+            }
+            if (string.IsNullOrEmpty(invariantFailure)
+                && !ReportInvariantValidator.Validate(currentReport, out string currentInvariantFailure))
+            {
+                invariantFailure = reportName + ": " + currentInvariantFailure;
+            }
+
+            if (!string.IsNullOrEmpty(identityFailure))
+            {
+                break;
+            }
         }
 
         Check(
-            string.IsNullOrEmpty(identityFailure),
+            currentReports.Count > 0 && string.IsNullOrEmpty(identityFailure),
             string.IsNullOrEmpty(identityFailure)
-                ? "latest report ammo identity and speed match the installed live template"
-                : "latest report ammo identity mismatch: " + identityFailure);
-        bool pairMatches = ReportPairValidator.Validate(latestReport, out string pairFailure);
+                ? "all current-build report ammunition identities and speeds match the installed templates"
+                : "current-build report ammunition identity mismatch: " + identityFailure);
         Check(
-            pairMatches,
-            pairMatches
-                ? "latest CSV and JSON exports match field for field"
-                : "latest CSV and JSON export mismatch: " + pairFailure);
-        bool invariantsMatch = ReportInvariantValidator.Validate(latestReport, out string invariantFailure);
+            currentReports.Count > 0 && string.IsNullOrEmpty(pairFailure),
+            string.IsNullOrEmpty(pairFailure)
+                ? "all current-build CSV and JSON exports match field for field"
+                : "current-build CSV and JSON export mismatch: " + pairFailure);
         Check(
-            invariantsMatch,
-            invariantsMatch
-                ? "latest report satisfies ballistic, durability, trajectory, and lineage invariants"
-                : "latest report invariant failure: " + invariantFailure);
-        Console.WriteLine("Latest report: " + Path.GetFileName(latestReport));
+            currentReports.Count > 0 && string.IsNullOrEmpty(invariantFailure),
+            string.IsNullOrEmpty(invariantFailure)
+                ? "all current-build reports satisfy ballistic, durability, trajectory, and lineage invariants"
+                : "current-build report invariant failure: " + invariantFailure);
+        Console.WriteLine(
+            "Current reports validated: "
+            + currentReports.Count.ToString(CultureInfo.InvariantCulture)
+            + "; latest: "
+            + Path.GetFileName(latestReport));
     }
 }
 
