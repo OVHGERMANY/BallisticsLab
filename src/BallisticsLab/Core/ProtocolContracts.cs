@@ -25,7 +25,9 @@ namespace BallisticsLab.Core
         ImpactAngleOutOfRange = 8,
         VelocityOutOfRange = 9,
         EdgeDistanceInsufficient = 10,
-        NeighbourDistanceInsufficient = 11
+        NeighbourDistanceInsufficient = 11,
+        AmmunitionDesignationVariant = 12,
+        AmmunitionPhysicalStateMismatch = 13
     }
 
     internal enum ProtocolScreeningStatus
@@ -293,7 +295,7 @@ namespace BallisticsLab.Core
             int requiredQualifyingShots,
             double maximumImpactAngleDegrees,
             double minimumSeparationDiameters,
-            IReadOnlyList<string> verifiedAmmunitionTemplateIds)
+            IReadOnlyList<ProtocolAmmunitionMapping> ammunitionMappings)
         {
             ThreatId = Required(threatId, nameof(threatId));
             ProtectionClass = Required(protectionClass, nameof(protectionClass));
@@ -335,9 +337,9 @@ namespace BallisticsLab.Core
             ValidatePositive(
                 minimumSeparationDiameters,
                 nameof(minimumSeparationDiameters));
-            if (verifiedAmmunitionTemplateIds == null)
+            if (ammunitionMappings == null)
             {
-                ThrowNullAmmunitionIds(nameof(verifiedAmmunitionTemplateIds));
+                ThrowNullAmmunitionMappings(nameof(ammunitionMappings));
             }
 
             NominalProjectileMassKilograms = nominalProjectileMassKilograms;
@@ -349,8 +351,27 @@ namespace BallisticsLab.Core
             RequiredQualifyingShots = requiredQualifyingShots;
             MaximumImpactAngleDegrees = maximumImpactAngleDegrees;
             MinimumSeparationDiameters = minimumSeparationDiameters;
-            string[] ids = verifiedAmmunitionTemplateIds
-                .Where(id => !string.IsNullOrWhiteSpace(id))
+            ProtocolAmmunitionMapping[] mappings = ammunitionMappings.ToArray();
+            if (mappings.Any(mapping => mapping == null))
+            {
+                ThrowNullAmmunitionMapping(nameof(ammunitionMappings));
+            }
+            string[] duplicateTemplateIds = mappings
+                .Where(mapping => mapping.HasInstalledTemplate)
+                .GroupBy(mapping => mapping.TemplateId, StringComparer.Ordinal)
+                .Where(group => group.Count() > 1)
+                .Select(group => group.Key)
+                .ToArray();
+            if (duplicateTemplateIds.Length != 0)
+            {
+                ThrowDuplicateAmmunitionMapping(
+                    duplicateTemplateIds[0],
+                    nameof(ammunitionMappings));
+            }
+            AmmunitionMappings = Array.AsReadOnly(mappings);
+            string[] ids = mappings
+                .Where(mapping => mapping.CanQualifySimulationScreening)
+                .Select(mapping => mapping.TemplateId)
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(id => id, StringComparer.Ordinal)
                 .ToArray();
@@ -370,8 +391,19 @@ namespace BallisticsLab.Core
         internal int RequiredQualifyingShots { get; }
         internal double MaximumImpactAngleDegrees { get; }
         internal double MinimumSeparationDiameters { get; }
+        internal IReadOnlyList<ProtocolAmmunitionMapping> AmmunitionMappings { get; }
         internal IReadOnlyList<string> VerifiedAmmunitionTemplateIds { get; }
         internal bool SimulationScreeningOnly { get; } = true;
+
+        internal bool TryGetAmmunitionMapping(
+            string templateId,
+            out ProtocolAmmunitionMapping? mapping)
+        {
+            mapping = AmmunitionMappings.FirstOrDefault(candidate =>
+                candidate.HasInstalledTemplate
+                && string.Equals(candidate.TemplateId, templateId, StringComparison.Ordinal));
+            return mapping != null;
+        }
 
         private static string Required(string value, string parameterName)
         {
@@ -461,9 +493,27 @@ namespace BallisticsLab.Core
         }
 
         [DoesNotReturn]
-        private static void ThrowNullAmmunitionIds(string parameterName)
+        private static void ThrowNullAmmunitionMappings(string parameterName)
         {
             throw new ArgumentNullException(parameterName);
+        }
+
+        [DoesNotReturn]
+        private static void ThrowNullAmmunitionMapping(string parameterName)
+        {
+            throw new ArgumentException(
+                "Ammunition mappings cannot contain a null entry.",
+                parameterName);
+        }
+
+        [DoesNotReturn]
+        private static void ThrowDuplicateAmmunitionMapping(
+            string templateId,
+            string parameterName)
+        {
+            throw new ArgumentException(
+                "Ammunition template mapping is duplicated: " + templateId,
+                parameterName);
         }
     }
 
@@ -491,7 +541,9 @@ namespace BallisticsLab.Core
             ProtocolScreeningStatus status,
             ProtocolObservedOutcome observedOutcome,
             int requiredQualifyingShots,
-            IReadOnlyList<ProtocolShotQualification> shots)
+            IReadOnlyList<ProtocolShotQualification> shots,
+            bool hasKnownNominalMassMismatch,
+            bool hasInstalledLocaleMassMismatch)
         {
             Status = status;
             ObservedOutcome = observedOutcome;
@@ -503,6 +555,8 @@ namespace BallisticsLab.Core
             }
             Shots = Array.AsReadOnly(copy);
             QualifyingShotCount = copy.Count(shot => shot.IsQualifying);
+            HasKnownNominalMassMismatch = hasKnownNominalMassMismatch;
+            HasInstalledLocaleMassMismatch = hasInstalledLocaleMassMismatch;
         }
 
         internal ProtocolScreeningStatus Status { get; }
@@ -510,6 +564,8 @@ namespace BallisticsLab.Core
         internal int RequiredQualifyingShots { get; }
         internal int QualifyingShotCount { get; }
         internal IReadOnlyList<ProtocolShotQualification> Shots { get; }
+        internal bool HasKnownNominalMassMismatch { get; }
+        internal bool HasInstalledLocaleMassMismatch { get; }
         internal bool IsCertificationClaim { get; }
     }
 
@@ -556,7 +612,11 @@ namespace BallisticsLab.Core
                 || results.Any(result => result.Reason
                     == ProtocolShotQualificationReason.MeasurementBasisMismatch)
                 || results.Any(result => result.Reason
-                    == ProtocolShotQualificationReason.AmmunitionIdentityUnverified);
+                    == ProtocolShotQualificationReason.AmmunitionIdentityUnverified)
+                || results.Any(result => result.Reason
+                    == ProtocolShotQualificationReason.AmmunitionDesignationVariant)
+                || results.Any(result => result.Reason
+                    == ProtocolShotQualificationReason.AmmunitionPhysicalStateMismatch);
             ProtocolScreeningStatus status = qualifying.Count >= threat.RequiredQualifyingShots
                 ? ProtocolScreeningStatus.SimulationScreeningComplete
                 : missingFoundation
@@ -569,11 +629,29 @@ namespace BallisticsLab.Core
                     ? ProtocolObservedOutcome.ThroughPenetrationObserved
                     : ProtocolObservedOutcome.NoThroughPenetrationObserved;
             }
+            bool hasKnownNominalMassMismatch = false;
+            bool hasInstalledLocaleMassMismatch = false;
+            for (int index = 0; index < qualifying.Count; index++)
+            {
+                ProtocolShotEvidence shot = qualifying[index];
+                if (!threat.TryGetAmmunitionMapping(
+                        shot.AmmunitionTemplateId,
+                        out ProtocolAmmunitionMapping? mapping)
+                    || mapping == null)
+                {
+                    continue;
+                }
+                hasKnownNominalMassMismatch |= !mapping.InstalledMassMatchesNominal(
+                    threat.NominalProjectileMassKilograms);
+                hasInstalledLocaleMassMismatch |= !mapping.InstalledMassMatchesLocale();
+            }
             return new ProtocolScreeningEvaluation(
                 status,
                 outcome,
                 threat.RequiredQualifyingShots,
-                new ReadOnlyCollection<ProtocolShotQualification>(results));
+                new ReadOnlyCollection<ProtocolShotQualification>(results),
+                hasKnownNominalMassMismatch,
+                hasInstalledLocaleMassMismatch);
         }
 
         private static ProtocolShotQualificationReason Qualify(
@@ -587,14 +665,31 @@ namespace BallisticsLab.Core
             {
                 return ProtocolShotQualificationReason.MeasurementBasisMismatch;
             }
-            if (threat.VerifiedAmmunitionTemplateIds.Count == 0)
-            {
-                return ProtocolShotQualificationReason.AmmunitionIdentityUnverified;
-            }
-            if (!threat.VerifiedAmmunitionTemplateIds.Contains(
+            if (threat.TryGetAmmunitionMapping(
                     shot.AmmunitionTemplateId,
-                    StringComparer.Ordinal))
+                    out ProtocolAmmunitionMapping? mapping)
+                && mapping != null)
             {
+                if (mapping.IdentityStatus
+                    == ProtocolAmmunitionIdentityStatus.VariantDesignation)
+                {
+                    return ProtocolShotQualificationReason.AmmunitionDesignationVariant;
+                }
+                if (!mapping.CanQualifySimulationScreening)
+                {
+                    return ProtocolShotQualificationReason.AmmunitionIdentityUnverified;
+                }
+                if (!mapping.MatchesRecordedProjectileMass(shot.ProjectileMassKilograms))
+                {
+                    return ProtocolShotQualificationReason.AmmunitionPhysicalStateMismatch;
+                }
+            }
+            else
+            {
+                if (threat.VerifiedAmmunitionTemplateIds.Count == 0)
+                {
+                    return ProtocolShotQualificationReason.AmmunitionIdentityUnverified;
+                }
                 return ProtocolShotQualificationReason.AmmunitionIdentityMismatch;
             }
             if (!shot.WitnessBackstopConfigured)

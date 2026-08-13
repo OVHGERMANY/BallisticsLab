@@ -16,7 +16,22 @@ Guided campaigns remove the repeated panel work from fixture testing without fir
 
 Campaign attempts now carry detached protocol-shot evidence: absolute target-impact speed, projectile mass and diameter, impact angle, fixture-local hit coordinates, plate-face dimensions, fixture distance, and witness-backstop state. A GOST-oriented catalog records the eight nominal Br1-through-Br6 threats from GOST 34286-2017, including both Br4 and both Br5 threats. Its pure screening evaluator applies the five-shot count, five-caliber edge and shot spacing, 5-degree incidence limit, test distance, velocity window, and the standard's more-severe out-of-window observations. These results are simulation screening only and never certification.
 
-The runtime reads only trajectory nodes EFT has already computed, measures cumulative path from the shot start, and linearly interpolates speed at 3 metres without advancing or rewriting the game trajectory. Evidence is marked `EftTrajectoryThreeMetres` when the cached path reaches that distance; a shorter path remains `TargetImpactProxy` and cannot complete a protocol screen. This is a simulation value, not a physical chronograph measurement or certification result. The nominal threat catalog also contains no game-ammunition IDs until each mapping is verified. Verified threat mappings and a same-sample five-point runtime campaign remain separate development work.
+The runtime reads only trajectory nodes EFT has already computed, measures cumulative path from the shot start, and linearly interpolates speed at 3 metres without advancing or rewriting the game trajectory. Evidence is marked `EftTrajectoryThreeMetres` when the cached path reaches that distance; a shorter path remains `TargetImpactProxy` and cannot complete a protocol screen. This is a simulation value, not a physical chronograph measurement or certification result.
+
+The installed SPT 4.1.2 item database and its English/Russian locale records now provide five exact designation mappings, one related variant, and two unavailable threats. Exact identity does not imply exact physical representation: the evaluator requires the shot mass to match the installed simulation value, then separately reports known differences from the nominal threat mass and the locale description. A variant or unavailable designation fails closed. Even an exact mapping can produce only a non-certifying simulation screen.
+
+| Threat | Installed EFT mapping | Identity | Mass evidence in grams: nominal / simulation / locale |
+|---|---|---|---:|
+| Br1 9x18 Pst 57-N-181S | `5737201124597760fc4431f1` | Variant `57-N-181S-01`; not qualifying | 5.9 / 5.9 / 5.9 |
+| Br2 9x21 P 7N28 | `5a26abfac4a28232980eabff` | Exact | 7.93 / 7.9 / 7.5 |
+| Br3 9x19 Pst 7N21 | `56d59d3ad2720bdb418b4577` | Exact | 7.0 / 5.4 / 5.4 |
+| Br4 5.45x39 PP 7N10 | `56dff2ced2720bb4668b4567` | Exact | 3.5 / 3.68 / 3.5 |
+| Br4 7.62x39 PS 57-N-231 | `5656d7c34bdc2d9d198b4587` | Exact | 7.9 / 7.9 / 7.9 |
+| Br5 7.62x54 PP 7N13 | None | Not present in supported database | 9.4 / — / — |
+| Br5 7.62x54 B-32 7-BZ-3 | None | Not present in supported database | 10.4 / — / — |
+| Br6 12.7x108 B-32 57-BZ-542 | `5cde8864d7f00c0010373be1` | Exact | 48.2 / 48.3 / 48.0 |
+
+A same-sample five-point runtime campaign and the dedicated protocol result document remain separate development work.
 
 The BR4 and BR5 buttons select EFT database templates bearing those names. They are repeatable game-data presets, not a claim of real-world certification. Layer spacing is the physical air gap from the back face of one collider to the front face of the next. Plate thickness controls physical collider geometry; armor class, durability, material resistance, and penetration chance come from the selected EFT template.
 

@@ -205,11 +205,26 @@ Check(
     ProtocolTests.ShotEvidenceRejectsInvalidFaceGeometry(),
     "protocol shot evidence validates projectile geometry and fixture-local impact bounds");
 Check(
+    ProtocolTests.MappingCollectionsAreDetachedAndRejectDuplicates(),
+    "protocol ammunition mappings are detached from caller mutation and reject duplicate templates");
+Check(
     ProtocolTests.TargetImpactProxyCannotCompleteScreening(),
     "target-impact velocity remains an explicit proxy and cannot complete protocol screening");
 Check(
     ProtocolTests.UnverifiedCatalogAmmunitionCannotCompleteScreening(),
     "nominal catalog threats cannot complete screening without a verified game-ammunition mapping");
+Check(
+    ProtocolTests.VariantDesignationCannotCompleteScreening(),
+    "a related cartridge variant cannot stand in for the exact protocol designation");
+Check(
+    ProtocolTests.ExactCatalogMappingCanCompleteSimulationScreening(),
+    "an exact installed designation can complete only a non-certifying simulation screen");
+Check(
+    ProtocolTests.ExactIdentityReportsKnownGameRepresentationMismatches(),
+    "simulation screening reports known nominal and locale mass mismatches");
+Check(
+    ProtocolTests.RecordedMassMustMatchMappedGameRepresentation(),
+    "protocol evidence must match the mapped installed projectile mass");
 Check(
     ProtocolTests.ValidFiveShotPatternCompletesSimulationScreening(),
     "five qualifying spaced V3 observations complete simulation screening without certification");
@@ -228,6 +243,15 @@ Check(
 Check(
     ProtocolTests.CampaignEvidenceRejectsMismatchedProtocolIdentity(),
     "campaign evidence rejects protocol geometry attached to another fixture");
+Check(
+    GostAmmunitionMappingTests.SupportedDatabaseFilesMatchCatalogSnapshot(itemsPath),
+    "installed item and English/Russian locale databases match the verified mapping snapshot");
+Check(
+    GostAmmunitionMappingTests.InstalledMappingsMatchDatabaseAndLocales(itemsPath),
+    "every installed protocol mapping matches its exact database and locale evidence");
+Check(
+    GostAmmunitionMappingTests.UnavailableThreatDesignationsRemainAbsent(itemsPath),
+    "7N13 and 7-BZ-3 remain absent from installed 7.62x54R ammunition data");
 Check(
     ProtocolTrajectorySamplerTests.ExactThreeMetreNodeReturnsNodeSpeed(),
     "three-metre trajectory sampling returns an exact cached-node speed");

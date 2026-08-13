@@ -11,7 +11,7 @@ Snapshot date: 2026-08-13
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
 - Currently deployed and playtested DLL SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
-- Current strict-build candidate SHA-256: `5E201FF86180A591A1E88F9027393FC0A958C0FB940A65B0195906DBF5EE7215`
+- Current strict-build candidate SHA-256: `B23AB85E75956F5A60340E378EF9191D9833D7959F82CDD93237214E60D14710`
 - Default configuration: disabled
 
 The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
@@ -37,17 +37,18 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Schema-4 campaign definitions, detached attempt evidence, and result matrices whose case seeds, statuses, counts, means, maxima, and completion state are independently recomputed by the offline validator.
 - A completed or stopped campaign cannot be silently replaced. Evidence revisions remain monotonic across replacements, unsaved attempts are checkpointed first, and a failed checkpoint blocks the new campaign start.
 - Per-attempt protocol evidence records absolute target-impact speed, projectile mass and diameter, actual incidence, fixture-local hit coordinates, face dimensions, fixture distance, and witness-backstop state without retaining a pooled shot or Unity object.
-- A nominal GOST 34286-2017 catalog represents all eight Br1-through-Br6 threat rows, including the two Br4 and two Br5 threats, while leaving unverified EFT ammunition mappings empty.
+- A nominal GOST 34286-2017 catalog represents all eight Br1-through-Br6 threat rows, including the two Br4 and two Br5 threats. The supported item and English/Russian locale snapshots establish five exact designation mappings, the `57-N-181S-01` Br1 variant, and the absence of both Br5 designations.
+- Mapping metadata keeps installed simulation mass, locale-described mass, initial speed, internal name, display name, caliber, and exact designation evidence separate. The evaluator admits only exact designations whose recorded projectile mass matches the installed simulation mass, while preserving flags for nominal-mass and locale-mass differences. Variants and unavailable threats fail closed.
 - A pure GOST-oriented screening evaluator enforces the five-shot count, same-sample identity, five-caliber edge and neighbour spacing, 5-degree incidence limit, test-distance tolerance, velocity window, and the standard's more-severe low-velocity penetration and high-velocity stop exceptions.
 - Screening results are explicitly non-certifying. Runtime sampling reads cached EFT trajectory nodes without advancing the trajectory, measures cumulative path length, and interpolates velocity at 3 metres. A shot whose cached path is shorter remains `TargetImpactProxy` and cannot satisfy the protocol basis.
 
-This development layer has not been deployed or tested in-game. Verified EFT threat-ammunition mappings, same-sample five-point runtime sequencing, and the formal protocol report remain next.
+This development layer has not been deployed or tested in-game. Same-sample five-point runtime sequencing and the formal protocol report remain next.
 
 ## Automated and startup verification
 
 - Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
-- Pure and installed-database validation: 116 checks passed.
-- Validation with all installed-runtime reports: 123 checks passed.
+- Pure and installed-database validation: 124 checks passed.
+- Validation with all installed-runtime reports: 131 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -59,7 +60,7 @@ This development layer has not been deployed or tested in-game. Verified EFT thr
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 - Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `5E201FF8...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `B23AB85E...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
 ## Installed runtime evidence
 

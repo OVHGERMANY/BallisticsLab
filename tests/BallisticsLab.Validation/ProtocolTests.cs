@@ -4,7 +4,22 @@ using System.Reflection;
 internal static class ProtocolTests
 {
     private const string VerifiedAmmo = "verified-ammunition-template";
-    private static readonly string[] VerifiedAmmunitionIds = { VerifiedAmmo };
+    private static readonly ProtocolAmmunitionMapping[] VerifiedAmmunitionMappings =
+    {
+        ProtocolAmmunitionMapping.Installed(
+            ProtocolAmmunitionIdentityStatus.ExactDesignation,
+            VerifiedAmmo,
+            "verified-internal-name",
+            "Verified ammunition",
+            "VerifiedCaliber",
+            0.0079d,
+            0.0079d,
+            720d,
+            "Verified designation",
+            "Проверенное обозначение",
+            "7.9 gram",
+            "Synthetic exact mapping for pure evaluator tests.")
+    };
     private static readonly int[] LayerZero = { 0 };
 
     internal static bool CatalogMatchesPublishedNominalThreatTable()
@@ -82,7 +97,15 @@ internal static class ProtocolTests
                 definition.MinimumSeparationDiameters,
                 5d))
             && definitions.All(definition => definition.SimulationScreeningOnly)
-            && definitions.All(definition => definition.VerifiedAmmunitionTemplateIds.Count == 0);
+            && definitions.Sum(definition => definition.AmmunitionMappings.Count) == 8
+            && definitions.Sum(definition => definition.AmmunitionMappings.Count(mapping =>
+                mapping.IdentityStatus == ProtocolAmmunitionIdentityStatus.ExactDesignation)) == 5
+            && definitions.Sum(definition => definition.AmmunitionMappings.Count(mapping =>
+                mapping.IdentityStatus == ProtocolAmmunitionIdentityStatus.VariantDesignation)) == 1
+            && definitions.Sum(definition => definition.AmmunitionMappings.Count(mapping =>
+                mapping.IdentityStatus
+                    == ProtocolAmmunitionIdentityStatus.NotAvailableInSupportedDatabase)) == 2
+            && definitions.Sum(definition => definition.VerifiedAmmunitionTemplateIds.Count) == 5;
     }
 
     internal static bool ShotEvidenceRejectsInvalidFaceGeometry()
@@ -129,6 +152,21 @@ internal static class ProtocolTests
             && diameterRejected;
     }
 
+    internal static bool MappingCollectionsAreDetachedAndRejectDuplicates()
+    {
+        ProtocolAmmunitionMapping mapping = VerifiedAmmunitionMappings[0];
+        var source = new[] { mapping };
+        ProtocolThreatDefinition threat = SyntheticThreat(source);
+        source[0] = ProtocolAmmunitionMapping.Unavailable("Mutation sentinel.");
+        bool duplicateRejected = Throws<ArgumentException>(() => _ = SyntheticThreat(
+            new[] { mapping, mapping }));
+        return ReferenceEquals(threat.AmmunitionMappings[0], mapping)
+            && threat.VerifiedAmmunitionTemplateIds.SequenceEqual(
+                new[] { VerifiedAmmo },
+                StringComparer.Ordinal)
+            && duplicateRejected;
+    }
+
     internal static bool TargetImpactProxyCannotCompleteScreening()
     {
         ProtocolThreatDefinition threat = SyntheticThreat();
@@ -147,17 +185,86 @@ internal static class ProtocolTests
 
     internal static bool UnverifiedCatalogAmmunitionCannotCompleteScreening()
     {
-        ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br4")[0];
+        ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br5")[0];
         IReadOnlyList<ProtocolShotEvidence> shots = Pattern(
             ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
-            895d,
+            830d,
             false,
-            ammunitionTemplateId: "545-pp-candidate");
+            ammunitionTemplateId: "unavailable-7n13");
         ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(threat, shots);
         return result.Status == ProtocolScreeningStatus.InsufficientEvidence
             && result.QualifyingShotCount == 0
             && result.Shots.All(shot => shot.Reason
                 == ProtocolShotQualificationReason.AmmunitionIdentityUnverified);
+    }
+
+    internal static bool VariantDesignationCannotCompleteScreening()
+    {
+        ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br1")[0];
+        IReadOnlyList<ProtocolShotEvidence> shots = Pattern(
+            ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
+            335d,
+            false,
+            ammunitionTemplateId: "5737201124597760fc4431f1",
+            projectileMassKilograms: 0.0059d,
+            projectileDiameterMetres: 0.00927d,
+            fixtureDistanceMetres: 5d);
+        ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(threat, shots);
+        return result.Status == ProtocolScreeningStatus.InsufficientEvidence
+            && result.QualifyingShotCount == 0
+            && result.Shots.All(shot => shot.Reason
+                == ProtocolShotQualificationReason.AmmunitionDesignationVariant);
+    }
+
+    internal static bool ExactCatalogMappingCanCompleteSimulationScreening()
+    {
+        ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br4")[1];
+        IReadOnlyList<ProtocolShotEvidence> shots = Pattern(
+            ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
+            720d,
+            false,
+            ammunitionTemplateId: "5656d7c34bdc2d9d198b4587");
+        ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(threat, shots);
+        return result.Status == ProtocolScreeningStatus.SimulationScreeningComplete
+            && result.QualifyingShotCount == 5
+            && !result.HasKnownNominalMassMismatch
+            && !result.HasInstalledLocaleMassMismatch
+            && !result.IsCertificationClaim;
+    }
+
+    internal static bool ExactIdentityReportsKnownGameRepresentationMismatches()
+    {
+        ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br4")[0];
+        IReadOnlyList<ProtocolShotEvidence> shots = Pattern(
+            ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
+            895d,
+            false,
+            ammunitionTemplateId: "56dff2ced2720bb4668b4567",
+            projectileMassKilograms: 0.00368d,
+            projectileDiameterMetres: 0.00545d);
+        ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(threat, shots);
+        return result.Status == ProtocolScreeningStatus.SimulationScreeningComplete
+            && result.QualifyingShotCount == 5
+            && result.HasKnownNominalMassMismatch
+            && result.HasInstalledLocaleMassMismatch
+            && !result.IsCertificationClaim;
+    }
+
+    internal static bool RecordedMassMustMatchMappedGameRepresentation()
+    {
+        ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br4")[0];
+        IReadOnlyList<ProtocolShotEvidence> shots = Pattern(
+            ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
+            895d,
+            false,
+            ammunitionTemplateId: "56dff2ced2720bb4668b4567",
+            projectileMassKilograms: 0.0035d,
+            projectileDiameterMetres: 0.00545d);
+        ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(threat, shots);
+        return result.Status == ProtocolScreeningStatus.InsufficientEvidence
+            && result.QualifyingShotCount == 0
+            && result.Shots.All(shot => shot.Reason
+                == ProtocolShotQualificationReason.AmmunitionPhysicalStateMismatch);
     }
 
     internal static bool ValidFiveShotPatternCompletesSimulationScreening()
@@ -284,6 +391,12 @@ internal static class ProtocolTests
 
     private static ProtocolThreatDefinition SyntheticThreat()
     {
+        return SyntheticThreat(VerifiedAmmunitionMappings);
+    }
+
+    private static ProtocolThreatDefinition SyntheticThreat(
+        IReadOnlyList<ProtocolAmmunitionMapping> mappings)
+    {
         return new ProtocolThreatDefinition(
             "synthetic-threat",
             "Screening",
@@ -298,22 +411,25 @@ internal static class ProtocolTests
             5,
             5d,
             5d,
-            VerifiedAmmunitionIds);
+            mappings);
     }
 
     private static ProtocolShotEvidence[] Pattern(
         ProtocolVelocityMeasurementBasis measurementBasis,
         double velocity,
         bool throughPenetration,
-        string ammunitionTemplateId = VerifiedAmmo)
+        string ammunitionTemplateId = VerifiedAmmo,
+        double projectileMassKilograms = 0.0079d,
+        double projectileDiameterMetres = 0.00762d,
+        double fixtureDistanceMetres = 10d)
     {
         return new[]
         {
-            Shot(1L, measurementBasis, velocity, 0d, 0d, throughPenetration, ammunitionTemplateId),
-            Shot(1L, measurementBasis, velocity, -0.10d, 0d, throughPenetration, ammunitionTemplateId),
-            Shot(1L, measurementBasis, velocity, 0.10d, 0d, throughPenetration, ammunitionTemplateId),
-            Shot(1L, measurementBasis, velocity, 0d, -0.10d, throughPenetration, ammunitionTemplateId),
-            Shot(1L, measurementBasis, velocity, 0d, 0.10d, throughPenetration, ammunitionTemplateId)
+            Shot(1L, measurementBasis, velocity, 0d, 0d, throughPenetration, ammunitionTemplateId, projectileMassKilograms, projectileDiameterMetres, fixtureDistanceMetres),
+            Shot(1L, measurementBasis, velocity, -0.10d, 0d, throughPenetration, ammunitionTemplateId, projectileMassKilograms, projectileDiameterMetres, fixtureDistanceMetres),
+            Shot(1L, measurementBasis, velocity, 0.10d, 0d, throughPenetration, ammunitionTemplateId, projectileMassKilograms, projectileDiameterMetres, fixtureDistanceMetres),
+            Shot(1L, measurementBasis, velocity, 0d, -0.10d, throughPenetration, ammunitionTemplateId, projectileMassKilograms, projectileDiameterMetres, fixtureDistanceMetres),
+            Shot(1L, measurementBasis, velocity, 0d, 0.10d, throughPenetration, ammunitionTemplateId, projectileMassKilograms, projectileDiameterMetres, fixtureDistanceMetres)
         };
     }
 
@@ -324,21 +440,24 @@ internal static class ProtocolTests
         double localX,
         double localY,
         bool throughPenetration,
-        string ammunitionTemplateId = VerifiedAmmo)
+        string ammunitionTemplateId = VerifiedAmmo,
+        double projectileMassKilograms = 0.0079d,
+        double projectileDiameterMetres = 0.00762d,
+        double fixtureDistanceMetres = 10d)
     {
         return new ProtocolShotEvidence(
             fixtureId,
             ammunitionTemplateId,
             measurementBasis,
             velocity,
-            0.0079d,
-            0.00762d,
+            projectileMassKilograms,
+            projectileDiameterMetres,
             0d,
             localX,
             localY,
             1d,
             1.5d,
-            10d,
+            fixtureDistanceMetres,
             true,
             throughPenetration);
     }
