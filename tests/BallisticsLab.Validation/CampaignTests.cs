@@ -1,0 +1,812 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using BallisticsLab.Core;
+using BallisticsLab.Validation;
+
+internal static class CampaignTests
+{
+    private static readonly int[] LayerZero = { 0 };
+    private static readonly int[] LayersZeroOne = { 0, 1 };
+    private static readonly int[] LayersZeroOneTwo = { 0, 1, 2 };
+    private static readonly int[] UnorderedDuplicateLayers = { 2, 0, 2, 1 };
+    private static readonly string[] PhysicalMaterials =
+    {
+        "ArmoredSteel",
+        "Ceramic",
+        "UHMWPE",
+        "Titan",
+        "Aluminium",
+        "Aramid",
+        "Combined"
+    };
+
+    internal static bool SeedDerivationIsStableAndCaseSpecific()
+    {
+        const ulong runSeed = 0x1122334455667788UL;
+        ulong first = CampaignSeedDeriver.Derive(runSeed, "fixture-baseline", "steel-c6", 0);
+        ulong repeated = CampaignSeedDeriver.Derive(runSeed, "fixture-baseline", "steel-c6", 0);
+        ulong nextRepetition = CampaignSeedDeriver.Derive(
+            runSeed,
+            "fixture-baseline",
+            "steel-c6",
+            1);
+        ulong nextCase = CampaignSeedDeriver.Derive(runSeed, "fixture-baseline", "steel-c3", 0);
+        return first == repeated
+            && first != 0UL
+            && first != nextRepetition
+            && first != nextCase
+            && nextRepetition != nextCase;
+    }
+
+    internal static bool EvidenceRevisionRemainsMonotonicAcrossCampaignResets()
+    {
+        var revision = new CampaignEvidenceRevisionTracker();
+        DateTime first = new DateTime(2026, 8, 13, 12, 0, 0, DateTimeKind.Utc);
+        DateTime second = first.AddSeconds(1d);
+        long firstRevision = revision.Mark(first);
+        revision.ResetTimestamp();
+        bool preserved = revision.Revision == firstRevision
+            && revision.LastUpdatedUtc == DateTime.MinValue;
+        long secondRevision = revision.Mark(second);
+        return firstRevision == 1L
+            && preserved
+            && secondRevision == 2L
+            && revision.LastUpdatedUtc == second;
+    }
+
+    internal static bool DefinitionRejectsDuplicateCaseIdentity()
+    {
+        CampaignCaseDefinition campaignCase = Case(
+            "duplicate",
+            repetitions: 1,
+            CampaignResetPolicy.BeforeEachCase);
+        try
+        {
+            _ = new CampaignDefinition(
+                "duplicate-campaign",
+                "Duplicate campaign",
+                new List<CampaignCaseDefinition> { campaignCase, campaignCase });
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+    }
+
+    internal static bool EvidenceCanonicalizesHitLayers()
+    {
+        CampaignShotEvidence evidence = Evidence(
+            fixtureId: 1L,
+            chainId: "canonical",
+            velocityFraction: 1d,
+            layers: UnorderedDuplicateLayers,
+            fixtureLayerCount: 3);
+        return evidence.HitLayers.SequenceEqual(LayersZeroOneTwo);
+    }
+
+    internal static bool EvidenceRejectsLayersOutsideRecordedFixture()
+    {
+        try
+        {
+            _ = Evidence(
+                fixtureId: 1L,
+                chainId: "outside-fixture",
+                velocityFraction: 1d,
+                layers: LayersZeroOne,
+                fixtureLayerCount: 1);
+            return false;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return true;
+        }
+    }
+
+    internal static bool ConservationRequirementCannotExistWithoutPhysicalEvidence()
+    {
+        try
+        {
+            _ = new CampaignCaseDefinition(
+                "invalid-conservation",
+                "Invalid conservation requirement",
+                CampaignFixtureSelectorKind.MaterialAndArmorClass,
+                string.Empty,
+                "ArmoredSteel",
+                4,
+                1,
+                0.15d,
+                0.0127d,
+                8d,
+                0d,
+                true,
+                1,
+                CampaignResetPolicy.BeforeEachShot,
+                0.5d,
+                1.5d,
+                false,
+                false,
+                true,
+                0.000001d,
+                1d);
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+    }
+
+    internal static bool TrackerEnforcesResetAndCompletesInOrder()
+    {
+        CampaignDefinition definition = Definition();
+        var tracker = new CampaignRunTracker(definition, 0x12345678UL);
+        if (!tracker.Start()
+            || tracker.Snapshot().State != CampaignRunState.AwaitingFixture
+            || !tracker.AttachFixture(100L))
+        {
+            return false;
+        }
+
+        CampaignAttemptRecord? wrongFixture = tracker.RecordShot(
+            Evidence(999L, "wrong-fixture", 1d, LayerZero));
+        CampaignAttemptRecord? velocityRejected = tracker.RecordShot(
+            Evidence(100L, "velocity-rejected", 0.4d, LayerZero));
+        if (wrongFixture != null
+            || velocityRejected?.Status != CampaignAttemptStatus.VelocityOutOfRange
+            || tracker.Snapshot().State != CampaignRunState.AwaitingReset
+            || tracker.ConfirmReset(999L)
+            || !tracker.ConfirmReset(100L))
+        {
+            return false;
+        }
+
+        CampaignAttemptRecord? firstAccepted = tracker.RecordShot(
+            Evidence(100L, "first-accepted", 1d, LayerZero));
+        if (firstAccepted?.Status != CampaignAttemptStatus.Accepted
+            || tracker.Snapshot().State != CampaignRunState.AwaitingReset
+            || tracker.RecordShot(Evidence(100L, "first-accepted", 1d, LayerZero)) != null
+            || !tracker.ConfirmReset(100L))
+        {
+            return false;
+        }
+
+        CampaignAttemptRecord? secondAccepted = tracker.RecordShot(
+            Evidence(100L, "second-accepted", 1.1d, LayerZero));
+        CampaignRunSnapshot afterFirstCase = tracker.Snapshot();
+        if (secondAccepted?.Status != CampaignAttemptStatus.Accepted
+            || afterFirstCase.State != CampaignRunState.AwaitingFixture
+            || afterFirstCase.CurrentCaseIndex != 1
+            || !tracker.AttachFixture(200L))
+        {
+            return false;
+        }
+
+        CampaignAttemptRecord? incomplete = tracker.RecordShot(
+            Evidence(
+                200L,
+                "incomplete",
+                1d,
+                LayerZero,
+                fixtureArmorClass: 3,
+                fixtureLayerCount: 2));
+        CampaignAttemptRecord? finalAccepted = tracker.RecordShot(
+            Evidence(
+                200L,
+                "final",
+                1d,
+                LayersZeroOne,
+                fixtureArmorClass: 3,
+                fixtureLayerCount: 2));
+        CampaignRunSnapshot completed = tracker.Snapshot();
+        return incomplete?.Status == CampaignAttemptStatus.IncompleteLayerChain
+            && finalAccepted?.Status == CampaignAttemptStatus.Accepted
+            && completed.State == CampaignRunState.Completed
+            && completed.Attempts.Count == 5
+            && velocityRejected.LabCaseSeed == firstAccepted.LabCaseSeed
+            && firstAccepted.LabCaseSeed != secondAccepted.LabCaseSeed;
+    }
+
+    internal static bool TrackerAppliesBackstopPhysicalAndConservationGates()
+    {
+        CampaignCaseDefinition gated = new CampaignCaseDefinition(
+            "gated",
+            "Gated evidence",
+            CampaignFixtureSelectorKind.MaterialAndArmorClass,
+            string.Empty,
+            "ArmoredSteel",
+            4,
+            1,
+            0.15d,
+            0.0127d,
+            8d,
+            0d,
+            true,
+            1,
+            CampaignResetPolicy.BeforeEachCase,
+            0.8d,
+            1.2d,
+            true,
+            true,
+            true,
+            0.000001d,
+            0.01d);
+        var tracker = new CampaignRunTracker(
+            new CampaignDefinition(
+                "gates",
+                "Gates",
+                new List<CampaignCaseDefinition> { gated }),
+            5UL);
+        tracker.Start();
+        tracker.AttachFixture(300L);
+
+        CampaignAttemptRecord? noBackstop = tracker.RecordShot(
+            Evidence(
+                300L,
+                "no-backstop",
+                1d,
+                LayerZero,
+                fixtureArmorClass: 4));
+        CampaignAttemptRecord? noPhysical = tracker.RecordShot(
+            Evidence(
+                300L,
+                "no-physical",
+                1d,
+                LayerZero,
+                reachedBackstop: true,
+                fixtureArmorClass: 4));
+        CampaignAttemptRecord? brokenClosure = tracker.RecordShot(
+            Evidence(
+                300L,
+                "broken-closure",
+                1d,
+                LayerZero,
+                reachedBackstop: true,
+                physicalTransitionCount: 1,
+                massClosureError: 0.001d,
+                fixtureArmorClass: 4));
+        CampaignAttemptRecord? missingConservation = tracker.RecordShot(
+            Evidence(
+                300L,
+                "missing-conservation",
+                1d,
+                LayerZero,
+                reachedBackstop: true,
+                physicalTransitionCount: 1,
+                conservationRecordCount: 0,
+                fixtureArmorClass: 4));
+        CampaignAttemptRecord? accepted = tracker.RecordShot(
+            Evidence(
+                300L,
+                "accepted",
+                1d,
+                LayerZero,
+                reachedBackstop: true,
+                physicalTransitionCount: 1,
+                massClosureError: 0.0000001d,
+                energyClosureError: 0.001d,
+                fixtureArmorClass: 4));
+        return noBackstop?.Status == CampaignAttemptStatus.MissingBackstop
+            && noPhysical?.Status == CampaignAttemptStatus.MissingPhysicalEvidence
+            && brokenClosure?.Status == CampaignAttemptStatus.ConservationFailure
+            && missingConservation?.Status == CampaignAttemptStatus.MissingConservationEvidence
+            && accepted?.Status == CampaignAttemptStatus.Accepted
+            && tracker.Snapshot().State == CampaignRunState.Completed;
+    }
+
+    internal static bool SnapshotDoesNotChangeAfterLaterAttempts()
+    {
+        CampaignDefinition definition = new CampaignDefinition(
+            "snapshot",
+            "Snapshot",
+            new List<CampaignCaseDefinition>
+            {
+                Case("single", 2, CampaignResetPolicy.BeforeEachCase)
+            });
+        var tracker = new CampaignRunTracker(definition, 9UL);
+        tracker.Start();
+        tracker.AttachFixture(400L);
+        tracker.RecordShot(Evidence(400L, "first", 1d, LayerZero));
+        CampaignRunSnapshot before = tracker.Snapshot();
+        tracker.RecordShot(Evidence(400L, "second", 1d, LayerZero));
+        return before.Attempts.Count == 1
+            && before.State == CampaignRunState.AwaitingShot
+            && tracker.Snapshot().Attempts.Count == 2;
+    }
+
+    internal static bool MatrixSummarizesAcceptedAndRejectedAttempts()
+    {
+        CampaignDefinition definition = Definition();
+        var tracker = new CampaignRunTracker(definition, 10UL);
+        tracker.Start();
+        tracker.AttachFixture(500L);
+        tracker.RecordShot(Evidence(500L, "bad-speed", 0.2d, LayerZero));
+        tracker.ConfirmReset(500L);
+        tracker.RecordShot(Evidence(500L, "good-one", 1d, LayerZero));
+        tracker.ConfirmReset(500L);
+        tracker.RecordShot(Evidence(500L, "good-two", 1.2d, LayerZero));
+        tracker.AttachFixture(600L);
+        tracker.RecordShot(
+            Evidence(
+                600L,
+                "bad-layer",
+                1d,
+                LayerZero,
+                fixtureArmorClass: 3,
+                fixtureLayerCount: 2));
+        tracker.RecordShot(
+            Evidence(
+                600L,
+                "good-final",
+                1d,
+                LayersZeroOne,
+                fixtureArmorClass: 3,
+                fixtureLayerCount: 2));
+
+        CampaignResultMatrix matrix = CampaignResultMatrixBuilder.Build(
+            definition,
+            tracker.Snapshot());
+        return matrix.Complete
+            && matrix.State == CampaignRunState.Completed
+            && matrix.AttemptCount == 5
+            && matrix.AcceptedCount == 3
+            && matrix.Rows.Count == 2
+            && matrix.Rows[0].FixtureRejectCount == 0
+            && matrix.Rows[0].VelocityRejectCount == 1
+            && matrix.Rows[0].AcceptedCount == 2
+            && Math.Abs(matrix.Rows[0].MeanVelocityFraction - 0.8d) < 0.000000001d
+            && matrix.Rows[1].LayerRejectCount == 1
+            && Math.Abs(matrix.Rows[1].MeanLayersHit - 1.5d) < 0.000000001d;
+    }
+
+    internal static bool TrackerRejectsWrongFixtureSelectorBeforeOtherGates()
+    {
+        var exactCase = new CampaignCaseDefinition(
+            "exact-template",
+            "Exact template",
+            CampaignFixtureSelectorKind.ExactTemplate,
+            "expected-template",
+            string.Empty,
+            0,
+            1,
+            0.15d,
+            0.0127d,
+            8d,
+            0d,
+            true,
+            1,
+            CampaignResetPolicy.BeforeEachCase,
+            0.5d,
+            1.5d,
+            false,
+            false,
+            false,
+            1d,
+            100d);
+        CampaignDefinition definition = new CampaignDefinition(
+            "exact-fixture",
+            "Exact fixture",
+            new List<CampaignCaseDefinition> { exactCase });
+        var tracker = new CampaignRunTracker(definition, 11UL);
+        tracker.Start();
+        tracker.AttachFixture(610L);
+
+        CampaignAttemptRecord? wrong = tracker.RecordShot(
+            Evidence(
+                610L,
+                "wrong-template",
+                1d,
+                LayerZero,
+                fixtureTemplateId: "wrong-template"));
+        CampaignAttemptRecord? accepted = tracker.RecordShot(
+            Evidence(
+                610L,
+                "matching-template",
+                1d,
+                LayerZero,
+                fixtureTemplateId: "expected-template"));
+        CampaignResultMatrix matrix = CampaignResultMatrixBuilder.Build(
+            definition,
+            tracker.Snapshot());
+        return wrong?.Status == CampaignAttemptStatus.FixtureMismatch
+            && accepted?.Status == CampaignAttemptStatus.Accepted
+            && tracker.Snapshot().State == CampaignRunState.Completed
+            && matrix.Rows[0].FixtureRejectCount == 1;
+    }
+
+    internal static bool BuiltInCatalogsDeclareExpectedCasesAndEvidenceRules()
+    {
+        CampaignDefinition baseline = CampaignCatalog.ControlledFixtureBaseline();
+        CampaignDefinition physical = CampaignCatalog.PhysicalMaterialMatrix();
+        return baseline.Cases.Count == 10
+            && baseline.RequiredRepetitions == 10
+            && baseline.Cases[0].CaseId == "steel-c6-one"
+            && baseline.Cases[7].LayerSpacingMetres == 0.30d
+            && baseline.Cases[8].TemplateId == "65573fa5655447403702a816"
+            && baseline.Cases.All(campaignCase => !campaignCase.RequirePhysicalEvidence)
+            && physical.Cases.Count == 7
+            && physical.RequiredRepetitions == 21
+            && physical.Cases.Select(campaignCase => campaignCase.Material).SequenceEqual(
+                PhysicalMaterials,
+                StringComparer.Ordinal)
+            && physical.Cases.Single(campaignCase => campaignCase.Material == "Aramid").ArmorClass == 2
+            && physical.Cases.Where(campaignCase => campaignCase.Material != "Aramid")
+                .All(campaignCase => campaignCase.ArmorClass == 4)
+            && physical.Cases.All(campaignCase => campaignCase.RequirePhysicalEvidence)
+            && physical.Cases.All(campaignCase => campaignCase.RequireConservationEvidence);
+    }
+
+    internal static bool PhysicalEvidenceUsesExactHostIdentityAndChecksClosure()
+    {
+        FakePhysicalEvent fake = FakePhysicalEvent.Resolved("campaign-physical");
+        if (!PhysicalTelemetryReflectionReader.TryCopy(
+                1,
+                fake.Event,
+                out PhysicalTelemetryEventRecord? resolved,
+                out _)
+            || resolved == null)
+        {
+            return false;
+        }
+        var tracker = new PhysicalTransitionTracker(4);
+        tracker.Add(resolved);
+        CampaignPhysicalEvidenceSummary matching = CampaignPhysicalEvidenceCalculator.Calculate(
+            tracker.Snapshot(),
+            17,
+            991,
+            "ammo-template",
+            "profile");
+        CampaignPhysicalEvidenceSummary mismatched = CampaignPhysicalEvidenceCalculator.Calculate(
+            tracker.Snapshot(),
+            18,
+            991,
+            "ammo-template",
+            "profile");
+        CampaignPhysicalEvidenceSummary wrongProfile = CampaignPhysicalEvidenceCalculator.Calculate(
+            tracker.Snapshot(),
+            17,
+            991,
+            "ammo-template",
+            "other-profile");
+        CampaignPhysicalEvidenceSummary missingProfile = CampaignPhysicalEvidenceCalculator.Calculate(
+            tracker.Snapshot(),
+            17,
+            991,
+            "ammo-template",
+            string.Empty);
+        return matching.TransitionCount == 1
+            && matching.ConservationRecordCount == 1
+            && Math.Abs(matching.MaximumMassClosureErrorKilograms) < 0.000000000001d
+            && Math.Abs(matching.MaximumEnergyClosureErrorJoules - 10d) < 0.000000001d
+            && mismatched.TransitionCount == 0
+            && mismatched.ConservationRecordCount == 0
+            && wrongProfile.TransitionCount == 0
+            && missingProfile.TransitionCount == 0;
+    }
+
+    internal static bool CampaignJsonContainsDefinitionAttemptsAndMatrix()
+    {
+        CampaignDefinition definition = new CampaignDefinition(
+            "json-campaign",
+            "JSON campaign",
+            new List<CampaignCaseDefinition>
+            {
+                Case("json-case", 1, CampaignResetPolicy.BeforeEachShot)
+            });
+        var tracker = new CampaignRunTracker(definition, 42UL);
+        tracker.Start();
+        tracker.AttachFixture(700L);
+        tracker.RecordShot(Evidence(700L, "json-chain", 1d, LayerZero));
+        string report = PhysicalReportDocumentWriter.Build(
+            "[]",
+            Array.Empty<PhysicalTransitionRecord>(),
+            definition,
+            tracker.Snapshot());
+        using JsonDocument document = JsonDocument.Parse(report);
+        JsonElement campaign = document.RootElement.GetProperty("campaign");
+        JsonElement attempt = campaign.GetProperty("attempts")[0];
+        JsonElement row = campaign.GetProperty("matrix").GetProperty("rows")[0];
+        return CampaignReportInvariantValidator.Validate(
+                document.RootElement,
+                out int attemptCount,
+                out _)
+            && attemptCount == 1
+            && campaign.GetProperty("campaignId").GetString() == "json-campaign"
+            && campaign.GetProperty("runSeed").GetUInt64() == 42UL
+            && !campaign.GetProperty("gameShotSeedOverridden").GetBoolean()
+            && campaign.GetProperty("state").GetString() == "Completed"
+            && attempt.GetProperty("chainId").GetString() == "json-chain"
+            && attempt.GetProperty("fixtureTemplateId").GetString() == "fixture-template"
+            && attempt.GetProperty("fixtureArmorMaterial").GetString() == "ArmoredSteel"
+            && attempt.GetProperty("fixtureArmorClass").GetInt32() == 6
+            && attempt.GetProperty("fixtureLayerCount").GetInt32() == 1
+            && attempt.GetProperty("rootFireIndex").GetInt32() == 17
+            && attempt.GetProperty("rootShooterProfileId").GetString() == "profile"
+            && attempt.GetProperty("status").GetString() == "Accepted"
+            && row.GetProperty("acceptedCount").GetInt32() == 1
+            && row.GetProperty("fixtureRejectCount").GetInt32() == 0
+            && row.GetProperty("complete").GetBoolean();
+    }
+
+    internal static bool CampaignJsonRejectsPartialDefinitionAndSnapshot()
+    {
+        CampaignDefinition definition = new CampaignDefinition(
+            "partial-campaign",
+            "Partial campaign",
+            new List<CampaignCaseDefinition>
+            {
+                Case("partial-case", 1, CampaignResetPolicy.BeforeEachShot)
+            });
+        try
+        {
+            _ = PhysicalReportDocumentWriter.Build(
+                "[]",
+                Array.Empty<PhysicalTransitionRecord>(),
+                definition,
+                null);
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+    }
+
+    internal static bool CampaignReportRejectsCorruptedSeedAndMatrix()
+    {
+        string report = CreateCompletedCampaignReport();
+        JsonNode wrongSeed = JsonNode.Parse(report)!;
+        wrongSeed["campaign"]!["attempts"]![0]!["labCaseSeed"] = 1UL;
+        using JsonDocument seedDocument = JsonDocument.Parse(wrongSeed.ToJsonString());
+        bool seedRejected = !CampaignReportInvariantValidator.Validate(
+            seedDocument.RootElement,
+            out _,
+            out string seedFailure);
+
+        JsonNode wrongMatrix = JsonNode.Parse(report)!;
+        wrongMatrix["campaign"]!["matrix"]!["acceptedCount"] = 2;
+        using JsonDocument matrixDocument = JsonDocument.Parse(wrongMatrix.ToJsonString());
+        bool matrixRejected = !CampaignReportInvariantValidator.Validate(
+            matrixDocument.RootElement,
+            out _,
+            out string matrixFailure);
+        return seedRejected
+            && seedFailure.Contains("attempt", StringComparison.OrdinalIgnoreCase)
+            && matrixRejected
+            && matrixFailure.Contains("matrix", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool CampaignReportRejectsCorruptedFixtureIdentity()
+    {
+        JsonNode corrupted = JsonNode.Parse(CreateCompletedCampaignReport())!;
+        corrupted["campaign"]!["attempts"]![0]!["fixtureArmorClass"] = 5;
+        using JsonDocument document = JsonDocument.Parse(corrupted.ToJsonString());
+        return !CampaignReportInvariantValidator.Validate(
+                document.RootElement,
+                out _,
+                out string failure)
+            && failure.Contains("status", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool CampaignReportRejectsCorruptedAttemptAndHeaderCursors()
+    {
+        string report = CreateCompletedCampaignReport();
+        JsonNode wrongAttempt = JsonNode.Parse(report)!;
+        wrongAttempt["campaign"]!["attempts"]![0]!["attemptIndex"] = 1;
+        using JsonDocument attemptDocument = JsonDocument.Parse(wrongAttempt.ToJsonString());
+        bool attemptRejected = !CampaignReportInvariantValidator.Validate(
+            attemptDocument.RootElement,
+            out _,
+            out string attemptFailure);
+
+        JsonNode wrongHeader = JsonNode.Parse(report)!;
+        wrongHeader["campaign"]!["currentCaseIndex"] = 0;
+        using JsonDocument headerDocument = JsonDocument.Parse(wrongHeader.ToJsonString());
+        bool headerRejected = !CampaignReportInvariantValidator.Validate(
+            headerDocument.RootElement,
+            out _,
+            out string headerFailure);
+        return attemptRejected
+            && attemptFailure.Contains("cursor", StringComparison.OrdinalIgnoreCase)
+            && headerRejected
+            && headerFailure.Contains("cursor", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool ReportInvariantAcceptsCampaignOnlyEvidence()
+    {
+        string path = Path.Combine(
+            Path.GetTempPath(),
+            "BallisticsLab.Campaign." + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(path, CreateCompletedCampaignReport());
+            return ReportInvariantValidator.Validate(path, out _);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    internal static bool ReportInvariantRejectsEmptyCampaignShell()
+    {
+        CampaignDefinition definition = new CampaignDefinition(
+            "empty-shell",
+            "Empty shell",
+            new List<CampaignCaseDefinition>
+            {
+                Case("empty-case", 1, CampaignResetPolicy.BeforeEachShot)
+            });
+        var tracker = new CampaignRunTracker(definition, 43UL);
+        tracker.Start();
+        tracker.AttachFixture(800L);
+        string path = Path.Combine(
+            Path.GetTempPath(),
+            "BallisticsLab.EmptyCampaign." + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(
+                path,
+                PhysicalReportDocumentWriter.Build(
+                    "[]",
+                    Array.Empty<PhysicalTransitionRecord>(),
+                    definition,
+                    tracker.Snapshot()));
+            return !ReportInvariantValidator.Validate(path, out string failure)
+                && failure.Contains("no shot", StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    internal static bool StoppedCampaignPreservesAttemptsAndRejectsFurtherShots()
+    {
+        CampaignDefinition definition = new CampaignDefinition(
+            "stopped",
+            "Stopped campaign",
+            new List<CampaignCaseDefinition>
+            {
+                Case("two-repetitions", 2, CampaignResetPolicy.BeforeEachShot)
+            });
+        var tracker = new CampaignRunTracker(definition, 7UL);
+        tracker.Start();
+        tracker.AttachFixture(900L);
+        tracker.RecordShot(Evidence(900L, "first", 1d, LayerZero));
+        tracker.ConfirmReset(900L);
+        bool stopped = tracker.Stop();
+        CampaignAttemptRecord? afterStop = tracker.RecordShot(
+            Evidence(900L, "after-stop", 1d, LayerZero));
+        CampaignRunSnapshot snapshot = tracker.Snapshot();
+        return stopped
+            && snapshot.State == CampaignRunState.Stopped
+            && snapshot.Attempts.Count == 1
+            && afterStop == null
+            && !tracker.Stop();
+    }
+
+    private static string CreateCompletedCampaignReport()
+    {
+        CampaignDefinition definition = new CampaignDefinition(
+            "report-campaign",
+            "Report campaign",
+            new List<CampaignCaseDefinition>
+            {
+                Case("report-case", 1, CampaignResetPolicy.BeforeEachShot)
+            });
+        var tracker = new CampaignRunTracker(definition, 42UL);
+        tracker.Start();
+        tracker.AttachFixture(701L);
+        tracker.RecordShot(Evidence(701L, "report-chain", 1d, LayerZero));
+        return PhysicalReportDocumentWriter.Build(
+            "[]",
+            Array.Empty<PhysicalTransitionRecord>(),
+            definition,
+            tracker.Snapshot());
+    }
+
+    private static CampaignDefinition Definition()
+    {
+        return new CampaignDefinition(
+            "fixture-baseline",
+            "Fixture baseline",
+            new List<CampaignCaseDefinition>
+            {
+                Case("steel-c6", 2, CampaignResetPolicy.BeforeEachShot),
+                new CampaignCaseDefinition(
+                    "steel-c3-two",
+                    "Two-layer steel",
+                    CampaignFixtureSelectorKind.MaterialAndArmorClass,
+                    string.Empty,
+                    "ArmoredSteel",
+                    3,
+                    2,
+                    0.15d,
+                    0.0127d,
+                    8d,
+                    0d,
+                    true,
+                    1,
+                    CampaignResetPolicy.BeforeEachCase,
+                    0.5d,
+                    1.5d,
+                    false,
+                    false,
+                    false,
+                    1d,
+                    100d)
+            });
+    }
+
+    private static CampaignCaseDefinition Case(
+        string caseId,
+        int repetitions,
+        CampaignResetPolicy resetPolicy)
+    {
+        return new CampaignCaseDefinition(
+            caseId,
+            caseId + " label",
+            CampaignFixtureSelectorKind.MaterialAndArmorClass,
+            string.Empty,
+            "ArmoredSteel",
+            6,
+            1,
+            0.15d,
+            0.0127d,
+            8d,
+            0d,
+            true,
+            repetitions,
+            resetPolicy,
+            0.5d,
+            1.5d,
+            false,
+            false,
+            false,
+            1d,
+            100d);
+    }
+
+    private static CampaignShotEvidence Evidence(
+        long fixtureId,
+        string chainId,
+        double velocityFraction,
+        IReadOnlyList<int> layers,
+        bool reachedBackstop = false,
+        int physicalTransitionCount = 0,
+        int conservationRecordCount = -1,
+        double massClosureError = 0d,
+        double energyClosureError = 0d,
+        string fixtureTemplateId = "fixture-template",
+        string fixtureArmorMaterial = "ArmoredSteel",
+        int fixtureArmorClass = 6,
+        int fixtureLayerCount = 1)
+    {
+        return new CampaignShotEvidence(
+            fixtureId,
+            chainId,
+            fixtureTemplateId,
+            fixtureArmorMaterial,
+            fixtureArmorClass,
+            fixtureLayerCount,
+            17,
+            12345,
+            "profile",
+            "ammo-template",
+            velocityFraction,
+            layers,
+            "PENETRATED",
+            reachedBackstop,
+            physicalTransitionCount,
+            conservationRecordCount < 0 ? physicalTransitionCount : conservationRecordCount,
+            massClosureError,
+            energyClosureError);
+    }
+}

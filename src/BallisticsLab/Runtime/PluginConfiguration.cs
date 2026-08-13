@@ -62,6 +62,13 @@ namespace BallisticsLab.Runtime
                 "Automatic Report Saving",
                 true,
                 "Saves each changed shot-chain batch as a nonempty CSV/JSON pair after a completed burst and when the session or world ends.");
+            CampaignSeed = config.Bind(
+                "Campaigns",
+                "Lab Campaign Seed",
+                104729,
+                new ConfigDescription(
+                    "Derives stable Lab case identifiers. The game shot seed is observed in evidence and is not overridden.",
+                    new AcceptableValueRange<int>(1, int.MaxValue)));
         }
 
         internal ConfigEntry<bool> Enabled { get; }
@@ -75,5 +82,6 @@ namespace BallisticsLab.Runtime
         internal ConfigEntry<float> TraceLifetime { get; }
         internal ConfigEntry<bool> RecordAllSessionShots { get; }
         internal ConfigEntry<bool> AutomaticReportSaving { get; }
+        internal ConfigEntry<int> CampaignSeed { get; }
     }
 }

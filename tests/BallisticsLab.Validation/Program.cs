@@ -132,6 +132,69 @@ Check(
 Check(
     PhysicalTransitionInvariantTests.RejectsBrokenEnergyClosure(),
     "physical transition invariants reject broken energy closure");
+Check(
+    CampaignTests.SeedDerivationIsStableAndCaseSpecific(),
+    "campaign case seeds are stable and distinct across cases and repetitions");
+Check(
+    CampaignTests.EvidenceRevisionRemainsMonotonicAcrossCampaignResets(),
+    "campaign evidence revisions remain monotonic across campaign replacements");
+Check(
+    CampaignTests.DefinitionRejectsDuplicateCaseIdentity(),
+    "campaign definitions reject duplicate case identities");
+Check(
+    CampaignTests.EvidenceCanonicalizesHitLayers(),
+    "campaign evidence canonicalizes layer indices deterministically");
+Check(
+    CampaignTests.EvidenceRejectsLayersOutsideRecordedFixture(),
+    "campaign evidence rejects layer indices outside the recorded fixture");
+Check(
+    CampaignTests.ConservationRequirementCannotExistWithoutPhysicalEvidence(),
+    "campaign definitions reject conservation gates without physical-transition evidence");
+Check(
+    CampaignTests.TrackerEnforcesResetAndCompletesInOrder(),
+    "campaign tracker enforces fixture and reset order without counting duplicate chains");
+Check(
+    CampaignTests.TrackerAppliesBackstopPhysicalAndConservationGates(),
+    "campaign tracker applies backstop, physical-evidence, and conservation gates");
+Check(
+    CampaignTests.SnapshotDoesNotChangeAfterLaterAttempts(),
+    "campaign snapshots remain detached from later attempts");
+Check(
+    CampaignTests.MatrixSummarizesAcceptedAndRejectedAttempts(),
+    "campaign result matrix summarizes accepted and rejected attempts");
+Check(
+    CampaignTests.TrackerRejectsWrongFixtureSelectorBeforeOtherGates(),
+    "campaign tracker rejects wrong physical fixtures before accepting shot evidence");
+Check(
+    CampaignTests.BuiltInCatalogsDeclareExpectedCasesAndEvidenceRules(),
+    "built-in campaigns declare the controlled stacks and physical material evidence rules");
+Check(
+    CampaignTests.PhysicalEvidenceUsesExactHostIdentityAndChecksClosure(),
+    "campaign physical evidence uses exact host identity and measures mass and energy closure");
+Check(
+    CampaignTests.CampaignJsonContainsDefinitionAttemptsAndMatrix(),
+    "schema 4 campaign JSON contains definitions, attempts, seed semantics, and result matrix");
+Check(
+    CampaignTests.CampaignJsonRejectsPartialDefinitionAndSnapshot(),
+    "campaign JSON refuses a partial definition/snapshot pair");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedSeedAndMatrix(),
+    "campaign report validation rejects corrupted case seeds and summary matrices");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedFixtureIdentity(),
+    "campaign report validation rejects fixture identity inconsistent with attempt status");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedAttemptAndHeaderCursors(),
+    "campaign report validation rejects impossible attempt order and header cursors");
+Check(
+    CampaignTests.ReportInvariantAcceptsCampaignOnlyEvidence(),
+    "campaign-only schema 4 evidence passes the report invariant gate");
+Check(
+    CampaignTests.ReportInvariantRejectsEmptyCampaignShell(),
+    "an empty campaign shell is not accepted as report evidence");
+Check(
+    CampaignTests.StoppedCampaignPreservesAttemptsAndRejectsFurtherShots(),
+    "stopping a campaign preserves evidence and rejects later shot chains");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 Check(
     !LabPolicies.ShouldSaveReport(0, 1, 0)
@@ -320,6 +383,12 @@ else
     Check(plates.Any(plate => plate.Id == granitBr5 && plate.ArmorClass == 6 && plate.Material == "Ceramic"), "Granit Br5 regression");
     Check(Enumerable.Range(3, 4).All(armorClass => plates.Any(plate => plate.Material == "ArmoredSteel" && plate.ArmorClass == armorClass)), "steel classes 3 through 6");
     Check(plates.All(plate => plate.Durability > 0 && plate.ArmorClass is >= 2 and <= 6), "plate class and durability bounds");
+    Check(
+        CampaignCatalog.PhysicalMaterialMatrix().Cases.All(
+            campaignCase => plates.Any(
+                plate => plate.Material == campaignCase.Material
+                    && plate.ArmorClass == campaignCase.ArmorClass)),
+        "every physical material campaign case resolves an exact installed material and armor class");
 
     Console.WriteLine("Catalog: " + plates.Count.ToString(CultureInfo.InvariantCulture) + " usable plates");
     foreach (IGrouping<string, PlateRow> group in plates.GroupBy(plate => plate.Material).OrderBy(group => group.Key, StringComparer.Ordinal))

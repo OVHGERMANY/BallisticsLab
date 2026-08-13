@@ -51,9 +51,10 @@ namespace BallisticsLab.Runtime.Telemetry
             FragmentIndex = shot.FragmentIndex;
             Shot root = FindRoot(shot, out int parentDepth);
             ParentDepth = parentDepth;
+            RootFireIndex = root.FireIndex;
             RootRandomSeed = root.RandomSeed;
-            string rootShooter = root.Player?.iPlayer?.ProfileId ?? root.PlayerProfileID ?? string.Empty;
-            ChainId = LabPolicies.ShotChainId(rootShooter, root.FireIndex, root.RandomSeed);
+            RootShooterProfileId = root.Player?.iPlayer?.ProfileId ?? root.PlayerProfileID ?? string.Empty;
+            ChainId = LabPolicies.ShotChainId(RootShooterProfileId, RootFireIndex, RootRandomSeed);
             TargetKind = "WORLD";
             TargetName = shot.HittedBallisticCollider != null
                 ? shot.HittedBallisticCollider.name
@@ -119,7 +120,9 @@ namespace BallisticsLab.Runtime.Telemetry
         internal int FireIndex { get; }
         internal int FragmentIndex { get; }
         internal int ParentDepth { get; }
+        internal int RootFireIndex { get; }
         internal int RootRandomSeed { get; }
+        internal string RootShooterProfileId { get; }
         internal bool IsForwardHit { get; }
         internal float DecisionDamage { get; }
         internal float DecisionPenetration { get; }

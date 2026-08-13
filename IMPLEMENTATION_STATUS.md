@@ -11,7 +11,7 @@ Snapshot date: 2026-08-13
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
 - Currently deployed and playtested DLL SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
-- Current strict-build candidate SHA-256: `E58C9690D31524D18552D1A33B26876839555557612B96F0E279E320FAD73450`
+- Current strict-build candidate SHA-256: `5E201FF86180A591A1E88F9027393FC0A958C0FB940A65B0195906DBF5EE7215`
 - Default configuration: disabled
 
 The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
@@ -30,14 +30,20 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Schema-4 JSON `physicalTransitions` export with complete parent/output state, material origin, prior collisions, loss budget, and conservation ledger.
 - Physical-transition-only manual and automatic reports with independent revision tracking; the flat shot-record CSV columns remain unchanged.
 - Offline mass and energy closure validation across parent allocation, target spall, output counts, modeled losses, residual energy, output energy, and closure error.
+- Built-in controlled-fixture and seven-material campaigns with exact installed material/class selectors plus explicit velocity, layer, backstop, physical-transition, and conservation gates.
+- One accepted complete chain per attempt, exact fixture and lineage correlation, deterministic duplicate rejection, and a 350 ms evidence-settle window before evaluation.
+- Automatic durability reset between repeated shots, automatic fixture advancement between cases, and an accessible guided-campaign panel that does not fire the weapon.
+- Stable case-identification seeds derived from a configurable Lab seed. These seeds label repeatable cases; they do not replace EFT's observed shot seed.
+- Schema-4 campaign definitions, detached attempt evidence, and result matrices whose case seeds, statuses, counts, means, maxima, and completion state are independently recomputed by the offline validator.
+- A completed or stopped campaign cannot be silently replaced. Evidence revisions remain monotonic across replacements, unsaved attempts are checkpointed first, and a failed checkpoint blocks the new campaign start.
 
-This development layer has not been deployed or tested in-game. Deterministic campaigns, reset control, result matrices, material standards, and protocol reporting remain next.
+This development layer has not been deployed or tested in-game. Formal material standards and protocol reporting remain next.
 
 ## Automated and startup verification
 
 - Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
-- Pure and installed-database validation: 78 checks passed.
-- Validation with all installed-runtime reports: 85 checks passed.
+- Pure and installed-database validation: 100 checks passed.
+- Validation with all installed-runtime reports: 107 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -49,7 +55,7 @@ This development layer has not been deployed or tested in-game. Deterministic ca
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 - Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `E58C9690...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `5E201FF8...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
 ## Installed runtime evidence
 
@@ -126,8 +132,8 @@ Historical evidence does not satisfy a missing `0.2.8` gate.
 
 ## Remaining development sequence
 
-- Add automated campaigns, deterministic seeds, reset control, result matrices, and conservation summaries.
 - Add formal GOST-oriented protocols and standardized reports.
+- Add protocol-level material acceptance limits and cross-campaign comparison summaries without treating EFT template labels as laboratory certification.
 - Run the final integrated in-game campaign only after every offline development layer is complete.
 
 Existing Granit BR4 and BR5 labels are repeatable EFT database presets only. They are not certification tests.

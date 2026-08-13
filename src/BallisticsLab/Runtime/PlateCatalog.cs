@@ -137,6 +137,12 @@ namespace BallisticsLab.Runtime
             return nearest == null ? -1 : _entries.IndexOf(nearest);
         }
 
+        internal int FindExactMaterial(EArmorMaterial material, int armorClass)
+        {
+            return _entries.FindIndex(
+                entry => entry.Material == material && entry.ArmorClass == armorClass);
+        }
+
         internal List<int> Search(string query)
         {
             if (string.IsNullOrWhiteSpace(query))

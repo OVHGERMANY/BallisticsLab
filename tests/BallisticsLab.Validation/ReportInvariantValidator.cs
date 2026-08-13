@@ -83,10 +83,19 @@ internal static class ReportInvariantValidator
                 && schemaElement.TryGetInt32(out int schema)
                 && schema >= 4;
             int physicalTransitionCount = 0;
+            int campaignAttemptCount = 0;
             if (schemaFour
                 && !PhysicalTransitionInvariantValidator.Validate(
                     document.RootElement,
                     out physicalTransitionCount,
+                    out failure))
+            {
+                return false;
+            }
+            if (schemaFour
+                && !CampaignReportInvariantValidator.Validate(
+                    document.RootElement,
+                    out campaignAttemptCount,
                     out failure))
             {
                 return false;
@@ -99,11 +108,11 @@ internal static class ReportInvariantValidator
             }
             if (records.GetArrayLength() == 0)
             {
-                if (physicalTransitionCount > 0)
+                if (physicalTransitionCount > 0 || campaignAttemptCount > 0)
                 {
                     return true;
                 }
-                failure = "report contains neither shot records nor physical transitions";
+                failure = "report contains no shot, physical-transition, or campaign-attempt evidence";
                 return false;
             }
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -14,6 +15,7 @@ using BallisticsLab.Runtime.Telemetry;
 using EFT;
 using EFT.Ballistics;
 using EFT.InputSystem;
+using EFT.InventoryLogic;
 using UnityEngine;
 
 namespace BallisticsLab.Runtime
@@ -137,6 +139,7 @@ namespace BallisticsLab.Runtime
             if (_sessionActive)
             {
                 PhysicalTelemetrySessionBridge.Update();
+                UpdateCampaign();
                 BotController.Update();
                 RefreshHideoutShootingModeStatus();
                 UpdateTrace();
@@ -196,6 +199,7 @@ namespace BallisticsLab.Runtime
 
         internal static void NotifyRecord(ShotRecord record)
         {
+            CampaignRuntimeController.Observe(record);
             _latestRecord = record;
             _traceUntil = Time.time + (Plugin.Configuration?.TraceLifetime.Value ?? 8f);
             _status = "Recorded shot #" + record.Sequence + ": " + record.Outcome + ".";
@@ -278,7 +282,11 @@ namespace BallisticsLab.Runtime
                 SetPanelVisible(false);
             }
 
-            DrawFixtureControls(sectionStyle, buttonStyle);
+            DrawCampaignControls(sectionStyle, buttonStyle);
+            if (!CampaignRuntimeController.IsRunning)
+            {
+                DrawFixtureControls(sectionStyle, buttonStyle);
+            }
             DrawBotControls(sectionStyle, buttonStyle);
             DrawLatestShot();
 
@@ -300,14 +308,20 @@ namespace BallisticsLab.Runtime
                     _status = "Export failed: " + exception.Message;
                 }
             }
-            if (GUILayout.Button("CLEAR RECORDS", _buttonStyle, GUILayout.Height(42f)))
+            if (!CampaignRuntimeController.IsRunning
+                && GUILayout.Button("CLEAR RECORDS", _buttonStyle, GUILayout.Height(42f)))
             {
                 SaveAutomaticReport(true);
+                CampaignRuntimeController.Clear();
                 TelemetryStore.Clear();
                 PhysicalTelemetrySessionBridge.ClearCaptured();
                 _latestRecord = null;
                 HideTrace();
                 _status = "Shot and physical-transition records cleared.";
+            }
+            else if (CampaignRuntimeController.IsRunning)
+            {
+                GUILayout.Label("Stop the guided campaign before clearing its evidence.");
             }
             GUILayout.EndHorizontal();
 
@@ -538,6 +552,64 @@ namespace BallisticsLab.Runtime
 
         }
 
+        private static void DrawCampaignControls(GUIStyle sectionStyle, GUIStyle buttonStyle)
+        {
+            GUILayout.Space(12f);
+            GUILayout.Label("GUIDED CAMPAIGNS", sectionStyle);
+            GUILayout.Box(CampaignRuntimeController.Describe(), GUILayout.ExpandWidth(true));
+            if (CampaignRuntimeController.IsRunning)
+            {
+                GUILayout.Label(
+                    "Shoot one round at the center marker. The Lab waits for the full shot chain, records the result, restores durability, and advances the fixture.");
+                if (GUILayout.Button("STOP GUIDED CAMPAIGN", buttonStyle, GUILayout.Height(52f)))
+                {
+                    StopCampaign("Guided campaign stopped. Captured attempts remain in reports.");
+                }
+                return;
+            }
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(
+                "Lab case seed: " + ActiveConfiguration.CampaignSeed.Value.ToString(CultureInfo.InvariantCulture),
+                GUILayout.Width(230f));
+            if (GUILayout.Button("-1", buttonStyle, GUILayout.Height(42f), GUILayout.Width(80f)))
+            {
+                if (ActiveConfiguration.CampaignSeed.Value > 1)
+                {
+                    ActiveConfiguration.CampaignSeed.Value--;
+                }
+            }
+            if (GUILayout.Button("+1", buttonStyle, GUILayout.Height(42f), GUILayout.Width(80f)))
+            {
+                if (ActiveConfiguration.CampaignSeed.Value < int.MaxValue)
+                {
+                    ActiveConfiguration.CampaignSeed.Value++;
+                }
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Label(
+                "This seed identifies repeatable Lab cases. The game shot seed is observed and recorded; it is not overridden.");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(
+                    "START CONTROLLED FIXTURE BASELINE\n10 plate-stack cases",
+                    buttonStyle,
+                    GUILayout.Height(66f)))
+            {
+                StartCampaign(CampaignCatalog.ControlledFixtureBaseline());
+            }
+            if (GUILayout.Button(
+                    "START PHYSICAL MATERIAL MATRIX\n7 materials x 3 accepted shots",
+                    buttonStyle,
+                    GUILayout.Height(66f)))
+            {
+                StartCampaign(CampaignCatalog.PhysicalMaterialMatrix());
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Label(
+                "The campaign automates fixture selection, repeat counts, evidence gates, resets, and result matrices. It does not fire the weapon.");
+        }
+
         private static void DrawBotControls(GUIStyle sectionStyle, GUIStyle buttonStyle)
         {
             GUILayout.Space(12f);
@@ -711,6 +783,7 @@ namespace BallisticsLab.Runtime
                 {
                     PresetIndices[index] = defaultIndex;
                 }
+                CampaignRuntimeController.Clear();
                 TelemetryStore.Clear();
                 _sessionActive = true;
                 PhysicalTelemetrySessionBridge.Start();
@@ -732,6 +805,8 @@ namespace BallisticsLab.Runtime
 
         private static void EndSession(string status)
         {
+            CampaignRuntimeController.TryFinalizePending(DateTime.MaxValue, out _);
+            CampaignRuntimeController.Stop();
             PhysicalTelemetrySessionBridge.Stop();
             SaveAutomaticReport(true);
             BotController.ClearSelection();
@@ -741,6 +816,7 @@ namespace BallisticsLab.Runtime
             HideTrace(true);
             _sessionActive = false;
             _latestRecord = null;
+            CampaignRuntimeController.Clear();
             _status = status;
         }
 
@@ -925,7 +1001,202 @@ namespace BallisticsLab.Runtime
             return property != null && property.GetValue(owner, null) is bool value && value;
         }
 
-        private static bool PlaceFixture()
+        private static void StartCampaign(CampaignDefinition definition)
+        {
+            if (!_sessionActive)
+            {
+                _status = "Start a lab session first.";
+                return;
+            }
+            if (!PrepareCampaignReplacement())
+            {
+                return;
+            }
+            ulong runSeed = (uint)ActiveConfiguration.CampaignSeed.Value;
+            if (!CampaignRuntimeController.Start(definition, runSeed))
+            {
+                _status = "Another guided campaign is still active.";
+                return;
+            }
+            if (!PlaceCampaignFixture())
+            {
+                CampaignRuntimeController.Stop();
+                return;
+            }
+            _status = "Campaign ready. Shoot one round at the center marker.";
+            SetPanelVisible(false);
+        }
+
+        private static bool PrepareCampaignReplacement()
+        {
+            if (!CampaignRuntimeController.HasCampaign)
+            {
+                return true;
+            }
+
+            if (TelemetryStore.HasUnsavedCampaignEvidence())
+            {
+                try
+                {
+                    string checkpoint = TelemetryStore.Export();
+                    Plugin.Log?.LogInfo("Previous guided campaign checkpointed before replacement: " + checkpoint);
+                }
+                catch (IOException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (UnauthorizedAccessException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (InvalidOperationException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (ArgumentException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (NotSupportedException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (System.Security.SecurityException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+            }
+
+            CampaignRuntimeController.Clear();
+            return true;
+        }
+
+        private static bool ReportCampaignCheckpointFailure(Exception exception)
+        {
+            _status = "Previous campaign checkpoint failed; new campaign was not started: "
+                + exception.Message;
+            Plugin.Log?.LogWarning(_status);
+            return false;
+        }
+
+        private static void StopCampaign(string status)
+        {
+            CampaignRuntimeController.TryFinalizePending(DateTime.MaxValue, out _);
+            CampaignRuntimeController.Stop();
+            SaveAutomaticReport(true);
+            _status = status;
+        }
+
+        private static void UpdateCampaign()
+        {
+            if (!CampaignRuntimeController.TryFinalizePending(
+                    DateTime.UtcNow,
+                    out CampaignAttemptRecord? attempt)
+                || attempt == null)
+            {
+                return;
+            }
+
+            string result = "Campaign attempt "
+                + attempt.AttemptOrdinal.ToString(CultureInfo.InvariantCulture)
+                + " was " + attempt.Status + ".";
+            if (!CampaignRuntimeController.TrySnapshot(
+                    out _,
+                    out CampaignRunSnapshot? snapshot,
+                    out _,
+                    out _)
+                || snapshot == null)
+            {
+                _status = result;
+                return;
+            }
+
+            if (snapshot.State == CampaignRunState.AwaitingReset)
+            {
+                if (_rig == null)
+                {
+                    StopCampaign(result + " Fixture vanished before reset; campaign stopped.");
+                    return;
+                }
+                _rig.ResetDurability();
+                if (!CampaignRuntimeController.ConfirmReset(_rig.FixtureId))
+                {
+                    StopCampaign(result + " Reset state did not match the active fixture; campaign stopped.");
+                    return;
+                }
+                _status = result + " Durability restored; shoot the same center marker again.";
+                return;
+            }
+
+            if (snapshot.State == CampaignRunState.AwaitingFixture)
+            {
+                if (!PlaceCampaignFixture())
+                {
+                    StopCampaign(result + " The next fixture could not be placed; campaign stopped.");
+                    return;
+                }
+                _status = result + " Next fixture placed; shoot its center marker.";
+                return;
+            }
+
+            _status = snapshot.State == CampaignRunState.Completed
+                ? result + " Campaign complete; the result matrix is ready in the JSON report."
+                : result;
+        }
+
+        private static bool PlaceCampaignFixture()
+        {
+            if (!CampaignRuntimeController.TryGetCurrentCase(
+                    out CampaignCaseDefinition? campaignCase)
+                || campaignCase == null)
+            {
+                _status = "The campaign has no current fixture case.";
+                return false;
+            }
+
+            int presetIndex;
+            if (campaignCase.SelectorKind == CampaignFixtureSelectorKind.ExactTemplate)
+            {
+                presetIndex = ActiveCatalog.FindByTemplateId(campaignCase.TemplateId);
+            }
+            else if (campaignCase.SelectorKind == CampaignFixtureSelectorKind.MaterialAndArmorClass
+                && Enum.TryParse(campaignCase.Material, ignoreCase: true, out EArmorMaterial material))
+            {
+                presetIndex = ActiveCatalog.FindExactMaterial(material, campaignCase.ArmorClass);
+            }
+            else
+            {
+                _status = "Unsupported campaign fixture selector for " + campaignCase.CaseId + ".";
+                return false;
+            }
+            if (presetIndex < 0)
+            {
+                _status = "No installed armor template satisfies campaign case "
+                    + campaignCase.CaseId + ".";
+                return false;
+            }
+
+            _distance = (float)campaignCase.DistanceMetres;
+            _spacing = (float)campaignCase.LayerSpacingMetres;
+            _thickness = (float)campaignCase.PlateThicknessMetres;
+            _angle = (float)campaignCase.AngleDegrees;
+            SetAllPresets(presetIndex, campaignCase.LayerCount);
+            if (!PlaceFixture(campaignCase.BackstopEnabled) || _rig == null)
+            {
+                return false;
+            }
+            if (!CampaignRuntimeController.AttachFixture(_rig.FixtureId))
+            {
+                _status = "Campaign fixture state rejected fixture #"
+                    + _rig.FixtureId.ToString(CultureInfo.InvariantCulture) + ".";
+                return false;
+            }
+            _status = "Campaign case " + campaignCase.CaseId + " placed as fixture #"
+                + _rig.FixtureId.ToString(CultureInfo.InvariantCulture) + ".";
+            return true;
+        }
+
+        private static bool PlaceFixture(bool? backstopOverride = null)
         {
             if (!_sessionActive || _catalog == null)
             {
@@ -959,7 +1230,7 @@ namespace BallisticsLab.Runtime
                 rotation,
                 _spacing,
                 _thickness,
-                ActiveConfiguration.CatcherEnabled.Value);
+                backstopOverride ?? ActiveConfiguration.CatcherEnabled.Value);
             _rig?.Dispose();
             _rig = replacement;
             _status = "Placed " + _layerCount + " layer(s) at " + Invariant(_distance, "F1")

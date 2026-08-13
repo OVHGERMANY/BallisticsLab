@@ -11,6 +11,15 @@ namespace BallisticsLab.Core
             string shotRecordsJsonArray,
             IReadOnlyList<PhysicalTransitionRecord> transitions)
         {
+            return Build(shotRecordsJsonArray, transitions, null, null);
+        }
+
+        internal static string Build(
+            string shotRecordsJsonArray,
+            IReadOnlyList<PhysicalTransitionRecord> transitions,
+            CampaignDefinition? campaignDefinition,
+            CampaignRunSnapshot? campaignSnapshot)
+        {
             if (string.IsNullOrWhiteSpace(shotRecordsJsonArray))
             {
                 throw new ArgumentException("Shot-record JSON array is required.", nameof(shotRecordsJsonArray));
@@ -29,6 +38,8 @@ namespace BallisticsLab.Core
                 .Append(shotRecordsJsonArray)
                 .Append(",\"physicalTransitions\":");
             PhysicalTransitionJsonWriter.AppendArray(builder, transitions);
+            builder.Append(",\"campaign\":");
+            CampaignJsonWriter.AppendOrNull(builder, campaignDefinition, campaignSnapshot);
             builder.Append('}');
             return builder.ToString();
         }

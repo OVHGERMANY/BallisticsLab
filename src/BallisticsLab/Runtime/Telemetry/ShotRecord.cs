@@ -75,7 +75,9 @@ namespace BallisticsLab.Runtime.Telemetry
                 FireIndex = state.FireIndex,
                 FragmentIndex = state.FragmentIndex,
                 ParentDepth = state.ParentDepth,
+                RootFireIndex = state.RootFireIndex,
                 RootRandomSeed = state.RootRandomSeed,
+                RootShooterProfileId = state.RootShooterProfileId,
                 IsForwardHit = state.IsForwardHit,
                 AmmoTemplateId = LabPolicies.AuthoritativeAmmoValue(
                     ammoTemplate?.StringId,
@@ -144,7 +146,9 @@ namespace BallisticsLab.Runtime.Telemetry
         internal int FireIndex { get; private set; }
         internal int FragmentIndex { get; private set; }
         internal int ParentDepth { get; private set; }
+        internal int RootFireIndex { get; private set; }
         internal int RootRandomSeed { get; private set; }
+        internal string RootShooterProfileId { get; private set; } = string.Empty;
         internal bool IsForwardHit { get; private set; }
         internal string AmmoTemplateId { get; private set; } = string.Empty;
         internal string AmmoName { get; private set; } = string.Empty;
