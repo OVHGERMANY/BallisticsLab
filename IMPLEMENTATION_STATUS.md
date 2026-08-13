@@ -15,11 +15,24 @@ Snapshot date: 2026-08-13
 
 The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
 
+## Active physical-telemetry development
+
+The `development/physical-projectile-telemetry` branch now has an offline-validated foundation for optional physical-state ingestion:
+
+- Reflection-only discovery from assemblies already loaded by the host; there is no compile-time project or assembly reference.
+- Exact publisher schema-1 validation before subscription.
+- Subscription only during an active Lab session, one-second late-discovery retries, and deterministic unsubscription during session teardown.
+- Immediate detached copies into immutable BallisticsLab-owned host, impact, component, collision-history, output, loss-budget, and conservation records.
+- Complete copied component geometry, mass, motion, energy, attitude, lineage, material provenance, damage and penetration capability, terminal state, and render state.
+- Safe absence, unsupported-schema, malformed-event, and bounded-buffer behavior.
+
+This foundation has not been deployed or tested in-game. Prepared/resolved pairing, duplicate and orphan policy, schema-4 JSON export, physical-only reports, and automatic-save revision integration remain the next milestone.
+
 ## Automated and startup verification
 
 - Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
-- Pure and installed-database validation: 55 checks passed.
-- Validation with all current reports: 62 checks passed.
+- Pure and installed-database validation: 62 checks passed.
+- Validation with all current reports: 69 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -31,7 +44,7 @@ The current source enables nullable analysis, checked arithmetic, recommended an
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 - Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `27423432...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `DC484371...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
 ## Current-build runtime evidence
 
@@ -106,16 +119,13 @@ Covered post-death durability loss at zero body health is already present in cur
 
 Historical evidence does not satisfy a missing `0.2.8` gate.
 
-## Deliberately not started
+## Remaining development sequence
 
-The following stages remain gated behind a stable, versioned, manually accepted Lab baseline:
-
-- Explicit physical state for intact, deformed, fragmented, and spall projectiles.
-- Projectile deformation and material-response calculations.
-- Conserved projectile fragmentation and separate target spall.
-- Individual fragment flight, collision, damage, and penetration.
-- Rendering driven by calculated projectile and fragment state.
-- Automated campaigns, deterministic seeds, reset control, and result matrices.
-- Formal GOST-style protocols and standardized reports.
+- Pair prepared and resolved physical transitions, preserve pending and orphan evidence, and reject duplicates deterministically.
+- Add schema-4 `physicalTransitions` JSON export without changing the flat shot-record CSV contract.
+- Add physical-transition-only automatic reports and revision tracking.
+- Add automated campaigns, deterministic seeds, reset control, result matrices, and conservation summaries.
+- Add formal GOST-oriented protocols and standardized reports.
+- Run the final integrated in-game campaign only after every offline development layer is complete.
 
 Existing Granit BR4 and BR5 labels are repeatable EFT database presets only. They are not certification tests.

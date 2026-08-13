@@ -136,6 +136,7 @@ namespace BallisticsLab.Runtime
 
             if (_sessionActive)
             {
+                PhysicalTelemetrySessionBridge.Update();
                 BotController.Update();
                 RefreshHideoutShootingModeStatus();
                 UpdateTrace();
@@ -300,6 +301,7 @@ namespace BallisticsLab.Runtime
             {
                 SaveAutomaticReport(true);
                 TelemetryStore.Clear();
+                PhysicalTelemetrySessionBridge.ClearCaptured();
                 _latestRecord = null;
                 HideTrace();
                 _status = "Shot records cleared.";
@@ -708,6 +710,7 @@ namespace BallisticsLab.Runtime
                 }
                 TelemetryStore.Clear();
                 _sessionActive = true;
+                PhysicalTelemetrySessionBridge.Start();
                 EnterHideoutShootingRangeIfNeeded();
                 if (!PlaceFixture())
                 {
@@ -726,6 +729,7 @@ namespace BallisticsLab.Runtime
 
         private static void EndSession(string status)
         {
+            PhysicalTelemetrySessionBridge.Stop();
             SaveAutomaticReport(true);
             BotController.ClearSelection();
             _rig?.Dispose();
@@ -1009,6 +1013,7 @@ namespace BallisticsLab.Runtime
 
             SaveAutomaticReport(true);
             TelemetryStore.Clear();
+            PhysicalTelemetrySessionBridge.ClearCaptured();
             _latestRecord = null;
             HideTrace();
             _status = "Fixture durability restored and shot records cleared.";

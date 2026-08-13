@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using BallisticsLab.Core;
+using BallisticsLab.Validation;
 
 const string plateParent = "644120aa86ffbe10ee032b6f";
 const string granitBr4 = "65573fa5655447403702a816";
@@ -27,7 +28,19 @@ Check(
     ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginGuid), "com.janky.ballisticslab")
     && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginName), "Janky-BallisticsLab")
     && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginVersion), "0.2.8")
-    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 3),
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 3)
+    && ConstantMatches(
+        typeof(PhysicalTelemetryContract),
+        nameof(PhysicalTelemetryContract.SupportedPublisherSchema),
+        1)
+    && ConstantMatches(
+        typeof(PhysicalTelemetryContract),
+        nameof(PhysicalTelemetryContract.SnapshotSchema),
+        1)
+    && ConstantMatches(
+        typeof(PhysicalTelemetryContract),
+        nameof(PhysicalTelemetryContract.PublisherTypeName),
+        "BallisticPenetration.Core.Physics.PhysicalProjectileTelemetry"),
     "report provenance constants match the current plugin build");
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
 Check(LabPolicies.OutcomeName(1, false, false) == "PENETRATED / DEVIATED", "deviation taxonomy");
@@ -53,6 +66,23 @@ Check(CurrentReportSetValidator.IgnoresCorruptHistoricalReport(), "current-repor
 Check(AcceptanceCoverageEvaluator.CompleteSyntheticCoveragePasses(), "report coverage accepts a complete controlled fixture matrix");
 Check(AcceptanceCoverageEvaluator.CasualBotTrafficCannotSatisfyFixtureCoverage(), "casual bot traffic cannot satisfy controlled fixture gates");
 Check(AcceptanceCoverageEvaluator.DuplicateBatchesDoNotInflateCoverage(), "duplicate automatic batches do not inflate acceptance coverage");
+Check(PhysicalTelemetryFoundationTests.AbsentPublisherIsSafe(), "absent physical telemetry publisher is a safe no-op");
+Check(PhysicalTelemetryFoundationTests.UnsupportedSchemaIsRejected(), "unsupported physical telemetry schema is rejected before subscription");
+Check(
+    PhysicalTelemetryFoundationTests.LateDiscoveryAttachesAndSessionDetachReleasesDelegate(),
+    "late physical telemetry discovery attaches and session teardown releases the delegate");
+Check(
+    PhysicalTelemetryFoundationTests.PreparedEventIsCopiedCompletelyAndDetached(),
+    "prepared physical telemetry is copied completely without retaining foreign collections");
+Check(
+    PhysicalTelemetryFoundationTests.ResolvedEventCopiesOutputsProvenanceAndConservation(),
+    "resolved physical telemetry preserves output provenance and conservation data");
+Check(
+    PhysicalTelemetryFoundationTests.CaptureBufferIsBoundedAndReturnsDetachedSnapshots(),
+    "physical telemetry capture buffer is bounded and snapshots are detached");
+Check(
+    PhysicalTelemetryFoundationTests.RejectsInvalidOrNonFiniteForeignEvents(),
+    "invalid physical telemetry is rejected without partial capture");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 Check(
     !LabPolicies.ShouldSaveReport(0, 1, 0)
