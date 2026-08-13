@@ -149,7 +149,7 @@ internal static class ProtocolTests
     {
         ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br4")[0];
         IReadOnlyList<ProtocolShotEvidence> shots = Pattern(
-            ProtocolVelocityMeasurementBasis.MuzzleThreeMetres,
+            ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
             895d,
             false,
             ammunitionTemplateId: "545-pp-candidate");
@@ -164,7 +164,7 @@ internal static class ProtocolTests
     {
         ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(
             SyntheticThreat(),
-            Pattern(ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 720d, false));
+            Pattern(ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 720d, false));
         return result.Status == ProtocolScreeningStatus.SimulationScreeningComplete
             && result.QualifyingShotCount == 5
             && result.ObservedOutcome
@@ -176,7 +176,7 @@ internal static class ProtocolTests
     internal static bool ExtraIncompleteObservationDoesNotInvalidateCompleteScreening()
     {
         var shots = new List<ProtocolShotEvidence>(
-            Pattern(ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 720d, false))
+            Pattern(ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 720d, false))
         {
             Shot(
                 1L,
@@ -199,11 +199,11 @@ internal static class ProtocolTests
     {
         var shots = new List<ProtocolShotEvidence>
         {
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 690d, -0.10d, 0d, true),
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 750d, 0.10d, 0d, false),
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 720d, 0d, 0d, false),
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 720d, 0d, 0.10d, false),
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 720d, 0d, -0.10d, false)
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 690d, -0.10d, 0d, true),
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 750d, 0.10d, 0d, false),
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 720d, 0d, 0d, false),
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 720d, 0d, 0.10d, false),
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 720d, 0d, -0.10d, false)
         };
         ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(
             SyntheticThreat(),
@@ -217,8 +217,8 @@ internal static class ProtocolTests
     {
         var shots = new List<ProtocolShotEvidence>
         {
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 690d, -0.10d, 0d, false),
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 750d, 0.10d, 0d, true)
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 690d, -0.10d, 0d, false),
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 750d, 0.10d, 0d, true)
         };
         ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(
             SyntheticThreat(),
@@ -233,10 +233,10 @@ internal static class ProtocolTests
     {
         var shots = new List<ProtocolShotEvidence>
         {
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 720d, 0d, 0d, false),
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 720d, 0.02d, 0d, false),
-            Shot(1L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 720d, 0.49d, 0d, false),
-            Shot(2L, ProtocolVelocityMeasurementBasis.MuzzleThreeMetres, 720d, 0.10d, 0d, false)
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 720d, 0d, 0d, false),
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 720d, 0.02d, 0d, false),
+            Shot(1L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 720d, 0.49d, 0d, false),
+            Shot(2L, ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres, 720d, 0.10d, 0d, false)
         };
         ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(
             SyntheticThreat(),

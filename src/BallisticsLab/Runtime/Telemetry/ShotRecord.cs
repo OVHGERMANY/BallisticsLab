@@ -108,6 +108,8 @@ namespace BallisticsLab.Runtime.Telemetry
                 Outcome = LabPolicies.OutcomeName((int)shot.BulletState, shot.BlockedBy.HasValue, shot.DeflectedBy.HasValue),
                 ImpactAngle = angle,
                 ImpactSpeed = state.ImpactSpeed,
+                HasThreeMetreVelocity = state.HasThreeMetreVelocity,
+                ThreeMetreVelocity = state.ThreeMetreVelocity,
                 TemplateSpeed = templateSpeed,
                 Fraction = templateSpeed > 0f ? state.ImpactSpeed / templateSpeed : 0f,
                 ProjectileMassKilograms = (ammoTemplate?.BulletMassGram ?? 0f) * 0.001f,
@@ -185,6 +187,8 @@ namespace BallisticsLab.Runtime.Telemetry
         internal string Outcome { get; private set; } = string.Empty;
         internal float ImpactAngle { get; private set; }
         internal float ImpactSpeed { get; private set; }
+        internal bool HasThreeMetreVelocity { get; private set; }
+        internal float ThreeMetreVelocity { get; private set; }
         internal float TemplateSpeed { get; private set; }
         internal float Fraction { get; private set; }
         internal float ProjectileMassKilograms { get; private set; }

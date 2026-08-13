@@ -421,8 +421,12 @@ internal static class CampaignReportInvariantValidator
                 out ProtocolVelocityMeasurementBasis measurementBasis)
             || !TryDouble(
                 element,
-                "impactSpeedMetresPerSecond",
-                out double impactSpeed)
+                "protocolVelocityMetresPerSecond",
+                out double protocolVelocity)
+            || !TryDouble(
+                element,
+                "targetImpactSpeedMetresPerSecond",
+                out double targetImpactSpeed)
             || !TryDouble(
                 element,
                 "projectileMassKilograms",
@@ -456,7 +460,7 @@ internal static class CampaignReportInvariantValidator
                 fixtureId,
                 ammunitionTemplateId,
                 measurementBasis,
-                impactSpeed,
+                protocolVelocity,
                 projectileMass,
                 projectileDiameter,
                 impactAngle,
@@ -466,7 +470,8 @@ internal static class CampaignReportInvariantValidator
                 faceHeight,
                 fixtureDistance,
                 witnessBackstopConfigured,
-                throughPenetrationObserved);
+                throughPenetrationObserved,
+                targetImpactSpeed);
             return true;
         }
         catch (ArgumentException)

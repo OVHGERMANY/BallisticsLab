@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using BallisticsLab.Core;
 using EFT;
@@ -47,6 +48,10 @@ namespace BallisticsLab.Runtime.Telemetry
             DecisionDamage = shot.Damage;
             DecisionPenetration = shot.PenetrationPower;
             ImpactSpeed = shot.CurrentVelocity.magnitude;
+            HasThreeMetreVelocity = TryCaptureThreeMetreVelocity(
+                shot,
+                out float threeMetreVelocity);
+            ThreeMetreVelocity = threeMetreVelocity;
             IsForwardHit = shot.IsForwardHit;
             FireIndex = shot.FireIndex;
             FragmentIndex = shot.FragmentIndex;
@@ -129,6 +134,8 @@ namespace BallisticsLab.Runtime.Telemetry
         internal float DecisionDamage { get; }
         internal float DecisionPenetration { get; }
         internal float ImpactSpeed { get; }
+        internal bool HasThreeMetreVelocity { get; }
+        internal float ThreeMetreVelocity { get; }
         internal string TargetName { get; }
         internal string TargetKind { get; }
         internal string Material { get; }
@@ -235,6 +242,60 @@ namespace BallisticsLab.Runtime.Telemetry
             FixtureLocalHitY = localY;
             FixtureFaceWidth = width;
             FixtureFaceHeight = height;
+        }
+
+        private static bool TryCaptureThreeMetreVelocity(Shot shot, out float speed)
+        {
+            speed = 0f;
+            if (shot == null
+                || !IsFinite(shot.StartPosition)
+                || !IsFinite(shot.HitPoint)
+                || Vector3.Distance(shot.StartPosition, shot.HitPoint)
+                    < ProtocolTrajectorySampler.StandardMeasurementDistanceMetres)
+            {
+                return false;
+            }
+            TrajectoryCalculator? trajectory = shot.TrajectoryInfo;
+            if (trajectory == null)
+            {
+                return false;
+            }
+            TrajectoryInfo[]? history = trajectory.history;
+            if (history == null || history.Length == 0)
+            {
+                return false;
+            }
+
+            int finalIndex = Math.Min(trajectory.cursorIndex, history.Length - 1);
+            if (finalIndex < 1)
+            {
+                return false;
+            }
+            var samples = new List<ProtocolTrajectorySample>(finalIndex + 1);
+            for (int index = 0; index <= finalIndex; index++)
+            {
+                TrajectoryInfo entry = history[index];
+                if (!IsFinite(entry.position) || !IsFinite(entry.velocity))
+                {
+                    return false;
+                }
+                samples.Add(new ProtocolTrajectorySample(
+                    entry.position.x,
+                    entry.position.y,
+                    entry.position.z,
+                    entry.velocity.magnitude));
+            }
+
+            if (!ProtocolTrajectorySampler.TryInterpolateSpeedAtPathDistance(
+                    samples,
+                    ProtocolTrajectorySampler.StandardMeasurementDistanceMetres,
+                    out double sampledSpeed)
+                || sampledSpeed > float.MaxValue)
+            {
+                return false;
+            }
+            speed = (float)sampledSpeed;
+            return IsFinite(speed) && speed >= 0f;
         }
 
         private static bool IsFinite(Vector3 value)

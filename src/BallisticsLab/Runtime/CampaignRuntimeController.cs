@@ -382,11 +382,17 @@ namespace BallisticsLab.Runtime
                 identity.RootRandomSeed,
                 identity.AmmoTemplateId,
                 identity.RootShooterProfileId);
+            ProtocolVelocityMeasurementBasis velocityBasis = identity.HasThreeMetreVelocity
+                ? ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres
+                : ProtocolVelocityMeasurementBasis.TargetImpactProxy;
+            double protocolVelocity = identity.HasThreeMetreVelocity
+                ? identity.ThreeMetreVelocity
+                : identity.ImpactSpeed;
             var protocolEvidence = new ProtocolShotEvidence(
                 fixtureId,
                 identity.AmmoTemplateId,
-                ProtocolVelocityMeasurementBasis.TargetImpactProxy,
-                identity.ImpactSpeed,
+                velocityBasis,
+                protocolVelocity,
                 identity.ProjectileMassKilograms,
                 identity.ProjectileDiameterMetres,
                 identity.ImpactAngle,
@@ -396,7 +402,8 @@ namespace BallisticsLab.Runtime
                 identity.FixtureFaceHeight,
                 identity.ImpactDistanceMetres,
                 campaignCase.BackstopEnabled,
-                reachedBackstop);
+                reachedBackstop,
+                identity.ImpactSpeed);
             evidence = new CampaignShotEvidence(
                 fixtureId,
                 chainId,

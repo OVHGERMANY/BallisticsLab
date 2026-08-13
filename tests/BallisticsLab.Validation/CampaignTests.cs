@@ -526,7 +526,9 @@ internal static class CampaignTests
             && attempt.GetProperty("status").GetString() == "Accepted"
             && protocol.GetProperty("velocityMeasurementBasis").GetString()
                 == "TargetImpactProxy"
-            && Math.Abs(protocol.GetProperty("impactSpeedMetresPerSecond").GetDouble() - 800d)
+            && Math.Abs(protocol.GetProperty("protocolVelocityMetresPerSecond").GetDouble() - 800d)
+                < 0.000001d
+            && Math.Abs(protocol.GetProperty("targetImpactSpeedMetresPerSecond").GetDouble() - 800d)
                 < 0.000001d
             && Math.Abs(protocol.GetProperty("projectileMassKilograms").GetDouble() - 0.008d)
                 < 0.000000001d

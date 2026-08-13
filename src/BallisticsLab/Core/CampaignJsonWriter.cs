@@ -180,8 +180,13 @@ namespace BallisticsLab.Core
             Number(
                 builder,
                 ref first,
-                "impactSpeedMetresPerSecond",
-                evidence.ImpactSpeedMetresPerSecond);
+                "protocolVelocityMetresPerSecond",
+                evidence.ProtocolVelocityMetresPerSecond);
+            Number(
+                builder,
+                ref first,
+                "targetImpactSpeedMetresPerSecond",
+                evidence.TargetImpactSpeedMetresPerSecond);
             Number(
                 builder,
                 ref first,

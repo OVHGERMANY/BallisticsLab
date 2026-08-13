@@ -228,6 +228,21 @@ Check(
 Check(
     ProtocolTests.CampaignEvidenceRejectsMismatchedProtocolIdentity(),
     "campaign evidence rejects protocol geometry attached to another fixture");
+Check(
+    ProtocolTrajectorySamplerTests.ExactThreeMetreNodeReturnsNodeSpeed(),
+    "three-metre trajectory sampling returns an exact cached-node speed");
+Check(
+    ProtocolTrajectorySamplerTests.CurvedPathUsesCumulativeDistanceAndInterpolatesSpeed(),
+    "three-metre trajectory sampling uses cumulative path length and speed interpolation");
+Check(
+    ProtocolTrajectorySamplerTests.DuplicateNodesDoNotInflateDistance(),
+    "duplicate trajectory nodes do not inflate the three-metre path distance");
+Check(
+    ProtocolTrajectorySamplerTests.InsufficientPathDoesNotExtrapolate(),
+    "a trajectory shorter than three metres remains insufficient instead of extrapolated");
+Check(
+    ProtocolTrajectorySamplerTests.InvalidInputsAreRejected(),
+    "three-metre trajectory sampling rejects invalid samples and distances");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 Check(
     !LabPolicies.ShouldSaveReport(0, 1, 0)

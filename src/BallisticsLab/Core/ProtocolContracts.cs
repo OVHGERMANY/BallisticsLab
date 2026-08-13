@@ -9,7 +9,7 @@ namespace BallisticsLab.Core
     internal enum ProtocolVelocityMeasurementBasis
     {
         TargetImpactProxy = 0,
-        MuzzleThreeMetres = 1
+        EftTrajectoryThreeMetres = 1
     }
 
     internal enum ProtocolShotQualificationReason
@@ -50,7 +50,7 @@ namespace BallisticsLab.Core
             long fixtureId,
             string ammunitionTemplateId,
             ProtocolVelocityMeasurementBasis velocityMeasurementBasis,
-            double impactSpeedMetresPerSecond,
+            double protocolVelocityMetresPerSecond,
             double projectileMassKilograms,
             double projectileDiameterMetres,
             double impactAngleDegrees,
@@ -61,13 +61,49 @@ namespace BallisticsLab.Core
             double fixtureDistanceMetres,
             bool witnessBackstopConfigured,
             bool throughPenetrationObserved)
+            : this(
+                fixtureId,
+                ammunitionTemplateId,
+                velocityMeasurementBasis,
+                protocolVelocityMetresPerSecond,
+                projectileMassKilograms,
+                projectileDiameterMetres,
+                impactAngleDegrees,
+                fixtureLocalHitXMetres,
+                fixtureLocalHitYMetres,
+                fixtureFaceWidthMetres,
+                fixtureFaceHeightMetres,
+                fixtureDistanceMetres,
+                witnessBackstopConfigured,
+                throughPenetrationObserved,
+                protocolVelocityMetresPerSecond)
+        {
+        }
+
+        internal ProtocolShotEvidence(
+            long fixtureId,
+            string ammunitionTemplateId,
+            ProtocolVelocityMeasurementBasis velocityMeasurementBasis,
+            double protocolVelocityMetresPerSecond,
+            double projectileMassKilograms,
+            double projectileDiameterMetres,
+            double impactAngleDegrees,
+            double fixtureLocalHitXMetres,
+            double fixtureLocalHitYMetres,
+            double fixtureFaceWidthMetres,
+            double fixtureFaceHeightMetres,
+            double fixtureDistanceMetres,
+            bool witnessBackstopConfigured,
+            bool throughPenetrationObserved,
+            double targetImpactSpeedMetresPerSecond)
         {
             if (fixtureId <= 0L)
             {
                 ThrowInvalidFixture(nameof(fixtureId));
             }
             if (velocityMeasurementBasis != ProtocolVelocityMeasurementBasis.TargetImpactProxy
-                && velocityMeasurementBasis != ProtocolVelocityMeasurementBasis.MuzzleThreeMetres)
+                && velocityMeasurementBasis
+                    != ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres)
             {
                 ThrowInvalidMeasurementBasis(velocityMeasurementBasis);
             }
@@ -75,8 +111,11 @@ namespace BallisticsLab.Core
                 ammunitionTemplateId,
                 nameof(ammunitionTemplateId));
             ValidateNonNegative(
-                impactSpeedMetresPerSecond,
-                nameof(impactSpeedMetresPerSecond));
+                protocolVelocityMetresPerSecond,
+                nameof(protocolVelocityMetresPerSecond));
+            ValidateNonNegative(
+                targetImpactSpeedMetresPerSecond,
+                nameof(targetImpactSpeedMetresPerSecond));
             ValidatePositive(projectileMassKilograms, nameof(projectileMassKilograms));
             ValidatePositive(projectileDiameterMetres, nameof(projectileDiameterMetres));
             ValidateInclusive(impactAngleDegrees, 0d, 90d, nameof(impactAngleDegrees));
@@ -95,7 +134,8 @@ namespace BallisticsLab.Core
 
             FixtureId = fixtureId;
             VelocityMeasurementBasis = velocityMeasurementBasis;
-            ImpactSpeedMetresPerSecond = impactSpeedMetresPerSecond;
+            ProtocolVelocityMetresPerSecond = protocolVelocityMetresPerSecond;
+            TargetImpactSpeedMetresPerSecond = targetImpactSpeedMetresPerSecond;
             ProjectileMassKilograms = projectileMassKilograms;
             ProjectileDiameterMetres = projectileDiameterMetres;
             ImpactAngleDegrees = impactAngleDegrees;
@@ -111,7 +151,8 @@ namespace BallisticsLab.Core
         internal long FixtureId { get; }
         internal string AmmunitionTemplateId { get; }
         internal ProtocolVelocityMeasurementBasis VelocityMeasurementBasis { get; }
-        internal double ImpactSpeedMetresPerSecond { get; }
+        internal double ProtocolVelocityMetresPerSecond { get; }
+        internal double TargetImpactSpeedMetresPerSecond { get; }
         internal double ProjectileMassKilograms { get; }
         internal double ProjectileDiameterMetres { get; }
         internal double ImpactAngleDegrees { get; }
@@ -541,7 +582,8 @@ namespace BallisticsLab.Core
             long fixtureId,
             List<ProtocolShotEvidence> qualifying)
         {
-            if (shot.VelocityMeasurementBasis != ProtocolVelocityMeasurementBasis.MuzzleThreeMetres)
+            if (shot.VelocityMeasurementBasis
+                != ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres)
             {
                 return ProtocolShotQualificationReason.MeasurementBasisMismatch;
             }
@@ -572,13 +614,13 @@ namespace BallisticsLab.Core
             {
                 return ProtocolShotQualificationReason.ImpactAngleOutOfRange;
             }
-            bool withinVelocity = shot.ImpactSpeedMetresPerSecond
+            bool withinVelocity = shot.ProtocolVelocityMetresPerSecond
                     >= threat.MinimumVelocityMetresPerSecond
-                && shot.ImpactSpeedMetresPerSecond <= threat.MaximumVelocityMetresPerSecond;
+                && shot.ProtocolVelocityMetresPerSecond <= threat.MaximumVelocityMetresPerSecond;
             bool severityException = (
-                    shot.ImpactSpeedMetresPerSecond < threat.MinimumVelocityMetresPerSecond
+                    shot.ProtocolVelocityMetresPerSecond < threat.MinimumVelocityMetresPerSecond
                     && shot.ThroughPenetrationObserved)
-                || (shot.ImpactSpeedMetresPerSecond > threat.MaximumVelocityMetresPerSecond
+                || (shot.ProtocolVelocityMetresPerSecond > threat.MaximumVelocityMetresPerSecond
                     && !shot.ThroughPenetrationObserved);
             if (!withinVelocity && !severityException)
             {
