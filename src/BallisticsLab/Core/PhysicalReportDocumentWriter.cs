@@ -40,6 +40,11 @@ namespace BallisticsLab.Core
             PhysicalTransitionJsonWriter.AppendArray(builder, transitions);
             builder.Append(",\"campaign\":");
             CampaignJsonWriter.AppendOrNull(builder, campaignDefinition, campaignSnapshot);
+            builder.Append(",\"protocolScreeningResult\":");
+            ProtocolScreeningResultDocumentWriter.AppendOrNull(
+                builder,
+                campaignDefinition,
+                campaignSnapshot);
             builder.Append('}');
             return builder.ToString();
         }

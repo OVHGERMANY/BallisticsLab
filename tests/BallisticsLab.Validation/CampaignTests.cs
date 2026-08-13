@@ -617,6 +617,138 @@ internal static class CampaignTests
             && !ordinary.InvalidateCurrentProtocolSample();
     }
 
+    internal static bool ProtocolResultSummarizesCompletedSampleAndStandards()
+    {
+        string report = CreateCompletedProtocolReport(deferCompletion: false);
+        using JsonDocument document = JsonDocument.Parse(report);
+        JsonElement result = document.RootElement.GetProperty("protocolScreeningResult");
+        JsonElement screening = result.GetProperty("screenings")[0];
+        JsonElement sample = screening.GetProperty("samples")[0];
+        return result.GetProperty("documentSchema").GetInt32() == 1
+            && result.GetProperty("documentType").GetString()
+                == "BallisticsLabProtocolScreening"
+            && result.GetProperty("classificationStandard").GetString()
+                == GostProtocolCatalog.ClassificationStandard
+            && result.GetProperty("testMethodStandard").GetString()
+                == GostProtocolCatalog.TestMethodStandard
+            && result.GetProperty("simulationScreeningOnly").GetBoolean()
+            && !result.GetProperty("certificationClaim").GetBoolean()
+            && screening.GetProperty("threatId").GetString()
+                == "gost-34286-br4-7.62x39-ps-57-n-231"
+            && screening.GetProperty("resultStatus").GetString()
+                == "SimulationScreeningComplete"
+            && screening.GetProperty("evaluationStatus").GetString()
+                == "SimulationScreeningComplete"
+            && screening.GetProperty("observedOutcome").GetString()
+                == "NoThroughPenetrationObserved"
+            && screening.GetProperty("qualifyingShotCount").GetInt32() == 5
+            && screening.GetProperty("fixtureMaterial").GetString() == "ArmoredSteel"
+            && screening.GetProperty("fixtureArmorClass").GetInt32() == 4
+            && screening.GetProperty("fixtureLayerCount").GetInt32() == 1
+            && Math.Abs(screening.GetProperty(
+                    "meanObservedProtocolVelocityMetresPerSecond").GetDouble() - 720d)
+                < 0.000000001d
+            && screening.GetProperty("currentThroughPenetrationCount").GetInt32() == 0
+            && screening.GetProperty("currentNoThroughPenetrationCount").GetInt32() == 5
+            && screening.GetProperty("sampleCount").GetInt32() == 1
+            && screening.GetProperty("invalidatedSampleCount").GetInt32() == 0
+            && screening.GetProperty("complete").GetBoolean()
+            && sample.GetProperty("state").GetString() == "Complete"
+            && sample.GetProperty("acceptedAttemptCount").GetInt32() == 5
+            && sample.GetProperty("throughPenetrationCount").GetInt32() == 0
+            && CampaignReportInvariantValidator.Validate(
+                document.RootElement,
+                out int attemptCount,
+                out _)
+            && attemptCount == 5;
+    }
+
+    internal static bool ProtocolResultPreservesInvalidatedSampleHistory()
+    {
+        string report = CreateRecoveredProtocolReport();
+        using JsonDocument document = JsonDocument.Parse(report);
+        JsonElement screening = document.RootElement
+            .GetProperty("protocolScreeningResult")
+            .GetProperty("screenings")[0];
+        JsonElement samples = screening.GetProperty("samples");
+        JsonElement invalidated = samples[0];
+        JsonElement completed = samples[1];
+        return screening.GetProperty("resultStatus").GetString()
+                == "SimulationScreeningComplete"
+            && screening.GetProperty("currentSampleOrdinal").GetInt32() == 1
+            && screening.GetProperty("sampleCount").GetInt32() == 2
+            && screening.GetProperty("invalidatedSampleCount").GetInt32() == 1
+            && screening.GetProperty("totalAttemptCount").GetInt32() == 8
+            && screening.GetProperty("protocolRejectCount").GetInt32() == 1
+            && screening.GetProperty("sequenceInvalidatedAttemptCount").GetInt32() == 2
+            && invalidated.GetProperty("state").GetString() == "Invalidated"
+            && invalidated.GetProperty("qualifyingAttemptCount").GetInt32() == 2
+            && invalidated.GetProperty("invalidatedAttemptCount").GetInt32() == 2
+            && invalidated.GetProperty("rejectedAttemptCount").GetInt32() == 1
+            && invalidated.GetProperty("terminalQualificationReason").GetString()
+                == "ExpectedPointMismatch"
+            && completed.GetProperty("state").GetString() == "Complete"
+            && completed.GetProperty("acceptedAttemptCount").GetInt32() == 5
+            && CampaignReportInvariantValidator.Validate(
+                document.RootElement,
+                out int attemptCount,
+                out _)
+            && attemptCount == 8;
+    }
+
+    internal static bool ProtocolResultCannotCompleteWhileExtraEvidenceIsPending()
+    {
+        string report = CreateCompletedProtocolReport(deferCompletion: true);
+        using JsonDocument document = JsonDocument.Parse(report);
+        JsonElement screening = document.RootElement
+            .GetProperty("protocolScreeningResult")
+            .GetProperty("screenings")[0];
+        JsonElement sample = screening.GetProperty("samples")[0];
+        return screening.GetProperty("evaluationStatus").GetString()
+                == "SimulationScreeningComplete"
+            && screening.GetProperty("resultStatus").GetString() == "PendingEvidence"
+            && screening.GetProperty("observedOutcome").GetString() == "NotDetermined"
+            && !screening.GetProperty("complete").GetBoolean()
+            && sample.GetProperty("state").GetString() == "PendingEvidence"
+            && CampaignReportInvariantValidator.Validate(
+                document.RootElement,
+                out int attemptCount,
+                out _)
+            && attemptCount == 5;
+    }
+
+    internal static bool CampaignReportRejectsCorruptedProtocolResult()
+    {
+        string report = CreateRecoveredProtocolReport();
+        JsonNode falseCertification = JsonNode.Parse(report)!;
+        falseCertification["protocolScreeningResult"]!["certificationClaim"] = true;
+        using JsonDocument certificationDocument = JsonDocument.Parse(
+            falseCertification.ToJsonString());
+        bool certificationRejected = !CampaignReportInvariantValidator.Validate(
+            certificationDocument.RootElement,
+            out _,
+            out _);
+
+        JsonNode wrongResult = JsonNode.Parse(report)!;
+        wrongResult["protocolScreeningResult"]!["screenings"]![0]!["resultStatus"] =
+            "InsufficientEvidence";
+        using JsonDocument resultDocument = JsonDocument.Parse(wrongResult.ToJsonString());
+        bool resultRejected = !CampaignReportInvariantValidator.Validate(
+            resultDocument.RootElement,
+            out _,
+            out _);
+
+        JsonNode wrongSample = JsonNode.Parse(report)!;
+        wrongSample["protocolScreeningResult"]!["screenings"]![0]!["samples"]![0]![
+            "invalidatedAttemptCount"] = 1;
+        using JsonDocument sampleDocument = JsonDocument.Parse(wrongSample.ToJsonString());
+        bool sampleRejected = !CampaignReportInvariantValidator.Validate(
+            sampleDocument.RootElement,
+            out _,
+            out _);
+        return certificationRejected && resultRejected && sampleRejected;
+    }
+
     internal static bool PhysicalEvidenceUsesExactHostIdentityAndChecksClosure()
     {
         FakePhysicalEvent fake = FakePhysicalEvent.Resolved("campaign-physical");
@@ -698,6 +830,8 @@ internal static class CampaignTests
             && campaign.GetProperty("runSeed").GetUInt64() == 42UL
             && !campaign.GetProperty("gameShotSeedOverridden").GetBoolean()
             && campaign.GetProperty("state").GetString() == "Completed"
+            && document.RootElement.GetProperty("protocolScreeningResult").ValueKind
+                == JsonValueKind.Null
             && caseDefinition.GetProperty("shotSequencePolicy").GetString()
                 == "IndependentShots"
             && string.IsNullOrEmpty(
@@ -1174,6 +1308,51 @@ internal static class CampaignTests
         tracker.RecordShot(ProtocolEvidence(campaignCase, 1600L, "corrupt-a", 0));
         tracker.RecordShot(ProtocolEvidence(campaignCase, 1600L, "corrupt-b", 1));
         tracker.RecordShot(ProtocolEvidence(campaignCase, 1600L, "corrupt-c", 0));
+        return PhysicalReportDocumentWriter.Build(
+            "[]",
+            Array.Empty<PhysicalTransitionRecord>(),
+            definition,
+            tracker.Snapshot());
+    }
+
+    private static string CreateCompletedProtocolReport(bool deferCompletion)
+    {
+        CampaignDefinition definition = CampaignCatalog.GostSimulationScreening(
+            "gost-34286-br4-7.62x39-ps-57-n-231");
+        CampaignCaseDefinition campaignCase = definition.Cases[0];
+        var tracker = new CampaignRunTracker(definition, 77UL);
+        tracker.Start();
+        tracker.AttachFixture(1700L);
+        for (int index = 0; index < 5; index++)
+        {
+            tracker.RecordShot(
+                ProtocolEvidence(campaignCase, 1700L, "result-" + index, index),
+                deferProtocolCompletion: deferCompletion && index == 4);
+        }
+        return PhysicalReportDocumentWriter.Build(
+            "[]",
+            Array.Empty<PhysicalTransitionRecord>(),
+            definition,
+            tracker.Snapshot());
+    }
+
+    private static string CreateRecoveredProtocolReport()
+    {
+        CampaignDefinition definition = CampaignCatalog.GostSimulationScreening(
+            "gost-34286-br4-7.62x39-ps-57-n-231");
+        CampaignCaseDefinition campaignCase = definition.Cases[0];
+        var tracker = new CampaignRunTracker(definition, 78UL);
+        tracker.Start();
+        tracker.AttachFixture(1800L);
+        tracker.RecordShot(ProtocolEvidence(campaignCase, 1800L, "recovered-a", 0));
+        tracker.RecordShot(ProtocolEvidence(campaignCase, 1800L, "recovered-b", 1));
+        tracker.RecordShot(ProtocolEvidence(campaignCase, 1800L, "recovered-c", 0));
+        tracker.AttachFixture(1900L);
+        for (int index = 0; index < 5; index++)
+        {
+            tracker.RecordShot(
+                ProtocolEvidence(campaignCase, 1900L, "recovered-" + index, index));
+        }
         return PhysicalReportDocumentWriter.Build(
             "[]",
             Array.Empty<PhysicalTransitionRecord>(),

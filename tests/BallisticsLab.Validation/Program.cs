@@ -181,6 +181,18 @@ Check(
     CampaignTests.InvalidProtocolEvidenceCanDiscardDamagedSampleWithoutResettingIt(),
     "invalid protocol evidence discards the damaged sample instead of silently reusing it");
 Check(
+    CampaignTests.ProtocolResultSummarizesCompletedSampleAndStandards(),
+    "protocol result block summarizes the verified standard, mapping, and completed sample");
+Check(
+    CampaignTests.ProtocolResultPreservesInvalidatedSampleHistory(),
+    "protocol result block preserves invalidated samples before a recovered completion");
+Check(
+    CampaignTests.ProtocolResultCannotCompleteWhileExtraEvidenceIsPending(),
+    "protocol result block cannot claim completion while queued evidence is unresolved");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedProtocolResult(),
+    "campaign report validation rejects forged protocol result claims and sample counts");
+Check(
     CampaignTests.PhysicalEvidenceUsesExactHostIdentityAndChecksClosure(),
     "campaign physical evidence uses exact host identity and measures mass and energy closure");
 Check(

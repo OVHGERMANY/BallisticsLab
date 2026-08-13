@@ -90,7 +90,22 @@ namespace BallisticsLab.Runtime
         {
             lock (Sync)
             {
-                if (_tracker == null || !_tracker.Stop())
+                if (_tracker == null)
+                {
+                    return false;
+                }
+                CampaignRunSnapshot snapshot = _tracker.Snapshot();
+                bool unresolvedProtocolHit = CurrentCaseIsProtocolSequence(
+                        _tracker,
+                        _definition)
+                    && (snapshot.ProtocolCompletionDeferred
+                        || !string.IsNullOrEmpty(_pendingChainId)
+                        || QueuedProtocolChainIds.Count != 0);
+                if (unresolvedProtocolHit)
+                {
+                    _tracker.InvalidateCurrentProtocolSample();
+                }
+                if (!_tracker.Stop())
                 {
                     return false;
                 }

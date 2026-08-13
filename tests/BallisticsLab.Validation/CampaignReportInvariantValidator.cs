@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using BallisticsLab.Core;
 
 internal static class CampaignReportInvariantValidator
@@ -28,6 +29,10 @@ internal static class CampaignReportInvariantValidator
             || !TryInt32(campaign, "currentRepetitionIndex", out int currentRepetitionIndex)
             || !TryInt32(campaign, "currentAttemptIndex", out int currentAttemptIndex)
             || !TryInt64(campaign, "currentFixtureId", out long currentFixtureId)
+            || !TryBoolean(
+                campaign,
+                "protocolCompletionDeferred",
+                out bool protocolCompletionDeferred)
             || !campaign.TryGetProperty("gameShotSeedOverridden", out JsonElement seedOverridden)
             || seedOverridden.ValueKind != JsonValueKind.False
             || !TryText(campaign, "seedSemantics", out _))
@@ -79,6 +84,7 @@ internal static class CampaignReportInvariantValidator
                 currentRepetitionIndex,
                 currentAttemptIndex,
                 currentFixtureId,
+                protocolCompletionDeferred,
                 out failure))
         {
             return false;
@@ -93,6 +99,7 @@ internal static class CampaignReportInvariantValidator
             currentRepetitionIndex,
             currentAttemptIndex,
             currentFixtureId,
+            protocolCompletionDeferred,
             attempts);
         CampaignResultMatrix expected = CampaignResultMatrixBuilder.Build(definition, snapshot);
         if (state == CampaignRunState.Completed
@@ -106,7 +113,60 @@ internal static class CampaignReportInvariantValidator
             failure = "campaign matrix is complete but state is not Completed";
             return false;
         }
-        return MatrixMatches(matrixElement, expected, out failure);
+        if (!MatrixMatches(matrixElement, expected, out failure))
+        {
+            return false;
+        }
+        return ProtocolResultMatches(root, definition, snapshot, out failure);
+    }
+
+    private static bool ProtocolResultMatches(
+        JsonElement root,
+        CampaignDefinition definition,
+        CampaignRunSnapshot snapshot,
+        out string failure)
+    {
+        failure = string.Empty;
+        bool hasProtocolCase = definition.Cases.Any(campaignCase =>
+            campaignCase.IsProtocolSequence);
+        if (!root.TryGetProperty(
+                "protocolScreeningResult",
+                out JsonElement actualElement))
+        {
+            if (!hasProtocolCase)
+            {
+                return true;
+            }
+            failure = "protocol screening result is missing";
+            return false;
+        }
+
+        string expectedJson = ProtocolScreeningResultDocumentWriter.BuildOrNull(
+            definition,
+            snapshot);
+        if (string.Equals(expectedJson, "null", StringComparison.Ordinal))
+        {
+            if (actualElement.ValueKind == JsonValueKind.Null)
+            {
+                return true;
+            }
+            failure = "non-protocol campaign contains a protocol screening result";
+            return false;
+        }
+        if (actualElement.ValueKind != JsonValueKind.Object)
+        {
+            failure = "protocol screening result is not an object";
+            return false;
+        }
+
+        JsonNode? expectedNode = JsonNode.Parse(expectedJson);
+        JsonNode? actualNode = JsonNode.Parse(actualElement.GetRawText());
+        if (JsonNode.DeepEquals(expectedNode, actualNode))
+        {
+            return true;
+        }
+        failure = "protocol screening result does not match campaign evidence";
+        return false;
     }
 
     private static bool ReplayMatchesHeader(
@@ -118,6 +178,7 @@ internal static class CampaignReportInvariantValidator
         int expectedRepetitionIndex,
         int expectedAttemptIndex,
         long expectedFixtureId,
+        bool expectedProtocolCompletionDeferred,
         out string failure)
     {
         failure = string.Empty;
@@ -166,6 +227,15 @@ internal static class CampaignReportInvariantValidator
             bool deferProtocolCompletion = definition.Cases[recorded.CaseIndex].IsProtocolSequence
                 && attempts.Skip(index + 1).Any(later => later.CaseIndex == recorded.CaseIndex
                     && later.SampleOrdinal == recorded.SampleOrdinal);
+            if (!deferProtocolCompletion
+                && expectedProtocolCompletionDeferred
+                && index == attempts.Count - 1
+                && recorded.Status == CampaignAttemptStatus.Accepted
+                && recorded.CaseIndex == expectedCaseIndex
+                && recorded.RepetitionIndex == expectedRepetitionIndex)
+            {
+                deferProtocolCompletion = true;
+            }
             CampaignAttemptRecord? replayed = tracker.RecordShot(
                 recorded.Evidence,
                 deferProtocolCompletion);
@@ -222,7 +292,8 @@ internal static class CampaignReportInvariantValidator
             || replay.CurrentCaseIndex != expectedCaseIndex
             || replay.CurrentRepetitionIndex != expectedRepetitionIndex
             || replay.CurrentAttemptIndex != expectedAttemptIndex
-            || replay.CurrentFixtureId != expectedFixtureId)
+            || replay.CurrentFixtureId != expectedFixtureId
+            || replay.ProtocolCompletionDeferred != expectedProtocolCompletionDeferred)
         {
             failure = "campaign header cursor does not match replayed attempts";
             return false;
@@ -578,6 +649,8 @@ internal static class CampaignReportInvariantValidator
                     row,
                     "sequenceInvalidatedCount",
                     expectedRow.SequenceInvalidatedCount)
+                || !TryBoolean(row, "completionDeferred", out bool completionDeferred)
+                || completionDeferred != expectedRow.CompletionDeferred
                 || !MatchesDouble(row, "meanVelocityFraction", expectedRow.MeanVelocityFraction)
                 || !MatchesDouble(row, "meanLayersHit", expectedRow.MeanLayersHit)
                 || !MatchesDouble(

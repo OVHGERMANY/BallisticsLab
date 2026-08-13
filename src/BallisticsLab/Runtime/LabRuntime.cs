@@ -860,7 +860,7 @@ namespace BallisticsLab.Runtime
 
         private static void EndSession(string status)
         {
-            CampaignRuntimeController.TryFinalizePending(DateTime.MaxValue, out _);
+            FinalizePendingCampaignEvidence();
             CampaignRuntimeController.Stop();
             PhysicalTelemetrySessionBridge.Stop();
             SaveAutomaticReport(true);
@@ -1139,10 +1139,17 @@ namespace BallisticsLab.Runtime
 
         private static void StopCampaign(string status)
         {
-            CampaignRuntimeController.TryFinalizePending(DateTime.MaxValue, out _);
+            FinalizePendingCampaignEvidence();
             CampaignRuntimeController.Stop();
             SaveAutomaticReport(true);
             _status = status;
+        }
+
+        private static void FinalizePendingCampaignEvidence()
+        {
+            while (CampaignRuntimeController.TryFinalizePending(DateTime.MaxValue, out _))
+            {
+            }
         }
 
         private static void UpdateCampaign()

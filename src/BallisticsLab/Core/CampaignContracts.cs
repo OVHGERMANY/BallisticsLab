@@ -740,6 +740,7 @@ namespace BallisticsLab.Core
             int currentRepetitionIndex,
             int currentAttemptIndex,
             long currentFixtureId,
+            bool protocolCompletionDeferred,
             IReadOnlyList<CampaignAttemptRecord> attempts)
         {
             if (attempts == null)
@@ -754,6 +755,7 @@ namespace BallisticsLab.Core
             CurrentRepetitionIndex = currentRepetitionIndex;
             CurrentAttemptIndex = currentAttemptIndex;
             CurrentFixtureId = currentFixtureId;
+            ProtocolCompletionDeferred = protocolCompletionDeferred;
             var copy = new CampaignAttemptRecord[attempts.Count];
             for (int index = 0; index < copy.Length; index++)
             {
@@ -770,6 +772,7 @@ namespace BallisticsLab.Core
         internal int CurrentRepetitionIndex { get; }
         internal int CurrentAttemptIndex { get; }
         internal long CurrentFixtureId { get; }
+        internal bool ProtocolCompletionDeferred { get; }
         internal IReadOnlyList<CampaignAttemptRecord> Attempts { get; }
 
         [DoesNotReturn]
@@ -814,6 +817,7 @@ namespace BallisticsLab.Core
         private int _attemptIndex;
         private long _fixtureId;
         private long _attemptOrdinal;
+        private bool _protocolCompletionDeferred;
 
         internal CampaignRunTracker(CampaignDefinition definition, ulong runSeed)
         {
@@ -971,6 +975,7 @@ namespace BallisticsLab.Core
                     _repetitionIndex,
                     _attemptIndex,
                     _fixtureId,
+                    _protocolCompletionDeferred,
                     new ReadOnlyCollection<CampaignAttemptRecord>(_attempts.ToArray()));
             }
         }
@@ -979,6 +984,7 @@ namespace BallisticsLab.Core
             CampaignCaseDefinition campaignCase,
             bool deferProtocolCompletion)
         {
+            _protocolCompletionDeferred = false;
             _repetitionIndex++;
             _attemptIndex = 0;
             if (_repetitionIndex < campaignCase.RequiredRepetitions)
@@ -991,6 +997,7 @@ namespace BallisticsLab.Core
             if (campaignCase.IsProtocolSequence && deferProtocolCompletion)
             {
                 _repetitionIndex--;
+                _protocolCompletionDeferred = true;
                 _state = CampaignRunState.AwaitingShot;
                 return;
             }
@@ -1072,6 +1079,7 @@ namespace BallisticsLab.Core
             _repetitionIndex = 0;
             _attemptIndex = 0;
             _fixtureId = 0L;
+            _protocolCompletionDeferred = false;
             _state = CampaignRunState.AwaitingFixture;
         }
 
@@ -1263,6 +1271,7 @@ namespace BallisticsLab.Core
             int missingConservationRejectCount,
             int protocolRejectCount,
             int sequenceInvalidatedCount,
+            bool completionDeferred,
             double meanVelocityFraction,
             double meanLayersHit,
             double maximumMassClosureErrorKilograms,
@@ -1283,6 +1292,7 @@ namespace BallisticsLab.Core
             MissingConservationRejectCount = missingConservationRejectCount;
             ProtocolRejectCount = protocolRejectCount;
             SequenceInvalidatedCount = sequenceInvalidatedCount;
+            CompletionDeferred = completionDeferred;
             MeanVelocityFraction = meanVelocityFraction;
             MeanLayersHit = meanLayersHit;
             MaximumMassClosureErrorKilograms = maximumMassClosureErrorKilograms;
@@ -1305,11 +1315,12 @@ namespace BallisticsLab.Core
         internal int MissingConservationRejectCount { get; }
         internal int ProtocolRejectCount { get; }
         internal int SequenceInvalidatedCount { get; }
+        internal bool CompletionDeferred { get; }
         internal double MeanVelocityFraction { get; }
         internal double MeanLayersHit { get; }
         internal double MaximumMassClosureErrorKilograms { get; }
         internal double MaximumEnergyClosureErrorJoules { get; }
-        internal bool Complete => AcceptedCount >= RequiredRepetitions;
+        internal bool Complete => AcceptedCount >= RequiredRepetitions && !CompletionDeferred;
     }
 
     internal sealed class CampaignResultMatrix
@@ -1383,6 +1394,8 @@ namespace BallisticsLab.Core
                     Count(attempts, CampaignAttemptStatus.MissingConservationEvidence),
                     Count(attempts, CampaignAttemptStatus.ProtocolRejected),
                     Count(attempts, CampaignAttemptStatus.SequenceInvalidated),
+                    snapshot.ProtocolCompletionDeferred
+                        && caseIndex == snapshot.CurrentCaseIndex,
                     Mean(attempts, attempt => attempt.Evidence.VelocityFraction),
                     Mean(attempts, attempt => attempt.Evidence.HitLayers.Count),
                     Maximum(

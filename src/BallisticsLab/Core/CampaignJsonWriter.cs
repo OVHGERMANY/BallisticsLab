@@ -40,6 +40,11 @@ namespace BallisticsLab.Core
             Number(builder, ref first, "currentRepetitionIndex", snapshot.CurrentRepetitionIndex);
             Number(builder, ref first, "currentAttemptIndex", snapshot.CurrentAttemptIndex);
             Number(builder, ref first, "currentFixtureId", snapshot.CurrentFixtureId);
+            Boolean(
+                builder,
+                ref first,
+                "protocolCompletionDeferred",
+                snapshot.ProtocolCompletionDeferred);
             Boolean(builder, ref first, "gameShotSeedOverridden", false);
             String(
                 builder,
@@ -313,6 +318,11 @@ namespace BallisticsLab.Core
                     ref rowFirst,
                     "sequenceInvalidatedCount",
                     row.SequenceInvalidatedCount);
+                Boolean(
+                    builder,
+                    ref rowFirst,
+                    "completionDeferred",
+                    row.CompletionDeferred);
                 Number(builder, ref rowFirst, "meanVelocityFraction", row.MeanVelocityFraction);
                 Number(builder, ref rowFirst, "meanLayersHit", row.MeanLayersHit);
                 Number(
