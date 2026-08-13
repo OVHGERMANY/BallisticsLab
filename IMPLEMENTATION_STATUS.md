@@ -25,14 +25,15 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Immediate detached copies into immutable BallisticsLab-owned host, impact, component, collision-history, output, loss-budget, and conservation records.
 - Complete copied component geometry, mass, motion, energy, attitude, lineage, material provenance, damage and penetration capability, terminal state, and render state.
 - Safe absence, unsupported-schema, malformed-event, and bounded-buffer behavior.
+- Exact ordinal transition-ID pairing with first-seen ordering, pending prepared evidence, orphaned resolved evidence, and deterministic duplicate counters that preserve the first accepted stage.
 
-This foundation has not been deployed or tested in-game. Prepared/resolved pairing, duplicate and orphan policy, schema-4 JSON export, physical-only reports, and automatic-save revision integration remain the next milestone.
+This foundation has not been deployed or tested in-game. Schema-4 JSON export, physical-only reports, and automatic-save revision integration remain the next milestone.
 
 ## Automated and startup verification
 
 - Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
-- Pure and installed-database validation: 62 checks passed.
-- Validation with all current reports: 69 checks passed.
+- Pure and installed-database validation: 69 checks passed.
+- Validation with all current reports: 76 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -44,7 +45,7 @@ This foundation has not been deployed or tested in-game. Prepared/resolved pairi
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 - Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `DC484371...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `DAC4A8B9...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
 ## Current-build runtime evidence
 
@@ -121,7 +122,6 @@ Historical evidence does not satisfy a missing `0.2.8` gate.
 
 ## Remaining development sequence
 
-- Pair prepared and resolved physical transitions, preserve pending and orphan evidence, and reject duplicates deterministically.
 - Add schema-4 `physicalTransitions` JSON export without changing the flat shot-record CSV contract.
 - Add physical-transition-only automatic reports and revision tracking.
 - Add automated campaigns, deterministic seeds, reset control, result matrices, and conservation summaries.

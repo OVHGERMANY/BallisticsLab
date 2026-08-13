@@ -8,6 +8,8 @@ namespace BallisticsLab.Runtime.Telemetry
     {
         private static readonly PhysicalTelemetryCaptureBuffer Captured =
             new PhysicalTelemetryCaptureBuffer(LabPolicies.MaximumRecords * 2);
+        private static readonly PhysicalTransitionTracker Transitions =
+            new PhysicalTransitionTracker(LabPolicies.MaximumRecords);
 
         private static PhysicalTelemetryPublisherConnection? _connection;
         private static DateTime _nextDiscoveryUtc;
@@ -16,10 +18,15 @@ namespace BallisticsLab.Runtime.Telemetry
 
         internal static int CapturedCount => Captured.Count;
 
+        internal static int TransitionCount => Transitions.Count;
+
+        internal static long TransitionRevision => Transitions.Revision;
+
         internal static void Start()
         {
             Stop();
             Captured.Clear();
+            Transitions.Clear();
             _active = true;
             _connection = new PhysicalTelemetryPublisherConnection();
             _nextDiscoveryUtc = DateTime.MinValue;
@@ -39,7 +46,7 @@ namespace BallisticsLab.Runtime.Telemetry
             _nextDiscoveryUtc = now.AddSeconds(1d);
             bool attached = connection.TryAttach(
                 AppDomain.CurrentDomain.GetAssemblies(),
-                Captured.Add,
+                Capture,
                 ReportRejectedEvent);
             ReportConnectionStatus(connection);
             if (attached)
@@ -55,9 +62,15 @@ namespace BallisticsLab.Runtime.Telemetry
             return Captured.Snapshot();
         }
 
+        internal static IReadOnlyList<PhysicalTransitionRecord> SnapshotTransitions()
+        {
+            return Transitions.Snapshot();
+        }
+
         internal static void ClearCaptured()
         {
             Captured.Clear();
+            Transitions.Clear();
         }
 
         internal static void Stop()
@@ -101,6 +114,12 @@ namespace BallisticsLab.Runtime.Telemetry
         private static void ReportRejectedEvent(string failure)
         {
             Plugin.Log?.LogWarning("Physical telemetry event rejected: " + failure);
+        }
+
+        private static void Capture(PhysicalTelemetryEventRecord record)
+        {
+            Captured.Add(record);
+            Transitions.Add(record);
         }
     }
 }

@@ -305,7 +305,7 @@ internal sealed class FakePhysicalEvent
         return new FakePhysicalEvent(value, parent, parentHistory, outputs, new List<object>());
     }
 
-    internal static FakePhysicalEvent Resolved()
+    internal static FakePhysicalEvent Resolved(string transitionId = "transition-resolved")
     {
         List<object> parentHistory = new() { Collision("collision-prior", FakeOutcome.Penetrated) };
         List<object> outputHistory = new() { Collision("collision-current", FakeOutcome.Fragmented) };
@@ -314,7 +314,7 @@ internal sealed class FakePhysicalEvent
         var value = new FakeTelemetryEvent
         {
             Stage = FakeStage.CollisionResolved,
-            TransitionId = "transition-resolved",
+            TransitionId = transitionId,
             Outcome = FakeOutcome.Fragmented,
             Host = Host(),
             Impact = Impact(),

@@ -83,6 +83,27 @@ Check(
 Check(
     PhysicalTelemetryFoundationTests.RejectsInvalidOrNonFiniteForeignEvents(),
     "invalid physical telemetry is rejected without partial capture");
+Check(
+    PhysicalTransitionTrackerTests.PreparedAndResolvedPairByExactTransitionId(),
+    "prepared and resolved events pair by exact transition ID");
+Check(
+    PhysicalTransitionTrackerTests.PreparedOnlyRemainsPendingEvidence(),
+    "prepared-only physical transitions remain pending evidence");
+Check(
+    PhysicalTransitionTrackerTests.ResolvedOnlyIsMarkedOrphaned(),
+    "resolved-only physical transitions are marked orphaned");
+Check(
+    PhysicalTransitionTrackerTests.OutOfOrderArrivalConvergesToCompleted(),
+    "out-of-order transition events converge to one completed pair");
+Check(
+    PhysicalTransitionTrackerTests.DuplicateStagesAreCountedAndFirstEventWins(),
+    "duplicate physical stages are counted without duplicating transitions");
+Check(
+    PhysicalTransitionTrackerTests.TransitionIdsUseOrdinalCaseSensitiveIdentity(),
+    "physical transition IDs use exact ordinal identity");
+Check(
+    PhysicalTransitionTrackerTests.CapacityEvictsOldestTransitionDeterministically(),
+    "physical transition capacity evicts the oldest evidence deterministically");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 Check(
     !LabPolicies.ShouldSaveReport(0, 1, 0)
