@@ -4,6 +4,7 @@ using EFT;
 using EFT.Ballistics;
 using EFT.InventoryLogic;
 using BallisticsLab.Runtime.Fixtures;
+using UnityEngine;
 
 namespace BallisticsLab.Runtime.Telemetry
 {
@@ -77,6 +78,7 @@ namespace BallisticsLab.Runtime.Telemetry
                 FixtureMaximumDurability = LabPlate.MaximumDurability;
                 FixtureLayerSpacing = LabPlate.LayerSpacing;
                 FixtureColliderThickness = LabPlate.ColliderThickness;
+                CaptureFixtureFacePoint(labPlate, shot.HitPoint);
                 TargetKind = "FIXTURE PLATE";
                 TargetName = "Fixture " + FixtureId + " layer " + (LayerIndex + 1)
                     + "/" + FixtureLayerCount + " | " + FixtureName;
@@ -141,6 +143,11 @@ namespace BallisticsLab.Runtime.Telemetry
         internal float FixtureMaximumDurability { get; }
         internal float FixtureLayerSpacing { get; }
         internal float FixtureColliderThickness { get; }
+        internal bool HasFixtureFacePoint { get; private set; }
+        internal float FixtureLocalHitX { get; private set; }
+        internal float FixtureLocalHitY { get; private set; }
+        internal float FixtureFaceWidth { get; private set; }
+        internal float FixtureFaceHeight { get; private set; }
         internal bool HasArmorAnalysis { get; }
         internal float ArmorRealResistance { get; }
         internal float ArmorClassResistance { get; }
@@ -198,6 +205,46 @@ namespace BallisticsLab.Runtime.Telemetry
             }
 
             return root;
+        }
+
+        private void CaptureFixtureFacePoint(LabPlateCollider plate, Vector3 hitPoint)
+        {
+            if (plate == null || !IsFinite(hitPoint))
+            {
+                return;
+            }
+
+            Vector3 local = plate.transform.InverseTransformPoint(hitPoint);
+            Vector3 scale = plate.transform.lossyScale;
+            float width = Mathf.Abs(scale.x);
+            float height = Mathf.Abs(scale.y);
+            float localX = local.x * width;
+            float localY = local.y * height;
+            if (!IsFinite(localX)
+                || !IsFinite(localY)
+                || !IsFinite(width)
+                || !IsFinite(height)
+                || width <= 0f
+                || height <= 0f)
+            {
+                return;
+            }
+
+            HasFixtureFacePoint = true;
+            FixtureLocalHitX = localX;
+            FixtureLocalHitY = localY;
+            FixtureFaceWidth = width;
+            FixtureFaceHeight = height;
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 }

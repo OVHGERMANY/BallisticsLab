@@ -182,6 +182,7 @@ namespace BallisticsLab.Runtime
             long fixtureId;
             DateTime pendingLastObservedUtc;
             CampaignRunTracker tracker;
+            CampaignCaseDefinition campaignCase;
             lock (Sync)
             {
                 if (_tracker == null
@@ -192,13 +193,17 @@ namespace BallisticsLab.Runtime
                 }
                 tracker = _tracker;
                 CampaignRunSnapshot snapshot = tracker.Snapshot();
-                if (snapshot.State != CampaignRunState.AwaitingShot)
+                if (snapshot.State != CampaignRunState.AwaitingShot
+                    || _definition == null
+                    || snapshot.CurrentCaseIndex < 0
+                    || snapshot.CurrentCaseIndex >= _definition.Cases.Count)
                 {
                     return false;
                 }
                 chainId = _pendingChainId;
                 fixtureId = snapshot.CurrentFixtureId;
                 pendingLastObservedUtc = _pendingLastObservedUtc;
+                campaignCase = _definition.Cases[snapshot.CurrentCaseIndex];
             }
 
             IReadOnlyList<PhysicalTransitionRecord> transitions =
@@ -210,7 +215,13 @@ namespace BallisticsLab.Runtime
             }
 
             IReadOnlyList<ShotRecord> records = TelemetryStore.SnapshotChain(chainId);
-            if (!TryBuildEvidence(records, transitions, fixtureId, chainId, out CampaignShotEvidence? evidence))
+            if (!TryBuildEvidence(
+                    records,
+                    transitions,
+                    fixtureId,
+                    chainId,
+                    campaignCase,
+                    out CampaignShotEvidence? evidence))
             {
                 lock (Sync)
                 {
@@ -321,6 +332,7 @@ namespace BallisticsLab.Runtime
             IReadOnlyList<PhysicalTransitionRecord> transitions,
             long fixtureId,
             string chainId,
+            CampaignCaseDefinition campaignCase,
             [NotNullWhen(true)] out CampaignShotEvidence? evidence)
         {
             ShotRecord[] fixtureRecords = records
@@ -340,7 +352,16 @@ namespace BallisticsLab.Runtime
                 || identity.FixtureArmorClass <= 0
                 || identity.FixtureLayerCount <= 0
                 || plateRecords.Any(record => !HasSameFixtureIdentity(record, identity))
-                || !IsFiniteNonNegative(identity.Fraction))
+                || !IsFiniteNonNegative(identity.Fraction)
+                || !IsFiniteNonNegative(identity.ImpactSpeed)
+                || !IsFinitePositive(identity.ProjectileMassKilograms)
+                || !IsFinitePositive(identity.ProjectileDiameterMetres)
+                || !identity.HasFixtureFacePoint
+                || !IsFiniteNonNegative(identity.ImpactAngle)
+                || identity.ImpactAngle > 90f
+                || !IsFinitePositive(identity.FixtureFaceWidth)
+                || !IsFinitePositive(identity.FixtureFaceHeight)
+                || !IsFinitePositive(identity.ImpactDistanceMetres))
             {
                 evidence = null;
                 return false;
@@ -361,6 +382,21 @@ namespace BallisticsLab.Runtime
                 identity.RootRandomSeed,
                 identity.AmmoTemplateId,
                 identity.RootShooterProfileId);
+            var protocolEvidence = new ProtocolShotEvidence(
+                fixtureId,
+                identity.AmmoTemplateId,
+                ProtocolVelocityMeasurementBasis.TargetImpactProxy,
+                identity.ImpactSpeed,
+                identity.ProjectileMassKilograms,
+                identity.ProjectileDiameterMetres,
+                identity.ImpactAngle,
+                identity.FixtureLocalHitX,
+                identity.FixtureLocalHitY,
+                identity.FixtureFaceWidth,
+                identity.FixtureFaceHeight,
+                identity.ImpactDistanceMetres,
+                campaignCase.BackstopEnabled,
+                reachedBackstop);
             evidence = new CampaignShotEvidence(
                 fixtureId,
                 chainId,
@@ -379,7 +415,8 @@ namespace BallisticsLab.Runtime
                 physical.TransitionCount,
                 physical.ConservationRecordCount,
                 physical.MaximumMassClosureErrorKilograms,
-                physical.MaximumEnergyClosureErrorJoules);
+                physical.MaximumEnergyClosureErrorJoules,
+                protocolEvidence);
             return true;
         }
 
@@ -407,6 +444,11 @@ namespace BallisticsLab.Runtime
         private static bool IsFiniteNonNegative(float value)
         {
             return !float.IsNaN(value) && !float.IsInfinity(value) && value >= 0f;
+        }
+
+        private static bool IsFinitePositive(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value) && value > 0f;
         }
 
         private static void MarkEvidenceChanged()

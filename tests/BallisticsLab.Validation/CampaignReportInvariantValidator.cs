@@ -341,6 +341,12 @@ internal static class CampaignReportInvariantValidator
                 || !TryLayers(element, out List<int> hitLayers)
                 || !TryText(element, "outcome", out string outcome)
                 || !TryBoolean(element, "reachedBackstop", out bool reachedBackstop)
+                || !TryProtocolEvidence(
+                    element,
+                    fixtureId,
+                    ammunitionTemplateId,
+                    reachedBackstop,
+                    out ProtocolShotEvidence? protocolEvidence)
                 || !TryInt32(element, "physicalTransitionCount", out int physicalCount)
                 || !TryInt32(element, "conservationRecordCount", out int conservationCount)
                 || !TryDouble(
@@ -374,7 +380,8 @@ internal static class CampaignReportInvariantValidator
                 physicalCount,
                 conservationCount,
                 maximumMassError,
-                maximumEnergyError);
+                maximumEnergyError,
+                protocolEvidence);
             if (CampaignEvidenceEvaluator.Evaluate(definition.Cases[caseIndex], evidence) != status)
             {
                 failure = "campaign attempt status does not match its evidence gates";
@@ -392,6 +399,81 @@ internal static class CampaignReportInvariantValidator
             expectedOrdinal++;
         }
         return true;
+    }
+
+    private static bool TryProtocolEvidence(
+        JsonElement attempt,
+        long fixtureId,
+        string ammunitionTemplateId,
+        bool reachedBackstop,
+        out ProtocolShotEvidence? evidence)
+    {
+        evidence = null;
+        if (!attempt.TryGetProperty("protocolEvidence", out JsonElement element)
+            || element.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+        if (element.ValueKind != JsonValueKind.Object
+            || !TryEnum(
+                element,
+                "velocityMeasurementBasis",
+                out ProtocolVelocityMeasurementBasis measurementBasis)
+            || !TryDouble(
+                element,
+                "impactSpeedMetresPerSecond",
+                out double impactSpeed)
+            || !TryDouble(
+                element,
+                "projectileMassKilograms",
+                out double projectileMass)
+            || !TryDouble(
+                element,
+                "projectileDiameterMetres",
+                out double projectileDiameter)
+            || !TryDouble(element, "impactAngleDegrees", out double impactAngle)
+            || !TryDouble(element, "fixtureLocalHitXMetres", out double localX)
+            || !TryDouble(element, "fixtureLocalHitYMetres", out double localY)
+            || !TryDouble(element, "fixtureFaceWidthMetres", out double faceWidth)
+            || !TryDouble(element, "fixtureFaceHeightMetres", out double faceHeight)
+            || !TryDouble(element, "fixtureDistanceMetres", out double fixtureDistance)
+            || !TryBoolean(
+                element,
+                "witnessBackstopConfigured",
+                out bool witnessBackstopConfigured)
+            || !TryBoolean(
+                element,
+                "throughPenetrationObserved",
+                out bool throughPenetrationObserved)
+            || throughPenetrationObserved != reachedBackstop)
+        {
+            return false;
+        }
+
+        try
+        {
+            evidence = new ProtocolShotEvidence(
+                fixtureId,
+                ammunitionTemplateId,
+                measurementBasis,
+                impactSpeed,
+                projectileMass,
+                projectileDiameter,
+                impactAngle,
+                localX,
+                localY,
+                faceWidth,
+                faceHeight,
+                fixtureDistance,
+                witnessBackstopConfigured,
+                throughPenetrationObserved);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            evidence = null;
+            return false;
+        }
     }
 
     private static bool MatrixMatches(

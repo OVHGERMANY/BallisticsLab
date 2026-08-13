@@ -184,6 +184,9 @@ Check(
     CampaignTests.CampaignReportRejectsCorruptedFixtureIdentity(),
     "campaign report validation rejects fixture identity inconsistent with attempt status");
 Check(
+    CampaignTests.CampaignReportRejectsCorruptedProtocolEvidence(),
+    "campaign report validation rejects impossible protocol geometry and outcome evidence");
+Check(
     CampaignTests.CampaignReportRejectsCorruptedAttemptAndHeaderCursors(),
     "campaign report validation rejects impossible attempt order and header cursors");
 Check(
@@ -195,6 +198,36 @@ Check(
 Check(
     CampaignTests.StoppedCampaignPreservesAttemptsAndRejectsFurtherShots(),
     "stopping a campaign preserves evidence and rejects later shot chains");
+Check(
+    ProtocolTests.CatalogMatchesPublishedNominalThreatTable(),
+    "GOST-oriented catalog preserves the published nominal Br1 through Br6 threat table");
+Check(
+    ProtocolTests.ShotEvidenceRejectsInvalidFaceGeometry(),
+    "protocol shot evidence validates projectile geometry and fixture-local impact bounds");
+Check(
+    ProtocolTests.TargetImpactProxyCannotCompleteScreening(),
+    "target-impact velocity remains an explicit proxy and cannot complete protocol screening");
+Check(
+    ProtocolTests.UnverifiedCatalogAmmunitionCannotCompleteScreening(),
+    "nominal catalog threats cannot complete screening without a verified game-ammunition mapping");
+Check(
+    ProtocolTests.ValidFiveShotPatternCompletesSimulationScreening(),
+    "five qualifying spaced V3 observations complete simulation screening without certification");
+Check(
+    ProtocolTests.ExtraIncompleteObservationDoesNotInvalidateCompleteScreening(),
+    "an extra incomplete observation cannot erase an otherwise complete screening set");
+Check(
+    ProtocolTests.VelocitySeverityExceptionsAreApplied(),
+    "lower-velocity penetration and higher-velocity stop observations retain severity exceptions");
+Check(
+    ProtocolTests.OppositeVelocityExceptionsRemainNonQualifying(),
+    "non-severe out-of-band velocity observations remain nonqualifying");
+Check(
+    ProtocolTests.EdgeSpacingAndFixtureIdentityAreEnforced(),
+    "protocol screening enforces edge spacing, neighbour spacing, and one physical sample");
+Check(
+    ProtocolTests.CampaignEvidenceRejectsMismatchedProtocolIdentity(),
+    "campaign evidence rejects protocol geometry attached to another fixture");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 Check(
     !LabPolicies.ShouldSaveReport(0, 1, 0)

@@ -137,6 +137,8 @@ namespace BallisticsLab.Core
                 String(builder, ref first, "rootShooterProfileId", evidence.RootShooterProfileId);
                 String(builder, ref first, "ammunitionTemplateId", evidence.AmmunitionTemplateId);
                 Number(builder, ref first, "velocityFraction", evidence.VelocityFraction);
+                Property(builder, ref first, "protocolEvidence");
+                AppendProtocolEvidence(builder, evidence.ProtocolEvidence);
                 Property(builder, ref first, "hitLayers");
                 AppendLayers(builder, evidence);
                 String(builder, ref first, "outcome", evidence.Outcome);
@@ -156,6 +158,81 @@ namespace BallisticsLab.Core
                 builder.Append('}');
             }
             builder.Append(']');
+        }
+
+        private static void AppendProtocolEvidence(
+            StringBuilder builder,
+            ProtocolShotEvidence? evidence)
+        {
+            if (evidence == null)
+            {
+                builder.Append("null");
+                return;
+            }
+
+            builder.Append('{');
+            bool first = true;
+            String(
+                builder,
+                ref first,
+                "velocityMeasurementBasis",
+                evidence.VelocityMeasurementBasis.ToString());
+            Number(
+                builder,
+                ref first,
+                "impactSpeedMetresPerSecond",
+                evidence.ImpactSpeedMetresPerSecond);
+            Number(
+                builder,
+                ref first,
+                "projectileMassKilograms",
+                evidence.ProjectileMassKilograms);
+            Number(
+                builder,
+                ref first,
+                "projectileDiameterMetres",
+                evidence.ProjectileDiameterMetres);
+            Number(
+                builder,
+                ref first,
+                "impactAngleDegrees",
+                evidence.ImpactAngleDegrees);
+            Number(
+                builder,
+                ref first,
+                "fixtureLocalHitXMetres",
+                evidence.FixtureLocalHitXMetres);
+            Number(
+                builder,
+                ref first,
+                "fixtureLocalHitYMetres",
+                evidence.FixtureLocalHitYMetres);
+            Number(
+                builder,
+                ref first,
+                "fixtureFaceWidthMetres",
+                evidence.FixtureFaceWidthMetres);
+            Number(
+                builder,
+                ref first,
+                "fixtureFaceHeightMetres",
+                evidence.FixtureFaceHeightMetres);
+            Number(
+                builder,
+                ref first,
+                "fixtureDistanceMetres",
+                evidence.FixtureDistanceMetres);
+            Boolean(
+                builder,
+                ref first,
+                "witnessBackstopConfigured",
+                evidence.WitnessBackstopConfigured);
+            Boolean(
+                builder,
+                ref first,
+                "throughPenetrationObserved",
+                evidence.ThroughPenetrationObserved);
+            builder.Append('}');
         }
 
         private static void AppendLayers(StringBuilder builder, CampaignShotEvidence evidence)

@@ -372,7 +372,8 @@ namespace BallisticsLab.Core
             int physicalTransitionCount,
             int conservationRecordCount,
             double maximumMassClosureErrorKilograms,
-            double maximumEnergyClosureErrorJoules)
+            double maximumEnergyClosureErrorJoules,
+            ProtocolShotEvidence? protocolEvidence = null)
         {
             if (fixtureId <= 0L)
             {
@@ -384,6 +385,15 @@ namespace BallisticsLab.Core
             ValidateRange(fixtureArmorClass, 1, 100, nameof(fixtureArmorClass));
             ValidateRange(fixtureLayerCount, 1, LabPolicies.MaximumLayers, nameof(fixtureLayerCount));
             AmmunitionTemplateId = Required(ammunitionTemplateId, nameof(ammunitionTemplateId));
+            if (protocolEvidence != null
+                && (protocolEvidence.FixtureId != fixtureId
+                    || !string.Equals(
+                        protocolEvidence.AmmunitionTemplateId,
+                        AmmunitionTemplateId,
+                        StringComparison.Ordinal)))
+            {
+                ThrowMismatchedProtocolEvidence();
+            }
             Outcome = Required(outcome, nameof(outcome));
             ValidateNonNegative(velocityFraction, nameof(velocityFraction));
             ValidateNonNegative(
@@ -428,6 +438,7 @@ namespace BallisticsLab.Core
             ConservationRecordCount = conservationRecordCount;
             MaximumMassClosureErrorKilograms = maximumMassClosureErrorKilograms;
             MaximumEnergyClosureErrorJoules = maximumEnergyClosureErrorJoules;
+            ProtocolEvidence = protocolEvidence;
         }
 
         internal long FixtureId { get; }
@@ -448,6 +459,7 @@ namespace BallisticsLab.Core
         internal int ConservationRecordCount { get; }
         internal double MaximumMassClosureErrorKilograms { get; }
         internal double MaximumEnergyClosureErrorJoules { get; }
+        internal ProtocolShotEvidence? ProtocolEvidence { get; }
 
         private static string Required(string value, string parameterName)
         {
@@ -526,6 +538,14 @@ namespace BallisticsLab.Core
             throw new ArgumentOutOfRangeException(
                 parameterName,
                 "Layer indices must be within the recorded fixture layer count.");
+        }
+
+        [DoesNotReturn]
+        private static void ThrowMismatchedProtocolEvidence()
+        {
+            throw new ArgumentException(
+                "Protocol evidence must identify the same fixture and ammunition as the campaign shot.",
+                "protocolEvidence");
         }
 
         private static bool IsFinite(double value)

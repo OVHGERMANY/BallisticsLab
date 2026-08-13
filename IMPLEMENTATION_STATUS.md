@@ -36,14 +36,18 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Stable case-identification seeds derived from a configurable Lab seed. These seeds label repeatable cases; they do not replace EFT's observed shot seed.
 - Schema-4 campaign definitions, detached attempt evidence, and result matrices whose case seeds, statuses, counts, means, maxima, and completion state are independently recomputed by the offline validator.
 - A completed or stopped campaign cannot be silently replaced. Evidence revisions remain monotonic across replacements, unsaved attempts are checkpointed first, and a failed checkpoint blocks the new campaign start.
+- Per-attempt protocol evidence records absolute target-impact speed, projectile mass and diameter, actual incidence, fixture-local hit coordinates, face dimensions, fixture distance, and witness-backstop state without retaining a pooled shot or Unity object.
+- A nominal GOST 34286-2017 catalog represents all eight Br1-through-Br6 threat rows, including the two Br4 and two Br5 threats, while leaving unverified EFT ammunition mappings empty.
+- A pure GOST-oriented screening evaluator enforces the five-shot count, same-sample identity, five-caliber edge and neighbour spacing, 5-degree incidence limit, test-distance tolerance, velocity window, and the standard's more-severe low-velocity penetration and high-velocity stop exceptions.
+- Screening results are explicitly non-certifying. Current target-impact velocity is marked `TargetImpactProxy` and can only produce insufficient protocol evidence because the test method requires velocity measured 3 metres from the muzzle.
 
-This development layer has not been deployed or tested in-game. Formal material standards and protocol reporting remain next.
+This development layer has not been deployed or tested in-game. Three-metre velocity sampling, verified EFT threat-ammunition mappings, same-sample five-point runtime sequencing, and the formal protocol report remain next.
 
 ## Automated and startup verification
 
 - Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
-- Pure and installed-database validation: 100 checks passed.
-- Validation with all installed-runtime reports: 107 checks passed.
+- Pure and installed-database validation: 111 checks passed.
+- Validation with all installed-runtime reports: 118 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -132,8 +136,10 @@ Historical evidence does not satisfy a missing `0.2.8` gate.
 
 ## Remaining development sequence
 
-- Add formal GOST-oriented protocols and standardized reports.
-- Add protocol-level material acceptance limits and cross-campaign comparison summaries without treating EFT template labels as laboratory certification.
+- Capture or derive the required 3-metre muzzle velocity without substituting target-impact speed.
+- Verify exact EFT ammunition-template mappings for each nominal protocol threat; do not infer mappings from display names alone.
+- Add a same-sample five-point protocol campaign that preserves durability between qualifying shots and places impacts at least five projectile diameters from every edge and earlier qualifying hit.
+- Add protocol reports and cross-campaign material comparisons that distinguish simulation-screening outcome from accredited certification.
 - Run the final integrated in-game campaign only after every offline development layer is complete.
 
 Existing Granit BR4 and BR5 labels are repeatable EFT database presets only. They are not certification tests.

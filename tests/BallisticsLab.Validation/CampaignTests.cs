@@ -505,6 +505,7 @@ internal static class CampaignTests
         using JsonDocument document = JsonDocument.Parse(report);
         JsonElement campaign = document.RootElement.GetProperty("campaign");
         JsonElement attempt = campaign.GetProperty("attempts")[0];
+        JsonElement protocol = attempt.GetProperty("protocolEvidence");
         JsonElement row = campaign.GetProperty("matrix").GetProperty("rows")[0];
         return CampaignReportInvariantValidator.Validate(
                 document.RootElement,
@@ -523,6 +524,15 @@ internal static class CampaignTests
             && attempt.GetProperty("rootFireIndex").GetInt32() == 17
             && attempt.GetProperty("rootShooterProfileId").GetString() == "profile"
             && attempt.GetProperty("status").GetString() == "Accepted"
+            && protocol.GetProperty("velocityMeasurementBasis").GetString()
+                == "TargetImpactProxy"
+            && Math.Abs(protocol.GetProperty("impactSpeedMetresPerSecond").GetDouble() - 800d)
+                < 0.000001d
+            && Math.Abs(protocol.GetProperty("projectileMassKilograms").GetDouble() - 0.008d)
+                < 0.000000001d
+            && Math.Abs(protocol.GetProperty("projectileDiameterMetres").GetDouble() - 0.00762d)
+                < 0.000000001d
+            && protocol.GetProperty("witnessBackstopConfigured").GetBoolean()
             && row.GetProperty("acceptedCount").GetInt32() == 1
             && row.GetProperty("fixtureRejectCount").GetInt32() == 0
             && row.GetProperty("complete").GetBoolean();
@@ -586,6 +596,31 @@ internal static class CampaignTests
                 out _,
                 out string failure)
             && failure.Contains("status", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool CampaignReportRejectsCorruptedProtocolEvidence()
+    {
+        JsonNode outsideFace = JsonNode.Parse(CreateCompletedCampaignReport())!;
+        outsideFace["campaign"]!["attempts"]![0]!["protocolEvidence"]![
+            "fixtureLocalHitXMetres"] = 2d;
+        using JsonDocument outsideDocument = JsonDocument.Parse(outsideFace.ToJsonString());
+        bool outsideRejected = !CampaignReportInvariantValidator.Validate(
+            outsideDocument.RootElement,
+            out _,
+            out string outsideFailure);
+
+        JsonNode outcomeMismatch = JsonNode.Parse(CreateCompletedCampaignReport())!;
+        outcomeMismatch["campaign"]!["attempts"]![0]!["protocolEvidence"]![
+            "throughPenetrationObserved"] = true;
+        using JsonDocument outcomeDocument = JsonDocument.Parse(outcomeMismatch.ToJsonString());
+        bool outcomeRejected = !CampaignReportInvariantValidator.Validate(
+            outcomeDocument.RootElement,
+            out _,
+            out string outcomeFailure);
+        return outsideRejected
+            && outsideFailure.Contains("attempt", StringComparison.OrdinalIgnoreCase)
+            && outcomeRejected
+            && outcomeFailure.Contains("attempt", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool CampaignReportRejectsCorruptedAttemptAndHeaderCursors()
@@ -807,6 +842,21 @@ internal static class CampaignTests
             physicalTransitionCount,
             conservationRecordCount < 0 ? physicalTransitionCount : conservationRecordCount,
             massClosureError,
-            energyClosureError);
+            energyClosureError,
+            new ProtocolShotEvidence(
+                fixtureId,
+                "ammo-template",
+                ProtocolVelocityMeasurementBasis.TargetImpactProxy,
+                800d,
+                0.008d,
+                0.00762d,
+                0d,
+                0d,
+                0d,
+                1d,
+                1.5d,
+                8d,
+                true,
+                reachedBackstop));
     }
 }
