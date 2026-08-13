@@ -62,9 +62,11 @@ namespace BallisticsLab.Runtime.Telemetry
             return Captured.Snapshot();
         }
 
-        internal static IReadOnlyList<PhysicalTransitionRecord> SnapshotTransitions()
+        internal static IReadOnlyList<PhysicalTransitionRecord> SnapshotTransitions(
+            out long revision,
+            out DateTime lastUpdatedUtc)
         {
-            return Transitions.Snapshot();
+            return Transitions.Snapshot(out revision, out lastUpdatedUtc);
         }
 
         internal static void ClearCaptured()

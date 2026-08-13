@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using BallisticsLab.Validation;
 
 internal static class ReportInvariantValidator
 {
@@ -76,11 +77,33 @@ internal static class ReportInvariantValidator
         try
         {
             using JsonDocument document = JsonDocument.Parse(File.ReadAllText(jsonPath));
+            bool schemaFour = document.RootElement.TryGetProperty(
+                    "schema",
+                    out JsonElement schemaElement)
+                && schemaElement.TryGetInt32(out int schema)
+                && schema >= 4;
+            int physicalTransitionCount = 0;
+            if (schemaFour
+                && !PhysicalTransitionInvariantValidator.Validate(
+                    document.RootElement,
+                    out physicalTransitionCount,
+                    out failure))
+            {
+                return false;
+            }
             if (!document.RootElement.TryGetProperty("records", out JsonElement records)
-                || records.ValueKind != JsonValueKind.Array
-                || records.GetArrayLength() == 0)
+                || records.ValueKind != JsonValueKind.Array)
             {
                 failure = "report contains no record array";
+                return false;
+            }
+            if (records.GetArrayLength() == 0)
+            {
+                if (physicalTransitionCount > 0)
+                {
+                    return true;
+                }
+                failure = "report contains neither shot records nor physical transitions";
                 return false;
             }
 

@@ -27,8 +27,13 @@ internal static class CurrentReportSetValidator
                     out JsonElement records)
                 && records.ValueKind == JsonValueKind.Array
                 && records.GetArrayLength() > 0;
+            bool hasPhysicalTransitions = candidate.RootElement.TryGetProperty(
+                    "physicalTransitions",
+                    out JsonElement transitions)
+                && transitions.ValueKind == JsonValueKind.Array
+                && transitions.GetArrayLength() > 0;
             if (currentSchema
-                && hasRecords
+                && (hasRecords || hasPhysicalTransitions)
                 && string.Equals(pluginVersion, expectedPluginVersion, StringComparison.Ordinal))
             {
                 selected.Add(reportFile);
@@ -86,6 +91,28 @@ internal static class CurrentReportSetValidator
             expectedValid: true,
             expectedCount: 1,
             expectedFailure: string.Empty);
+    }
+
+    internal static bool SelectsPhysicalOnlySchemaFourReport()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "BallisticsLab.PhysicalReportSet." + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string report = Path.Combine(directory, "BallisticsLab-physical.json");
+            File.WriteAllText(
+                report,
+                "{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],"
+                    + "\"physicalTransitions\":[{\"transitionId\":\"physical-only\"}]}");
+            IReadOnlyList<string> selected = Select(new[] { report }, 4, "0.2.8");
+            return selected.Count == 1 && selected[0] == report;
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
     }
 
     private static bool TestSyntheticSet(

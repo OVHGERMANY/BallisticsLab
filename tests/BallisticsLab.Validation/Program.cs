@@ -6,6 +6,7 @@ using BallisticsLab.Validation;
 const string plateParent = "644120aa86ffbe10ee032b6f";
 const string granitBr4 = "65573fa5655447403702a816";
 const string granitBr5 = "64afc71497cf3a403c01ff38";
+const int installedRuntimeEvidenceSchema = 3;
 
 string[] positionalArguments = args
     .Where(argument => !argument.StartsWith("--", StringComparison.Ordinal))
@@ -28,7 +29,7 @@ Check(
     ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginGuid), "com.janky.ballisticslab")
     && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginName), "Janky-BallisticsLab")
     && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginVersion), "0.2.8")
-    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 3)
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 4)
     && ConstantMatches(
         typeof(PhysicalTelemetryContract),
         nameof(PhysicalTelemetryContract.SupportedPublisherSchema),
@@ -53,8 +54,11 @@ Check(Math.Abs(LabPolicies.ImpactAngleDegrees(-0.5f) - 60f) < 0.0001f, "back-fac
 Check(LabPolicies.Csv("a,b") == "\"a,b\"", "CSV escaping");
 Check(LabPolicies.Json("a\n\"b") == "\"a\\n\\\"b\"", "JSON escaping");
 Check(ReportPairValidator.ParserHandlesQuotedFields(), "CSV report parser handles commas, quotes, and embedded newlines");
-Check(ReportPairValidator.ValidatorMatchesSyntheticPair(), "CSV and JSON report validator accepts a matching schema-3 pair");
+Check(ReportPairValidator.ValidatorMatchesSyntheticPair(), "CSV and JSON report validator accepts a matching schema-4 pair");
 Check(ReportPairValidator.ValidatorRejectsSyntheticMismatch(), "CSV and JSON report validator rejects a field mismatch");
+Check(
+    ReportPairValidator.ValidatorAcceptsPhysicalOnlySchemaFourPair(),
+    "CSV and JSON validator accepts a schema-4 physical-only report with the flat CSV header");
 Check(ReportInvariantValidator.AcceptsSyntheticReport(), "report invariants accept a valid collision record");
 Check(ReportInvariantValidator.RejectsIncorrectFalloff(), "report invariants reject incorrect penetration falloff");
 Check(ReportInvariantValidator.RejectsDetachedTrajectoryEndpoint(), "report invariants reject a detached trajectory endpoint");
@@ -63,6 +67,9 @@ Check(ReportInvariantValidator.RejectsMismatchedContinuationSource(), "report in
 Check(ReportInvariantValidator.RejectsChangedRootIdentity(), "report invariants reject a changed root identity inside one chain");
 Check(CurrentReportSetValidator.RejectsCorruptEarlierCurrentReport(), "current-report gate rejects corruption in an earlier contributing export");
 Check(CurrentReportSetValidator.IgnoresCorruptHistoricalReport(), "current-report gate excludes historical versions from current acceptance");
+Check(
+    CurrentReportSetValidator.SelectsPhysicalOnlySchemaFourReport(),
+    "current-report selection includes schema-4 physical-only evidence");
 Check(AcceptanceCoverageEvaluator.CompleteSyntheticCoveragePasses(), "report coverage accepts a complete controlled fixture matrix");
 Check(AcceptanceCoverageEvaluator.CasualBotTrafficCannotSatisfyFixtureCoverage(), "casual bot traffic cannot satisfy controlled fixture gates");
 Check(AcceptanceCoverageEvaluator.DuplicateBatchesDoNotInflateCoverage(), "duplicate automatic batches do not inflate acceptance coverage");
@@ -104,6 +111,27 @@ Check(
 Check(
     PhysicalTransitionTrackerTests.CapacityEvictsOldestTransitionDeterministically(),
     "physical transition capacity evicts the oldest evidence deterministically");
+Check(
+    PhysicalTransitionReportTests.SchemaFourWriterPreservesCompletePhysicalEvidence(),
+    "schema-4 physical transition JSON preserves complete paired evidence");
+Check(
+    PhysicalTransitionReportTests.PhysicalOnlyChangesTriggerCombinedReportPolicy(),
+    "physical-only revisions trigger report capture without a shot record");
+Check(
+    PhysicalTransitionReportTests.PhysicalOnlyDocumentUsesSchemaFourAndEmptyShotArray(),
+    "physical-only document uses schema 4 with an unchanged empty shot-record array");
+Check(
+    PhysicalTransitionReportTests.UpdatedRevisionIdentifiesOnlyChangedTransitions(),
+    "automatic physical evidence selection includes only transitions changed since save");
+Check(
+    PhysicalTransitionInvariantTests.AcceptsBalancedSchemaFourEvidence(),
+    "physical transition invariants accept balanced mass and energy evidence");
+Check(
+    PhysicalTransitionInvariantTests.RejectsBrokenMassClosure(),
+    "physical transition invariants reject broken mass closure");
+Check(
+    PhysicalTransitionInvariantTests.RejectsBrokenEnergyClosure(),
+    "physical transition invariants reject broken energy closure");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 Check(
     !LabPolicies.ShouldSaveReport(0, 1, 0)
@@ -316,8 +344,8 @@ if (!string.IsNullOrEmpty(reportsPath))
         using JsonDocument report = JsonDocument.Parse(File.ReadAllText(latestReport));
         bool currentSchema = report.RootElement.TryGetProperty("schema", out JsonElement schemaElement)
             && schemaElement.TryGetInt32(out int schema)
-            && schema == LabBuild.ReportSchema;
-        Check(currentSchema, "latest BallisticsLab report uses the current schema");
+            && schema == installedRuntimeEvidenceSchema;
+        Check(currentSchema, "latest installed-runtime report uses the accepted baseline schema");
         string reportVersion = report.RootElement.TryGetProperty(
                 "pluginVersion",
                 out JsonElement versionElement)
@@ -325,25 +353,25 @@ if (!string.IsNullOrEmpty(reportsPath))
             : string.Empty;
         Check(
             string.Equals(reportVersion, LabBuild.PluginVersion, StringComparison.Ordinal),
-            "latest BallisticsLab report identifies the current plugin version");
+            "latest installed-runtime report identifies the accepted plugin version");
 
         JsonElement recordsElement = report.RootElement.TryGetProperty("records", out JsonElement records)
             ? records
             : default;
         bool hasRecords = recordsElement.ValueKind == JsonValueKind.Array
             && recordsElement.GetArrayLength() > 0;
-        Check(hasRecords, "latest BallisticsLab report contains shot records");
+        Check(hasRecords, "latest installed-runtime report contains shot records");
 
         IReadOnlyList<string> currentReports = CurrentReportSetValidator.Select(
             reportFiles,
-            LabBuild.ReportSchema,
+            installedRuntimeEvidenceSchema,
             LabBuild.PluginVersion);
 
         string identityFailure = string.Empty;
         string pairFailure = string.Empty;
         bool invariantsValid = CurrentReportSetValidator.ValidateInvariants(
             reportFiles,
-            LabBuild.ReportSchema,
+            installedRuntimeEvidenceSchema,
             LabBuild.PluginVersion,
             out int invariantReportCount,
             out string invariantFailure);
@@ -403,24 +431,24 @@ if (!string.IsNullOrEmpty(reportsPath))
         Check(
             currentReports.Count > 0 && string.IsNullOrEmpty(identityFailure),
             string.IsNullOrEmpty(identityFailure)
-                ? "all current-build report ammunition identities and speeds match the installed templates"
-                : "current-build report ammunition identity mismatch: " + identityFailure);
+                ? "all installed-runtime report ammunition identities and speeds match the installed templates"
+                : "installed-runtime report ammunition identity mismatch: " + identityFailure);
         Check(
             currentReports.Count > 0 && string.IsNullOrEmpty(pairFailure),
             string.IsNullOrEmpty(pairFailure)
-                ? "all current-build CSV and JSON exports match field for field"
-                : "current-build CSV and JSON export mismatch: " + pairFailure);
+                ? "all installed-runtime CSV and JSON exports match field for field"
+                : "installed-runtime CSV and JSON export mismatch: " + pairFailure);
         Check(
             invariantsValid && invariantReportCount == currentReports.Count,
             invariantsValid && invariantReportCount == currentReports.Count
-                ? "all current-build reports satisfy ballistic, durability, trajectory, and lineage invariants"
-                : "current-build report invariant failure: " + invariantFailure);
+                ? "all installed-runtime reports satisfy ballistic, durability, trajectory, and lineage invariants"
+                : "installed-runtime report invariant failure: " + invariantFailure);
         AcceptanceReportCoverage coverage = AcceptanceCoverageEvaluator.Evaluate(
             reportFiles,
-            LabBuild.ReportSchema,
+            installedRuntimeEvidenceSchema,
             LabBuild.PluginVersion);
         Console.WriteLine(
-            "Current reports validated: "
+            "Installed-runtime reports validated: "
             + currentReports.Count.ToString(CultureInfo.InvariantCulture)
             + "; latest: "
             + Path.GetFileName(latestReport));

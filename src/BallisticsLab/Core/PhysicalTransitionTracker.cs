@@ -16,6 +16,7 @@ namespace BallisticsLab.Core
     {
         internal PhysicalTransitionRecord(
             long firstSeenOrdinal,
+            long lastUpdatedRevision,
             string transitionId,
             PhysicalTelemetryEventRecord? prepared,
             PhysicalTelemetryEventRecord? resolved,
@@ -23,6 +24,7 @@ namespace BallisticsLab.Core
             int resolvedDuplicateCount)
         {
             FirstSeenOrdinal = firstSeenOrdinal;
+            LastUpdatedRevision = lastUpdatedRevision;
             TransitionId = transitionId;
             Prepared = prepared;
             Resolved = resolved;
@@ -36,6 +38,7 @@ namespace BallisticsLab.Core
         }
 
         internal long FirstSeenOrdinal { get; }
+        internal long LastUpdatedRevision { get; }
         internal string TransitionId { get; }
         internal PhysicalTransitionState State { get; }
         internal PhysicalTelemetryEventRecord? Prepared { get; }
@@ -55,6 +58,7 @@ namespace BallisticsLab.Core
         private readonly int _maximumTransitions;
         private long _nextOrdinal;
         private long _revision;
+        private DateTime _lastUpdatedUtc;
 
         internal PhysicalTransitionTracker(int maximumTransitions)
         {
@@ -132,13 +136,24 @@ namespace BallisticsLab.Core
                     }
                 }
                 _revision++;
+                entry.LastUpdatedRevision = _revision;
+                _lastUpdatedUtc = DateTime.UtcNow;
             }
         }
 
         internal IReadOnlyList<PhysicalTransitionRecord> Snapshot()
         {
+            return Snapshot(out _, out _);
+        }
+
+        internal IReadOnlyList<PhysicalTransitionRecord> Snapshot(
+            out long revision,
+            out DateTime lastUpdatedUtc)
+        {
             lock (_sync)
             {
+                revision = _revision;
+                lastUpdatedUtc = _lastUpdatedUtc;
                 var records = new List<PhysicalTransitionRecord>(_entries.Count);
                 foreach (string transitionId in _order)
                 {
@@ -157,6 +172,7 @@ namespace BallisticsLab.Core
                 _order.Clear();
                 _nextOrdinal = 0L;
                 _revision = 0L;
+                _lastUpdatedUtc = DateTime.MinValue;
             }
         }
 
@@ -200,6 +216,7 @@ namespace BallisticsLab.Core
 
             internal long FirstSeenOrdinal { get; }
             internal string TransitionId { get; }
+            internal long LastUpdatedRevision { get; set; }
             internal PhysicalTelemetryEventRecord? Prepared { get; set; }
             internal PhysicalTelemetryEventRecord? Resolved { get; set; }
             internal int PreparedDuplicateCount { get; set; }
@@ -209,6 +226,7 @@ namespace BallisticsLab.Core
             {
                 return new PhysicalTransitionRecord(
                     FirstSeenOrdinal,
+                    LastUpdatedRevision,
                     TransitionId,
                     Prepared,
                     Resolved,

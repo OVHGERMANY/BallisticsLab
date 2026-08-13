@@ -263,7 +263,10 @@ namespace BallisticsLab.Runtime
             }
 
             _scroll = GUILayout.BeginScrollView(_scroll);
-            GUILayout.Label("SESSION ACTIVE | " + TelemetryStore.Count + " recorded shots", _sectionStyle);
+            GUILayout.Label(
+                "SESSION ACTIVE | " + TelemetryStore.Count + " recorded shots | "
+                    + PhysicalTelemetrySessionBridge.TransitionCount + " physical transitions",
+                _sectionStyle);
             GUILayout.Box(_status, _statusStyle, GUILayout.ExpandWidth(true));
             if (_world is HideoutGameWorld)
             {
@@ -283,7 +286,7 @@ namespace BallisticsLab.Runtime
             GUILayout.Label("REPORTS", _sectionStyle);
             GUILayout.Label(
                 ActiveConfiguration.AutomaticReportSaving.Value
-                    ? "Automatic saving is ON. Each changed shot-chain batch is saved after a burst and when the session ends."
+                    ? "Automatic saving is ON. Changed shot chains and physical transitions save after a burst and when the session ends."
                     : "Automatic saving is OFF. Use the manual export button before ending the session.");
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("SAVE REPORT NOW", _buttonStyle, GUILayout.Height(42f)))
@@ -304,7 +307,7 @@ namespace BallisticsLab.Runtime
                 PhysicalTelemetrySessionBridge.ClearCaptured();
                 _latestRecord = null;
                 HideTrace();
-                _status = "Shot records cleared.";
+                _status = "Shot and physical-transition records cleared.";
             }
             GUILayout.EndHorizontal();
 
@@ -757,7 +760,7 @@ namespace BallisticsLab.Runtime
                 string? result = TelemetryStore.ExportAutomatic(force);
                 if (!string.IsNullOrEmpty(result) && !force)
                 {
-                    _status = "Changed shot chains saved. Keep shooting or choose the next fixture.";
+                    _status = "Changed ballistic evidence saved. Keep shooting or choose the next fixture.";
                 }
             }
             catch (Exception exception)
@@ -1016,7 +1019,7 @@ namespace BallisticsLab.Runtime
             PhysicalTelemetrySessionBridge.ClearCaptured();
             _latestRecord = null;
             HideTrace();
-            _status = "Fixture durability restored and shot records cleared.";
+            _status = "Fixture durability restored and ballistic records cleared.";
         }
 
         private static void SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial material)

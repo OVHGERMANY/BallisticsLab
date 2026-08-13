@@ -5,12 +5,13 @@ Snapshot date: 2026-08-13
 ## Current baseline candidate
 
 - Plugin version: `0.2.8`
-- Report schema: `3`
+- Development report schema: `4`
+- Installed runtime-evidence schema: `3`
 - Runtime source: current repository tree
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
 - Currently deployed and playtested DLL SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
-- Current strict-build candidate SHA-256: `2742343222553B4E356FD8A65AA0271EDD01E5AE7C149D4D4A93D659CCAD0B1D`
+- Current strict-build candidate SHA-256: `E58C9690D31524D18552D1A33B26876839555557612B96F0E279E320FAD73450`
 - Default configuration: disabled
 
 The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
@@ -26,28 +27,31 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Complete copied component geometry, mass, motion, energy, attitude, lineage, material provenance, damage and penetration capability, terminal state, and render state.
 - Safe absence, unsupported-schema, malformed-event, and bounded-buffer behavior.
 - Exact ordinal transition-ID pairing with first-seen ordering, pending prepared evidence, orphaned resolved evidence, and deterministic duplicate counters that preserve the first accepted stage.
+- Schema-4 JSON `physicalTransitions` export with complete parent/output state, material origin, prior collisions, loss budget, and conservation ledger.
+- Physical-transition-only manual and automatic reports with independent revision tracking; the flat shot-record CSV columns remain unchanged.
+- Offline mass and energy closure validation across parent allocation, target spall, output counts, modeled losses, residual energy, output energy, and closure error.
 
-This foundation has not been deployed or tested in-game. Schema-4 JSON export, physical-only reports, and automatic-save revision integration remain the next milestone.
+This development layer has not been deployed or tested in-game. Deterministic campaigns, reset control, result matrices, material standards, and protocol reporting remain next.
 
 ## Automated and startup verification
 
 - Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
-- Pure and installed-database validation: 69 checks passed.
-- Validation with all current reports: 76 checks passed.
+- Pure and installed-database validation: 78 checks passed.
+- Validation with all installed-runtime reports: 85 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
 - Exact SPT version and game-assembly compatibility checks remain active.
 - The source default remains disabled.
 - Automatic saving emits nonempty changed-chain batches only. A later continuation includes its required parents but does not recopy unrelated saved chains.
-- Every admitted report must have schema `3`, plugin version `0.2.8`, a matching CSV partner, exact field equality, and valid ammunition identity, falloff, durability, trajectory, and lineage data.
+- Installed runtime evidence remains gated to schema `3` and plugin version `0.2.8`. Development schema `4` is separately covered by synthetic pair, physical-only, provenance, mass-closure, and energy-closure tests until the final deferred runtime campaign.
 - The tracked coverage evaluator separates casual bot traffic from controlled fixture evidence. Synthetic regressions prove that bot records cannot satisfy a fixture gate and duplicate automatic batches cannot inflate coverage.
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 - Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `DAC4A8B9...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `E58C9690...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
-## Current-build runtime evidence
+## Installed runtime evidence
 
 The admitted `0.2.8` set contains 104 automatic CSV/JSON pairs through `BallisticsLab-20260812-233342-265-104-auto.json`:
 
@@ -122,8 +126,6 @@ Historical evidence does not satisfy a missing `0.2.8` gate.
 
 ## Remaining development sequence
 
-- Add schema-4 `physicalTransitions` JSON export without changing the flat shot-record CSV contract.
-- Add physical-transition-only automatic reports and revision tracking.
 - Add automated campaigns, deterministic seeds, reset control, result matrices, and conservation summaries.
 - Add formal GOST-oriented protocols and standardized reports.
 - Run the final integrated in-game campaign only after every offline development layer is complete.
