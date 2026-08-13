@@ -60,7 +60,7 @@ namespace BallisticsLab.Runtime
 
             foreach (KeyValuePair<MongoID, ItemTemplate> pair in factory.ItemTemplates)
             {
-                ArmoredEquipmentTemplate armor = pair.Value as ArmoredEquipmentTemplate;
+                ArmoredEquipmentTemplate? armor = pair.Value as ArmoredEquipmentTemplate;
                 if (armor == null || armor.armorClass <= 0 || armor.MaxDurability <= 0)
                 {
                     continue;
@@ -129,7 +129,7 @@ namespace BallisticsLab.Runtime
                 return exact;
             }
 
-            PlateCatalogEntry nearest = _entries
+            PlateCatalogEntry? nearest = _entries
                 .Where(entry => entry.Material == material)
                 .OrderBy(entry => Math.Abs(entry.ArmorClass - preferredArmorClass))
                 .ThenByDescending(entry => entry.Durability)
@@ -149,8 +149,8 @@ namespace BallisticsLab.Runtime
             for (int index = 0; index < _entries.Count; index++)
             {
                 PlateCatalogEntry entry = _entries[index];
-                if (entry.DisplayName.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0
-                    || entry.TemplateId.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (entry.DisplayName.Contains(needle, StringComparison.OrdinalIgnoreCase)
+                    || entry.TemplateId.Contains(needle, StringComparison.OrdinalIgnoreCase))
                 {
                     result.Add(index);
                 }

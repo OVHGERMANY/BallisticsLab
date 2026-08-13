@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -65,6 +66,10 @@ internal static class ReportInvariantValidator
             pluginVersion);
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Arbitrary report faults are returned as validation failures by contract.")]
     internal static bool Validate(string jsonPath, out string failure)
     {
         failure = string.Empty;
@@ -237,7 +242,7 @@ internal static class ReportInvariantValidator
                     failure = Row(row, "chain identity is empty");
                     return false;
                 }
-                if (!chains.TryGetValue(chainId, out List<ChainLink> chain))
+                if (!chains.TryGetValue(chainId, out List<ChainLink>? chain))
                 {
                     chain = new List<ChainLink>();
                     chains.Add(chainId, chain);

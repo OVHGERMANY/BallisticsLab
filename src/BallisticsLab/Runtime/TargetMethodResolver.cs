@@ -9,7 +9,7 @@ namespace BallisticsLab.Runtime
 {
     internal static class TargetMethodResolver
     {
-        private static readonly BindingFlags ExactInstance =
+        private const BindingFlags ExactInstance =
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
 
         internal static MethodInfo ResolveHandleCollision()

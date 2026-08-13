@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using EFT;
 using EFT.Ballistics;
@@ -10,16 +11,16 @@ namespace BallisticsLab.Runtime.Bots
 {
     internal sealed class BotTestController
     {
-        private BotOwner _owner;
+        private BotOwner? _owner;
         private bool _frozen;
         private bool _wasPaused;
         private float _previousPauseEnd;
         private bool _previousCanShoot;
 
-        internal Player SelectedPlayer { get; private set; }
+        internal Player? SelectedPlayer { get; private set; }
         internal bool Frozen => _frozen;
 
-        internal string SelectUnderCrosshair(GameWorld world)
+        internal string SelectUnderCrosshair(GameWorld? world)
         {
             Camera camera = Camera.main;
             if (world == null || camera == null)
@@ -36,8 +37,8 @@ namespace BallisticsLab.Runtime.Bots
 
             foreach (RaycastHit hit in hits.OrderBy(value => value.distance))
             {
-                BodyPartCollider bodyPart = hit.collider.GetComponent<BodyPartCollider>();
-                Player player = bodyPart?.Player as Player;
+                BodyPartCollider? bodyPart = hit.collider.GetComponent<BodyPartCollider>();
+                Player? player = bodyPart?.Player as Player;
                 if (player == null)
                 {
                     player = world.GetPlayerByCollider(hit.collider);
@@ -162,12 +163,12 @@ namespace BallisticsLab.Runtime.Bots
 
                 armor.Add(
                     "C" + component.ArmorClass + " " + component.Template.ArmorMaterial
-                    + " " + component.Repairable.Durability.ToString("F1")
-                    + "/" + component.Repairable.MaxDurability.ToString("F1"));
+                    + " " + component.Repairable.Durability.ToString("F1", CultureInfo.InvariantCulture)
+                    + "/" + component.Repairable.MaxDurability.ToString("F1", CultureInfo.InvariantCulture));
             }
 
             return (SelectedPlayer.Profile?.Nickname ?? SelectedPlayer.ProfileId)
-                + " | HP " + health.ToString("F1")
+                + " | HP " + health.ToString("F1", CultureInfo.InvariantCulture)
                 + " | " + (alive ? (_frozen ? "HELD" : "live") : "DEAD - selection retained")
                 + (armor.Count > 0 ? " | " + string.Join("; ", armor) : " | no equipped armor");
         }

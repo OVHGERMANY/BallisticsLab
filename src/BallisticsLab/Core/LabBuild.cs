@@ -1,10 +1,10 @@
 namespace BallisticsLab.Core
 {
-    public static class LabBuild
+    internal static class LabBuild
     {
-        public const string PluginGuid = "com.janky.ballisticslab";
-        public const string PluginName = "Janky-BallisticsLab";
-        public const string PluginVersion = "0.2.8";
-        public const int ReportSchema = 3;
+        internal const string PluginGuid = "com.janky.ballisticslab";
+        internal const string PluginName = "Janky-BallisticsLab";
+        internal const string PluginVersion = "0.2.8";
+        internal const int ReportSchema = 3;
     }
 }

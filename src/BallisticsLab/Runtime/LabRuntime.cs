@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Comfort.Common;
 using BallisticsLab.Core;
@@ -25,11 +28,11 @@ namespace BallisticsLab.Runtime
         private static bool _initialized;
         private static bool _panelVisible;
         private static bool _sessionActive;
-        private static GameWorld _world;
-        private static object _hideoutPlayerOwner;
+        private static GameWorld? _world;
+        private static object? _hideoutPlayerOwner;
         private static bool _enteredShootingRange;
-        private static PlateCatalog _catalog;
-        private static FixtureRig _rig;
+        private static PlateCatalog? _catalog;
+        private static FixtureRig? _rig;
         private static Rect _window = new Rect(40f, 60f, 840f, 900f);
         private static Vector2 _scroll;
         private static int _layerCount = 1;
@@ -43,18 +46,26 @@ namespace BallisticsLab.Runtime
         private static string _shootingModeStatus = "not active";
         private static CursorLockMode _previousCursorLock;
         private static bool _previousCursorVisible;
-        private static LineRenderer _trace;
-        private static Material _traceMaterial;
-        private static ShotRecord _latestRecord;
+        private static LineRenderer? _trace;
+        private static Material? _traceMaterial;
+        private static ShotRecord? _latestRecord;
         private static float _traceUntil;
         private static bool _showAdvancedFixtureControls;
         private static bool _showShotDetails;
-        private static GUIStyle _titleStyle;
-        private static GUIStyle _sectionStyle;
-        private static GUIStyle _statusStyle;
-        private static GUIStyle _buttonStyle;
+        private static GUIStyle? _titleStyle;
+        private static GUIStyle? _sectionStyle;
+        private static GUIStyle? _statusStyle;
+        private static GUIStyle? _buttonStyle;
 
         internal static bool IsSessionActive => _sessionActive;
+
+        private static PluginConfiguration ActiveConfiguration =>
+            Plugin.Configuration
+            ?? throw new InvalidOperationException("The lab configuration is not initialized.");
+
+        private static PlateCatalog ActiveCatalog =>
+            _catalog
+            ?? throw new InvalidOperationException("The armor catalog is not initialized.");
 
         internal static bool ShouldBlockShootingCommand(ECommand command)
         {
@@ -77,7 +88,7 @@ namespace BallisticsLab.Runtime
                 return;
             }
 
-            PluginConfiguration config = Plugin.Configuration;
+            PluginConfiguration? config = Plugin.Configuration;
             _layerCount = config?.DefaultLayerCount.Value ?? 1;
             _distance = config?.DefaultDistance.Value ?? 8f;
             _spacing = config?.LayerSpacing.Value ?? 0.15f;
@@ -92,7 +103,7 @@ namespace BallisticsLab.Runtime
                 return;
             }
 
-            PluginConfiguration config = Plugin.Configuration;
+            PluginConfiguration? config = Plugin.Configuration;
             if (config == null || !config.Enabled.Value)
             {
                 if (_sessionActive)
@@ -106,7 +117,7 @@ namespace BallisticsLab.Runtime
                 return;
             }
 
-            GameWorld currentWorld = Singleton<GameWorld>.Instantiated
+            GameWorld? currentWorld = Singleton<GameWorld>.Instantiated
                 ? Singleton<GameWorld>.Instance
                 : null;
             if (!ReferenceEquals(currentWorld, _world))
@@ -196,6 +207,10 @@ namespace BallisticsLab.Runtime
             _initialized = false;
         }
 
+        [SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "Manual export reports failures in the panel instead of breaking Unity's IMGUI loop.")]
         private static void DrawWindow(int windowId)
         {
             if (_titleStyle == null)
@@ -222,6 +237,11 @@ namespace BallisticsLab.Runtime
                     padding = new RectOffset(10, 10, 8, 8)
                 };
             }
+
+            GUIStyle sectionStyle = _sectionStyle
+                ?? throw new InvalidOperationException("The section style was not initialized.");
+            GUIStyle buttonStyle = _buttonStyle
+                ?? throw new InvalidOperationException("The button style was not initialized.");
 
             GUILayout.BeginVertical(GUILayout.ExpandHeight(true));
             GUILayout.Label("BALLISTICS LAB", _titleStyle);
@@ -254,14 +274,14 @@ namespace BallisticsLab.Runtime
                 SetPanelVisible(false);
             }
 
-            DrawFixtureControls(_sectionStyle, _buttonStyle);
-            DrawBotControls(_sectionStyle, _buttonStyle);
+            DrawFixtureControls(sectionStyle, buttonStyle);
+            DrawBotControls(sectionStyle, buttonStyle);
             DrawLatestShot();
 
             GUILayout.Space(10f);
             GUILayout.Label("REPORTS", _sectionStyle);
             GUILayout.Label(
-                Plugin.Configuration.AutomaticReportSaving.Value
+                ActiveConfiguration.AutomaticReportSaving.Value
                     ? "Automatic saving is ON. Each changed shot-chain batch is saved after a burst and when the session ends."
                     : "Automatic saving is OFF. Use the manual export button before ending the session.");
             GUILayout.BeginHorizontal();
@@ -303,34 +323,34 @@ namespace BallisticsLab.Runtime
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("1 LAYER\nSTEEL C6", buttonStyle, GUILayout.Height(58f)))
             {
-                ApplyPresetAndPlace(_catalog.FindSteel(6), 1, "one-layer class-6 steel");
+                ApplyPresetAndPlace(ActiveCatalog.FindSteel(6), 1, "one-layer class-6 steel");
             }
             if (GUILayout.Button("2 LAYERS\nSTEEL C3", buttonStyle, GUILayout.Height(58f)))
             {
-                ApplyPresetAndPlace(_catalog.FindSteel(3), 2, "two-layer class-3 steel");
+                ApplyPresetAndPlace(ActiveCatalog.FindSteel(3), 2, "two-layer class-3 steel");
             }
             if (GUILayout.Button("3 LAYERS\nSTEEL C4", buttonStyle, GUILayout.Height(58f)))
             {
-                ApplyPresetAndPlace(_catalog.FindSteel(4), 3, "three-layer class-4 steel");
+                ApplyPresetAndPlace(ActiveCatalog.FindSteel(4), 3, "three-layer class-4 steel");
             }
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("3 LAYERS\nSTEEL C6", buttonStyle, GUILayout.Height(58f)))
             {
-                ApplyPresetAndPlace(_catalog.FindSteel(6), 3, "three-layer class-6 steel");
+                ApplyPresetAndPlace(ActiveCatalog.FindSteel(6), 3, "three-layer class-6 steel");
             }
             if (GUILayout.Button("GRANIT BR4\nGAME PRESET", buttonStyle, GUILayout.Height(58f)))
             {
                 ApplyPresetAndPlace(
-                    _catalog.FindByTemplateId(PlateCatalog.GranitBr4TemplateId),
+                    ActiveCatalog.FindByTemplateId(PlateCatalog.GranitBr4TemplateId),
                     1,
                     "Granit BR4 game preset");
             }
             if (GUILayout.Button("GRANIT BR5\nGAME PRESET", buttonStyle, GUILayout.Height(58f)))
             {
                 ApplyPresetAndPlace(
-                    _catalog.FindByTemplateId(PlateCatalog.GranitBr5TemplateId),
+                    ActiveCatalog.FindByTemplateId(PlateCatalog.GranitBr5TemplateId),
                     1,
                     "Granit BR5 game preset");
             }
@@ -342,7 +362,7 @@ namespace BallisticsLab.Runtime
             {
                 int requestedLayers = layers;
                 if (GUILayout.Button(
-                        requestedLayers.ToString(),
+                        Invariant(requestedLayers),
                         buttonStyle,
                         GUILayout.Height(44f),
                         GUILayout.MinWidth(54f)))
@@ -361,7 +381,7 @@ namespace BallisticsLab.Runtime
                     " | ",
                     _rig.Plates.Select(
                         plate => "L" + (plate.LayerIndex + 1) + " "
-                            + plate.Durability.ToString("F1") + "/" + plate.MaximumDurability.ToString("F1")));
+                            + Invariant(plate.Durability, "F1") + "/" + Invariant(plate.MaximumDurability, "F1")));
                 GUILayout.Box(
                     "ACTIVE FIXTURE #" + _rig.FixtureId + " | " + _rig.Plates.Count + " layer(s)\n"
                     + durability,
@@ -414,11 +434,11 @@ namespace BallisticsLab.Runtime
             GUILayout.EndHorizontal();
 
             _search = GUILayout.TextField(_search ?? string.Empty);
-            List<int> matches = _catalog.Search(_search);
+            List<int> matches = ActiveCatalog.Search(_search);
             int currentIndex = ClampPresetIndex(PresetIndices[_selectedLayer]);
-            PlateCatalogEntry current = _catalog.Entries[currentIndex];
+            PlateCatalogEntry current = ActiveCatalog.Entries[currentIndex];
             GUILayout.Label("Preset: " + current.DisplayName);
-            GUILayout.Label("Template: " + current.TemplateId + " | blunt throughput " + current.BluntThroughput.ToString("F3"));
+            GUILayout.Label("Template: " + current.TemplateId + " | blunt throughput " + Invariant(current.BluntThroughput, "F3"));
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("< matching preset"))
             {
@@ -445,27 +465,27 @@ namespace BallisticsLab.Runtime
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Distance " + _distance.ToString("F1") + " m", GUILayout.Width(135f));
+            GUILayout.Label("Distance " + Invariant(_distance, "F1") + " m", GUILayout.Width(135f));
             if (GUILayout.Button("-1m", GUILayout.Width(55f))) _distance = Mathf.Max(3f, _distance - 1f);
             if (GUILayout.Button("+1m", GUILayout.Width(55f))) _distance = Mathf.Min(50f, _distance + 1f);
-            GUILayout.Label("Angle " + _angle.ToString("F0") + " deg", GUILayout.Width(120f));
+            GUILayout.Label("Angle " + Invariant(_angle, "F0") + " deg", GUILayout.Width(120f));
             if (GUILayout.Button("-5", GUILayout.Width(45f))) _angle = Mathf.Max(-75f, _angle - 5f);
             if (GUILayout.Button("+5", GUILayout.Width(45f))) _angle = Mathf.Min(75f, _angle + 5f);
             GUILayout.EndHorizontal();
             GUILayout.Label("Thickness controls collider geometry; resistance and durability come from the selected EFT armor template.");
 
             GUILayout.BeginHorizontal();
-            bool backstopEnabled = Plugin.Configuration.CatcherEnabled.Value;
+            bool backstopEnabled = ActiveConfiguration.CatcherEnabled.Value;
             if (GUILayout.Button("Backstop: " + (backstopEnabled ? "ON" : "OFF")))
             {
-                Plugin.Configuration.CatcherEnabled.Value = !backstopEnabled;
+                ActiveConfiguration.CatcherEnabled.Value = !backstopEnabled;
                 _status = "Backstop " + (!backstopEnabled ? "enabled" : "disabled")
                     + "; rebuild the fixture to apply.";
             }
-            bool traceEnabled = Plugin.Configuration.TraceEnabled.Value;
+            bool traceEnabled = ActiveConfiguration.TraceEnabled.Value;
             if (GUILayout.Button("Last-shot trace: " + (traceEnabled ? "ON" : "OFF")))
             {
-                Plugin.Configuration.TraceEnabled.Value = !traceEnabled;
+                ActiveConfiguration.TraceEnabled.Value = !traceEnabled;
                 if (traceEnabled)
                 {
                     HideTrace();
@@ -474,10 +494,10 @@ namespace BallisticsLab.Runtime
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Gap " + _spacing.ToString("F2") + " m", GUILayout.Width(135f));
+            GUILayout.Label("Gap " + Invariant(_spacing, "F2") + " m", GUILayout.Width(135f));
             if (GUILayout.Button("-0.05", GUILayout.Width(60f))) _spacing = Mathf.Max(0.02f, _spacing - 0.05f);
             if (GUILayout.Button("+0.05", GUILayout.Width(60f))) _spacing = Mathf.Min(1f, _spacing + 0.05f);
-            GUILayout.Label("Thickness " + (_thickness * 1000f).ToString("F1") + " mm", GUILayout.Width(145f));
+            GUILayout.Label("Thickness " + Invariant(_thickness * 1000f, "F1") + " mm", GUILayout.Width(145f));
             if (GUILayout.Button("-1mm", GUILayout.Width(60f))) _thickness = Mathf.Max(0.003f, _thickness - 0.001f);
             if (GUILayout.Button("+1mm", GUILayout.Width(60f))) _thickness = Mathf.Min(0.1f, _thickness + 0.001f);
             GUILayout.EndHorizontal();
@@ -543,7 +563,7 @@ namespace BallisticsLab.Runtime
         {
             GUILayout.Space(12f);
             GUILayout.Label("LATEST SHOT", _sectionStyle);
-            ShotRecord record = _latestRecord ?? TelemetryStore.Latest;
+            ShotRecord? record = _latestRecord ?? TelemetryStore.Latest;
             if (record == null)
             {
                 GUILayout.Label("No shot recorded.");
@@ -555,8 +575,8 @@ namespace BallisticsLab.Runtime
                 : record.TargetKind;
             GUILayout.Box(
                 "#" + record.Sequence + "  " + record.Outcome + "\n"
-                + targetLayer + " | " + record.ImpactSpeed.ToString("F0") + " m/s"
-                + " | penetration " + record.DecisionPenetration.ToString("F1"),
+                + targetLayer + " | " + Invariant(record.ImpactSpeed, "F0") + " m/s"
+                + " | penetration " + Invariant(record.DecisionPenetration, "F1"),
                 _statusStyle,
                 GUILayout.ExpandWidth(true));
             _showShotDetails = GUILayout.Toggle(
@@ -575,16 +595,16 @@ namespace BallisticsLab.Runtime
                 + " | fragment " + record.FragmentIndex + " | depth " + record.ParentDepth
                 + " | " + (record.IsForwardHit ? "forward" : "back-face"));
             GUILayout.Label(
-                "Impact " + record.ImpactSpeed.ToString("F1") + " m/s | base " + record.TemplateSpeed.ToString("F1")
-                + " | ratio " + record.Fraction.ToString("F3") + " | angle " + record.ImpactAngle.ToString("F1") + " deg");
+                "Impact " + Invariant(record.ImpactSpeed, "F1") + " m/s | base " + Invariant(record.TemplateSpeed, "F1")
+                + " | ratio " + Invariant(record.Fraction, "F3") + " | angle " + Invariant(record.ImpactAngle, "F1") + " deg");
             GUILayout.Label(
-                "Incoming D/P " + record.IncomingDamage.ToString("F2") + "/" + record.IncomingPenetration.ToString("F2")
-                + " | decision D/P " + record.DecisionDamage.ToString("F2") + "/" + record.DecisionPenetration.ToString("F2"));
+                "Incoming D/P " + Invariant(record.IncomingDamage, "F2") + "/" + Invariant(record.IncomingPenetration, "F2")
+                + " | decision D/P " + Invariant(record.DecisionDamage, "F2") + "/" + Invariant(record.DecisionPenetration, "F2"));
             if (record.LayerIndex >= 0)
             {
                 GUILayout.Label(
                     "Layer " + (record.LayerIndex + 1) + " durability "
-                    + record.DurabilityBefore.ToString("F2") + " -> " + record.DurabilityAfter.ToString("F2"));
+                    + Invariant(record.DurabilityBefore, "F2") + " -> " + Invariant(record.DurabilityAfter, "F2"));
                 GUILayout.Label(
                     "Fixture #" + record.FixtureId + " | " + record.FixtureName
                     + " | C" + record.FixtureArmorClass + " " + record.FixtureArmorMaterial
@@ -592,10 +612,10 @@ namespace BallisticsLab.Runtime
                 if (record.HasArmorAnalysis)
                 {
                     GUILayout.Label(
-                        "Resistance real/class " + record.ArmorRealResistance.ToString("F2")
-                        + "/" + record.ArmorClassResistance.ToString("F2")
-                        + " | CF " + record.ArmorCf.ToString("F4")
-                        + " | calculated penetration chance " + record.PenetrationChancePercent.ToString("F1") + "%");
+                        "Resistance real/class " + Invariant(record.ArmorRealResistance, "F2")
+                        + "/" + Invariant(record.ArmorClassResistance, "F2")
+                        + " | CF " + Invariant(record.ArmorCf, "F4")
+                        + " | calculated penetration chance " + Invariant(record.PenetrationChancePercent, "F1") + "%");
                 }
             }
             if (LabPolicies.ShouldDisplayBodyTelemetry(
@@ -604,7 +624,7 @@ namespace BallisticsLab.Runtime
                     record.ArmorChanges))
             {
                 GUILayout.Label(
-                    "Body health " + record.BodyHealthBefore.ToString("F2") + " -> " + record.BodyHealthAfter.ToString("F2")
+                    "Body health " + Invariant(record.BodyHealthBefore, "F2") + " -> " + Invariant(record.BodyHealthAfter, "F2")
                     + (string.IsNullOrEmpty(record.ArmorChanges) ? string.Empty : " | armor " + record.ArmorChanges));
             }
             GUILayout.Label(
@@ -616,15 +636,15 @@ namespace BallisticsLab.Runtime
                 GUILayout.Label(
                     "Incoming continuation from fixture #" + record.ContinuationSourceFixtureId
                     + " layer " + (record.ContinuationSourceLayerIndex + 1)
-                    + " | penetration x" + record.ContinuationPenetrationFactor.ToString("F4")
-                    + " | velocity x" + record.ContinuationVelocityFactor.ToString("F4")
-                    + " | future outcomes x" + record.ContinuationOutcomeFactor.ToString("F4")
-                    + " | armor CF x" + record.ContinuationArmorCf.ToString("F4"));
+                    + " | penetration x" + Invariant(record.ContinuationPenetrationFactor, "F4")
+                    + " | velocity x" + Invariant(record.ContinuationVelocityFactor, "F4")
+                    + " | future outcomes x" + Invariant(record.ContinuationOutcomeFactor, "F4")
+                    + " | armor CF x" + Invariant(record.ContinuationArmorCf, "F4"));
                 GUILayout.Label(
-                    "Continuation D/P " + record.ContinuationDamageBefore.ToString("F2")
-                    + "/" + record.ContinuationPenetrationBefore.ToString("F2")
-                    + " -> " + record.ContinuationDamageAfter.ToString("F2")
-                    + "/" + record.ContinuationPenetrationAfter.ToString("F2"));
+                    "Continuation D/P " + Invariant(record.ContinuationDamageBefore, "F2")
+                    + "/" + Invariant(record.ContinuationPenetrationBefore, "F2")
+                    + " -> " + Invariant(record.ContinuationDamageAfter, "F2")
+                    + "/" + Invariant(record.ContinuationPenetrationAfter, "F2"));
             }
 
             IReadOnlyList<ShotRecord> chain = TelemetryStore.SnapshotChain(record.ChainId);
@@ -638,9 +658,9 @@ namespace BallisticsLab.Runtime
                         : link.TargetKind;
                     GUILayout.Label(
                         "  #" + link.Sequence + " " + layer + " " + link.Outcome
-                        + " | " + link.ImpactSpeed.ToString("F1") + "m/s"
-                        + " | D/P " + link.DecisionDamage.ToString("F1")
-                        + "/" + link.DecisionPenetration.ToString("F1"));
+                        + " | " + Invariant(link.ImpactSpeed, "F1") + "m/s"
+                        + " | D/P " + Invariant(link.DecisionDamage, "F1")
+                        + "/" + Invariant(link.DecisionPenetration, "F1"));
                 }
             }
         }
@@ -656,12 +676,16 @@ namespace BallisticsLab.Runtime
                 ShotRecord record = snapshot[index];
                 GUILayout.Label(
                     "#" + record.Sequence + " " + record.Outcome
-                    + " | " + record.ImpactSpeed.ToString("F0") + "m/s"
-                    + " | P " + record.DecisionPenetration.ToString("F1")
+                    + " | " + Invariant(record.ImpactSpeed, "F0") + "m/s"
+                    + " | P " + Invariant(record.DecisionPenetration, "F1")
                     + " | " + record.Target);
             }
         }
 
+        [SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "Session startup must roll back every partially constructed Unity fixture on failure.")]
         private static void StartSession()
         {
             if (_world == null || _world.MainPlayer == null)
@@ -673,7 +697,7 @@ namespace BallisticsLab.Runtime
             try
             {
                 _catalog ??= PlateCatalog.Build();
-                int defaultIndex = _catalog.FindByTemplateId(PlateCatalog.GranitBr4TemplateId);
+                int defaultIndex = ActiveCatalog.FindByTemplateId(PlateCatalog.GranitBr4TemplateId);
                 if (defaultIndex < 0)
                 {
                     defaultIndex = 0;
@@ -713,6 +737,10 @@ namespace BallisticsLab.Runtime
             _status = status;
         }
 
+        [SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "Optional telemetry persistence must not interrupt gameplay.")]
         private static void SaveAutomaticReport(bool force)
         {
             if (Plugin.Configuration?.AutomaticReportSaving.Value != true)
@@ -722,7 +750,7 @@ namespace BallisticsLab.Runtime
 
             try
             {
-                string result = TelemetryStore.ExportAutomatic(force);
+                string? result = TelemetryStore.ExportAutomatic(force);
                 if (!string.IsNullOrEmpty(result) && !force)
                 {
                     _status = "Changed shot chains saved. Keep shooting or choose the next fixture.";
@@ -743,7 +771,7 @@ namespace BallisticsLab.Runtime
                 return;
             }
 
-            Type ownerType = typeof(GameWorld).Assembly.GetType("EFT.HideoutPlayerOwner", throwOnError: false);
+            Type? ownerType = typeof(GameWorld).Assembly.GetType("EFT.HideoutPlayerOwner", throwOnError: false);
             if (ownerType == null)
             {
                 _shootingModeStatus = "owner type unavailable";
@@ -758,13 +786,14 @@ namespace BallisticsLab.Runtime
                 _shootingModeStatus = "owner not found";
                 return;
             }
-            if (ReadShootingRangeState(_hideoutPlayerOwner, ownerType))
+            object owner = _hideoutPlayerOwner;
+            if (ReadShootingRangeState(owner, ownerType))
             {
                 _shootingModeStatus = "already active";
                 return;
             }
 
-            Type representationType = typeof(GameWorld).Assembly.GetType(
+            Type? representationType = typeof(GameWorld).Assembly.GetType(
                 "EFT.Hideout.HideoutRepresentation",
                 throwOnError: false);
             if (representationType == null)
@@ -774,11 +803,11 @@ namespace BallisticsLab.Runtime
             }
 
             Type singletonType = typeof(Singleton<>).MakeGenericType(representationType);
-            PropertyInfo instantiatedProperty = singletonType.GetProperty(
+            PropertyInfo? instantiatedProperty = singletonType.GetProperty(
                 "Instantiated",
                 BindingFlags.Static | BindingFlags.Public);
             bool instantiated = instantiatedProperty?.GetValue(null, null) is bool exists && exists;
-            object representation = instantiated
+            object? representation = instantiated
                 ? singletonType.GetProperty("Instance", BindingFlags.Static | BindingFlags.Public)?.GetValue(null, null)
                 : null;
             if (representation == null)
@@ -787,7 +816,7 @@ namespace BallisticsLab.Runtime
                 return;
             }
 
-            MethodInfo enter = representationType.GetMethod(
+            MethodInfo? enter = representationType.GetMethod(
                 "ActivateWeapon",
                 BindingFlags.Instance | BindingFlags.Public,
                 binder: null,
@@ -798,38 +827,45 @@ namespace BallisticsLab.Runtime
                 throw new MissingMethodException(representationType.FullName, "ActivateWeapon(HideoutPlayerOwner)");
             }
 
-            enter.Invoke(representation, new[] { _hideoutPlayerOwner });
-            _enteredShootingRange = ReadShootingRangeState(_hideoutPlayerOwner, ownerType);
+            enter.Invoke(representation, new[] { owner });
+            _enteredShootingRange = ReadShootingRangeState(owner, ownerType);
             RefreshHideoutShootingModeStatus();
         }
 
+        [SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "Cleanup must not block world teardown when a reflected EFT method fails.")]
         private static void ExitHideoutShootingRangeIfOwned()
         {
-            object owner = _hideoutPlayerOwner;
-            Type ownerType = owner?.GetType();
+            object? owner = _hideoutPlayerOwner;
             bool shouldExit = _enteredShootingRange
-                && ownerType != null
-                && ReadShootingRangeState(owner, ownerType);
+                && owner != null
+                && ReadShootingRangeState(owner, owner.GetType());
             _hideoutPlayerOwner = null;
             _enteredShootingRange = false;
             _shootingModeStatus = "not active";
-            if (!shouldExit)
+            if (!shouldExit || owner == null)
             {
                 return;
             }
 
+            Type ownerType = owner.GetType();
+
             try
             {
-                MethodInfo exit = ownerType.GetMethod(
+                MethodInfo? exit = ownerType.GetMethod(
                     "ExitShootingRange",
                     BindingFlags.Instance | BindingFlags.Public,
                     binder: null,
                     types: Type.EmptyTypes,
                     modifiers: null);
-                Task task = exit?.Invoke(owner, null) as Task;
+                Task? task = exit?.Invoke(owner, null) as Task;
                 task?.ContinueWith(
                     failed => Plugin.Log?.LogError("Hideout shooting-range restore failed: " + failed.Exception),
-                    TaskContinuationOptions.OnlyOnFaulted);
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted,
+                    TaskScheduler.Default);
             }
             catch (Exception exception)
             {
@@ -845,21 +881,22 @@ namespace BallisticsLab.Runtime
                 return;
             }
 
-            object owner = _hideoutPlayerOwner;
-            Type ownerType = owner?.GetType();
-            if (ownerType == null)
+            object? owner = _hideoutPlayerOwner;
+            if (owner == null)
             {
                 return;
             }
 
+            Type ownerType = owner.GetType();
+
             bool active = ReadShootingRangeState(owner, ownerType);
-            object hideoutPlayer = ownerType.GetProperty(
+            object? hideoutPlayer = ownerType.GetProperty(
                 "HideoutPlayer",
                 BindingFlags.Instance | BindingFlags.Public)?.GetValue(owner, null);
             bool inventoryUpdating = false;
             if (hideoutPlayer != null)
             {
-                PropertyInfo updatingProperty = hideoutPlayer.GetType().GetProperty(
+                PropertyInfo? updatingProperty = hideoutPlayer.GetType().GetProperty(
                     "IsUpdateHideoutPlayerInventoryInProgress",
                     BindingFlags.Instance | BindingFlags.Public);
                 inventoryUpdating = updatingProperty?.GetValue(hideoutPlayer, null) is bool updating && updating;
@@ -906,7 +943,7 @@ namespace BallisticsLab.Runtime
             List<PlateCatalogEntry> presets = new List<PlateCatalogEntry>(_layerCount);
             for (int index = 0; index < _layerCount; index++)
             {
-                presets.Add(_catalog.Entries[ClampPresetIndex(PresetIndices[index])]);
+                presets.Add(ActiveCatalog.Entries[ClampPresetIndex(PresetIndices[index])]);
             }
 
             FixtureRig replacement = FixtureRig.Create(
@@ -915,11 +952,11 @@ namespace BallisticsLab.Runtime
                 rotation,
                 _spacing,
                 _thickness,
-                Plugin.Configuration.CatcherEnabled.Value);
+                ActiveConfiguration.CatcherEnabled.Value);
             _rig?.Dispose();
             _rig = replacement;
-            _status = "Placed " + _layerCount + " layer(s) at " + _distance.ToString("F1")
-                + " m and " + _angle.ToString("F0") + " degrees as fixture #" + _rig.FixtureId + ".";
+            _status = "Placed " + _layerCount + " layer(s) at " + Invariant(_distance, "F1")
+                + " m and " + Invariant(_angle, "F0") + " degrees as fixture #" + replacement.FixtureId + ".";
             return true;
         }
 
@@ -980,8 +1017,8 @@ namespace BallisticsLab.Runtime
         private static void SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial material)
         {
             int currentIndex = ClampPresetIndex(PresetIndices[_selectedLayer]);
-            int armorClass = _catalog.Entries[currentIndex].ArmorClass;
-            int replacement = _catalog.FindMaterial(material, armorClass);
+            int armorClass = ActiveCatalog.Entries[currentIndex].ArmorClass;
+            int replacement = ActiveCatalog.FindMaterial(material, armorClass);
             if (replacement < 0)
             {
                 _status = "No " + material + " armor template exists in the installed database.";
@@ -990,16 +1027,17 @@ namespace BallisticsLab.Runtime
 
             PresetIndices[_selectedLayer] = replacement;
             _status = "Layer " + (_selectedLayer + 1) + " now uses "
-                + _catalog.Entries[replacement].DisplayName + ".";
+                + ActiveCatalog.Entries[replacement].DisplayName + ".";
         }
 
         private static int ClampPresetIndex(int index)
         {
-            if (_catalog == null || _catalog.Entries.Count == 0)
+            PlateCatalog? catalog = _catalog;
+            if (catalog == null || catalog.Entries.Count == 0)
             {
                 return 0;
             }
-            return Math.Max(0, Math.Min(_catalog.Entries.Count - 1, index));
+            return Math.Max(0, Math.Min(catalog.Entries.Count - 1, index));
         }
 
         private static int CycleMatch(List<int> matches, int current, int direction)
@@ -1132,6 +1170,16 @@ namespace BallisticsLab.Runtime
                 UnityEngine.Object.Destroy(_traceMaterial);
                 _traceMaterial = null;
             }
+        }
+
+        private static string Invariant(float value, string format)
+        {
+            return value.ToString(format, CultureInfo.InvariantCulture);
+        }
+
+        private static string Invariant(int value)
+        {
+            return value.ToString(CultureInfo.InvariantCulture);
         }
     }
 }

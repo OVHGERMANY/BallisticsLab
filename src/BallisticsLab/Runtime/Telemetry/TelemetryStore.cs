@@ -22,7 +22,7 @@ namespace BallisticsLab.Runtime.Telemetry
         private static int _captureOrdinal;
         private static int _manualExportOrdinal;
 
-        internal static ShotRecord Latest
+        internal static ShotRecord? Latest
         {
             get
             {
@@ -128,7 +128,7 @@ namespace BallisticsLab.Runtime.Telemetry
             return result;
         }
 
-        internal static string ExportAutomatic(bool force)
+        internal static string? ExportAutomatic(bool force)
         {
             IReadOnlyList<ShotRecord> records;
             string stem;

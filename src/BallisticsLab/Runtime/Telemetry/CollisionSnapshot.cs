@@ -34,11 +34,11 @@ namespace BallisticsLab.Runtime.Telemetry
             }
         }
 
-        internal static CollisionSnapshot Take(Shot shot)
+        internal static CollisionSnapshot? Take(Shot shot)
         {
             lock (Values)
             {
-                if (!Values.TryGetValue(shot, out CollisionSnapshot snapshot))
+                if (!Values.TryGetValue(shot, out CollisionSnapshot? snapshot))
                 {
                     return null;
                 }
@@ -49,4 +49,3 @@ namespace BallisticsLab.Runtime.Telemetry
         }
     }
 }
-

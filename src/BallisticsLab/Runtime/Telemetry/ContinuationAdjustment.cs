@@ -39,7 +39,7 @@ namespace BallisticsLab.Runtime.Telemetry
         internal int FireIndex { get; }
         internal int RandomSeed { get; }
         internal int FragmentIndex { get; }
-        internal Shot Parent { get; }
+        internal Shot? Parent { get; }
         internal long FixtureId { get; }
         internal int SourceLayerIndex { get; }
         internal string Kind { get; }
@@ -67,11 +67,11 @@ namespace BallisticsLab.Runtime.Telemetry
             }
         }
 
-        internal static ContinuationAdjustment Take(Shot shot)
+        internal static ContinuationAdjustment? Take(Shot shot)
         {
             lock (Values)
             {
-                if (!Values.TryGetValue(shot, out ContinuationAdjustment adjustment))
+                if (!Values.TryGetValue(shot, out ContinuationAdjustment? adjustment))
                 {
                     return null;
                 }

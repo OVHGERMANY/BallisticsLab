@@ -98,7 +98,7 @@ internal static class AcceptanceCoverageEvaluator
 
         bool spacedArmor = chains.Any(chain =>
         {
-            AcceptanceRecord fixture = chain.FirstOrDefault(record => record.TargetKind == FixturePlate);
+            AcceptanceRecord? fixture = chain.FirstOrDefault(record => record.TargetKind == FixturePlate);
             return fixture != null
                 && fixture.LayerCount > 1
                 && fixture.LayerSpacing > 0d
@@ -346,7 +346,7 @@ internal static class AcceptanceCoverageEvaluator
     }
 
     private static void AddSteelChain(
-        ICollection<Dictionary<string, object>> records,
+        List<Dictionary<string, object>> records,
         string chain,
         int layerCount,
         int armorClass,
@@ -371,7 +371,7 @@ internal static class AcceptanceCoverageEvaluator
     }
 
     private static void AddGenericChain(
-        ICollection<Dictionary<string, object>> records,
+        List<Dictionary<string, object>> records,
         string chain,
         int layerCount,
         int sequence,
@@ -395,7 +395,7 @@ internal static class AcceptanceCoverageEvaluator
     }
 
     private static void AddContinuation(
-        IDictionary<string, object> record,
+        Dictionary<string, object> record,
         string kind,
         int sourceLayer)
     {
@@ -527,19 +527,19 @@ internal static class AcceptanceCoverageEvaluator
             };
         }
 
-        internal string ChainId { get; private set; }
+        internal string ChainId { get; private set; } = string.Empty;
         internal int FireIndex { get; private set; }
         internal int FragmentIndex { get; private set; }
         internal int ParentDepth { get; private set; }
         internal int Sequence { get; private set; }
-        internal string TargetKind { get; private set; }
-        internal string Target { get; private set; }
-        internal string Outcome { get; private set; }
+        internal string TargetKind { get; private set; } = string.Empty;
+        internal string Target { get; private set; } = string.Empty;
+        internal string Outcome { get; private set; } = string.Empty;
         internal int Layer { get; private set; }
         internal int LayerCount { get; private set; }
-        internal string FixtureTemplateId { get; private set; }
+        internal string FixtureTemplateId { get; private set; } = string.Empty;
         internal int FixtureArmorClass { get; private set; }
-        internal string FixtureArmorMaterial { get; private set; }
+        internal string FixtureArmorMaterial { get; private set; } = string.Empty;
         internal double LayerSpacing { get; private set; }
         internal double ColliderThickness { get; private set; }
         internal double ArmorRealResistance { get; private set; }
@@ -560,8 +560,8 @@ internal static class AcceptanceCoverageEvaluator
         internal bool HasTargetAliveBefore { get; private set; }
         internal bool TargetAliveAfter { get; private set; }
         internal bool HasTargetAliveAfter { get; private set; }
-        internal string ArmorChanges { get; private set; }
-        internal string ContinuationKind { get; private set; }
+        internal string ArmorChanges { get; private set; } = string.Empty;
+        internal string ContinuationKind { get; private set; } = string.Empty;
         internal int ContinuationSourceLayer { get; private set; }
         internal bool HasContinuationFactors { get; private set; }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using BallisticsLab.Runtime.Telemetry;
 using EFT.Ballistics;
@@ -24,7 +25,11 @@ namespace BallisticsLab.Runtime.Patches
 
         [PatchPrefix]
         [HarmonyPriority(Priority.First)]
-        private static void Prefix(Shot shotResult, out ShotApplicationState __state)
+        [SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "Optional telemetry must fail open instead of interrupting EFT shot application.")]
+        private static void Prefix(Shot shotResult, out ShotApplicationState? __state)
         {
             __state = null;
             try
@@ -46,7 +51,11 @@ namespace BallisticsLab.Runtime.Patches
 
         [PatchPostfix]
         [HarmonyPriority(Priority.Last)]
-        private static void Postfix(ShotApplicationState __state)
+        [SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "Optional report completion must fail open instead of interrupting EFT shot application.")]
+        private static void Postfix(ShotApplicationState? __state)
         {
             try
             {

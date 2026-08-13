@@ -5,9 +5,9 @@ using System.Text;
 
 namespace BallisticsLab.Core
 {
-    public readonly struct LabColliderBallisticSettings
+    internal readonly struct LabColliderBallisticSettings : IEquatable<LabColliderBallisticSettings>
     {
-        public LabColliderBallisticSettings(
+        internal LabColliderBallisticSettings(
             float penetrationLevel,
             float penetrationChance,
             float ricochetChance,
@@ -23,15 +23,55 @@ namespace BallisticsLab.Core
             TrajectoryDeviation = trajectoryDeviation;
         }
 
-        public float PenetrationLevel { get; }
-        public float PenetrationChance { get; }
-        public float RicochetChance { get; }
-        public float FragmentationChance { get; }
-        public float TrajectoryDeviationChance { get; }
-        public float TrajectoryDeviation { get; }
+        internal float PenetrationLevel { get; }
+        internal float PenetrationChance { get; }
+        internal float RicochetChance { get; }
+        internal float FragmentationChance { get; }
+        internal float TrajectoryDeviationChance { get; }
+        internal float TrajectoryDeviation { get; }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is LabColliderBallisticSettings other && Equals(other);
+        }
+
+        public bool Equals(LabColliderBallisticSettings other)
+        {
+            return PenetrationLevel.Equals(other.PenetrationLevel)
+                && PenetrationChance.Equals(other.PenetrationChance)
+                && RicochetChance.Equals(other.RicochetChance)
+                && FragmentationChance.Equals(other.FragmentationChance)
+                && TrajectoryDeviationChance.Equals(other.TrajectoryDeviationChance)
+                && TrajectoryDeviation.Equals(other.TrajectoryDeviation);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(
+                PenetrationLevel,
+                PenetrationChance,
+                RicochetChance,
+                FragmentationChance,
+                TrajectoryDeviationChance,
+                TrajectoryDeviation);
+        }
+
+        public static bool operator ==(
+            LabColliderBallisticSettings left,
+            LabColliderBallisticSettings right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(
+            LabColliderBallisticSettings left,
+            LabColliderBallisticSettings right)
+        {
+            return !left.Equals(right);
+        }
     }
 
-    public static class LabPolicies
+    internal static class LabPolicies
     {
         public const int MaximumLayers = 6;
         public const int MaximumRecords = 500;
@@ -48,10 +88,10 @@ namespace BallisticsLab.Core
         }
 
         public static IReadOnlyList<T> SelectChangedChains<T>(
-            IReadOnlyList<T> records,
+            IReadOnlyList<T>? records,
             long savedSequence,
-            Func<T, long> sequence,
-            Func<T, string> chainId)
+            Func<T, long>? sequence,
+            Func<T, string?>? chainId)
         {
             if (records == null || records.Count == 0 || sequence == null || chainId == null)
             {
@@ -62,7 +102,7 @@ namespace BallisticsLab.Core
             for (int index = 0; index < records.Count; index++)
             {
                 T record = records[index];
-                string id = chainId(record);
+                string? id = chainId(record);
                 if (sequence(record) > savedSequence && !string.IsNullOrEmpty(id))
                 {
                     changedChains.Add(id);
@@ -73,7 +113,7 @@ namespace BallisticsLab.Core
             for (int index = 0; index < records.Count; index++)
             {
                 T record = records[index];
-                string id = chainId(record);
+                string? id = chainId(record);
                 if ((!string.IsNullOrEmpty(id) && changedChains.Contains(id))
                     || (string.IsNullOrEmpty(id) && sequence(record) > savedSequence))
                 {
@@ -97,7 +137,7 @@ namespace BallisticsLab.Core
         }
 
         public static LabColliderBallisticSettings ResolveBodyArmorBallisticSettings(
-            IReadOnlyList<float> presetValues)
+            IReadOnlyList<float>? presetValues)
         {
             if (presetValues != null
                 && presetValues.Count >= 6
@@ -126,7 +166,7 @@ namespace BallisticsLab.Core
                 InstalledBodyArmorTrajectoryDeviation);
         }
 
-        public static string AuthoritativeAmmoValue(string templateValue, string itemValue)
+        public static string AuthoritativeAmmoValue(string? templateValue, string? itemValue)
         {
             return !string.IsNullOrWhiteSpace(templateValue)
                 ? templateValue
@@ -136,7 +176,7 @@ namespace BallisticsLab.Core
         public static bool ShouldDisplayBodyTelemetry(
             float healthBefore,
             float healthAfter,
-            string armorChanges)
+            string? armorChanges)
         {
             return healthBefore > 0f
                 || healthAfter > 0f
@@ -203,7 +243,7 @@ namespace BallisticsLab.Core
             return 0.2f + 0.8f * Clamp01(colliderPenetrationChance);
         }
 
-        public static string ShotChainId(string shooterProfileId, int fireIndex, int rootRandomSeed)
+        public static string ShotChainId(string? shooterProfileId, int fireIndex, int rootRandomSeed)
         {
             return (shooterProfileId ?? string.Empty)
                 + ":" + fireIndex.ToString(CultureInfo.InvariantCulture)
@@ -240,18 +280,18 @@ namespace BallisticsLab.Core
             return "UNRESOLVED (" + bulletState.ToString(CultureInfo.InvariantCulture) + ")";
         }
 
-        public static string Csv(string value)
+        public static string Csv(string? value)
         {
             value ??= string.Empty;
-            if (value.IndexOfAny(new[] { ',', '"', '\r', '\n' }) < 0)
+            if (!RequiresCsvQuoting(value))
             {
                 return value;
             }
 
-            return "\"" + value.Replace("\"", "\"\"") + "\"";
+            return "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
         }
 
-        public static string Json(string value)
+        public static string Json(string? value)
         {
             if (value == null)
             {
@@ -312,6 +352,19 @@ namespace BallisticsLab.Core
         private static bool IsPositiveProbability(float value)
         {
             return IsProbability(value) && value > 0f;
+        }
+
+        private static bool RequiresCsvQuoting(string value)
+        {
+            foreach (char character in value)
+            {
+                if (character == ',' || character == '"' || character == '\r' || character == '\n')
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

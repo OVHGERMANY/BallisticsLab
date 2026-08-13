@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using BallisticsLab.Runtime.Telemetry;
 using EFT.Ballistics;
@@ -25,6 +26,10 @@ namespace BallisticsLab.Runtime.Patches
 
         [PatchPrefix]
         [HarmonyPriority(Priority.First)]
+        [SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "Optional telemetry must fail open instead of interrupting EFT collision handling.")]
         private static void Prefix(Shot __instance, Vector3 prevVector3, Vector3 prevVelocity)
         {
             try
@@ -49,4 +54,3 @@ namespace BallisticsLab.Runtime.Patches
         }
     }
 }
-

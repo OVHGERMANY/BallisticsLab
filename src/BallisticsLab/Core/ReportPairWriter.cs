@@ -4,16 +4,44 @@ using System.Text;
 
 namespace BallisticsLab.Core
 {
-    public readonly struct ReportPairPaths
+    internal readonly struct ReportPairPaths : IEquatable<ReportPairPaths>
     {
-        public ReportPairPaths(string csvPath, string jsonPath)
+        internal ReportPairPaths(string csvPath, string jsonPath)
         {
             CsvPath = csvPath;
             JsonPath = jsonPath;
         }
 
-        public string CsvPath { get; }
-        public string JsonPath { get; }
+        internal string CsvPath { get; }
+        internal string JsonPath { get; }
+
+        public override bool Equals(object? obj)
+        {
+            return obj is ReportPairPaths other && Equals(other);
+        }
+
+        public bool Equals(ReportPairPaths other)
+        {
+            return string.Equals(CsvPath, other.CsvPath, StringComparison.Ordinal)
+                && string.Equals(JsonPath, other.JsonPath, StringComparison.Ordinal);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(
+                StringComparer.Ordinal.GetHashCode(CsvPath),
+                StringComparer.Ordinal.GetHashCode(JsonPath));
+        }
+
+        public static bool operator ==(ReportPairPaths left, ReportPairPaths right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(ReportPairPaths left, ReportPairPaths right)
+        {
+            return !left.Equals(right);
+        }
 
         public override string ToString()
         {
@@ -21,9 +49,9 @@ namespace BallisticsLab.Core
         }
     }
 
-    public static class ReportPairWriter
+    internal static class ReportPairWriter
     {
-        public static ReportPairPaths Write(
+        internal static ReportPairPaths Write(
             string reportDirectory,
             string stem,
             string csv,

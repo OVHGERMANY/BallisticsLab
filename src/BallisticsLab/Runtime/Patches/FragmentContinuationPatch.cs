@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using BallisticsLab.Core;
 using BallisticsLab.Runtime.Fixtures;
@@ -28,6 +29,10 @@ namespace BallisticsLab.Runtime.Patches
 
         [PatchPostfix]
         [HarmonyPriority(Priority.Last)]
+        [SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "Fixture-only telemetry correction must fail open instead of interrupting EFT fragmentation.")]
         private static void Postfix(Shot __instance)
         {
             try
@@ -48,7 +53,7 @@ namespace BallisticsLab.Runtime.Patches
                     return;
                 }
 
-                Ammo ammunition = __instance.Ammo as Ammo;
+                Ammo? ammunition = __instance.Ammo as Ammo;
                 // EFT applies these factors only when the hit collider is a BodyPartCollider.
                 // A fixture stays generic to avoid same-body-part suppression between physical layers.
                 float penetrationFactor = LabPolicies.PenetratedChildFactor(

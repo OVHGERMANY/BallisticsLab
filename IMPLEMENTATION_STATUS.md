@@ -1,23 +1,23 @@
 # BallisticsLab implementation status
 
-Snapshot date: 2026-08-12
+Snapshot date: 2026-08-13
 
 ## Current baseline candidate
 
 - Plugin version: `0.2.8`
 - Report schema: `3`
-- Runtime code source commit: `e3dc463`
+- Runtime source: current repository tree
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
-- Prior playtested runtime DLL SHA-256: `3C4BAAA940FB61CD557CC173B61A55FBAA9860A651DBEFA3A33A4DEC0171B5E6`
-- Current local and deployed DLL SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
+- Currently deployed and playtested DLL SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
+- Current strict-build candidate SHA-256: `2742343222553B4E356FD8A65AA0271EDD01E5AE7C149D4D4A93D659CCAD0B1D`
 - Default configuration: disabled
 
-The runtime source has not changed since `e3dc463`; later commits record build, startup, runtime evidence, and validation tooling. The candidate is not tagged as an accepted baseline. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
+The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
 
 ## Automated and startup verification
 
-- Release solution build: 0 warnings, 0 errors.
+- Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
 - Pure and installed-database validation: 55 checks passed.
 - Validation with all current reports: 62 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
@@ -29,8 +29,9 @@ The runtime source has not changed since `e3dc463`; later commits record build, 
 - Every admitted report must have schema `3`, plugin version `0.2.8`, a matching CSV partner, exact field equality, and valid ammunition identity, falloff, durability, trajectory, and lineage data.
 - The tracked coverage evaluator separates casual bot traffic from controlled fixture evidence. Synthetic regressions prove that bot records cannot satisfy a fixture gate and duplicate automatic batches cannot inflate coverage.
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
+- Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The earlier playtested DLL predates the deterministic build contract above. Decompilation confirms that it and the current candidate contain identical runtime code, metadata tables, assembly references, and resources; their differences are assembly informational version, MVID, deterministic PE content ID, and PDB checksum. The pinned-toolchain candidate was deployed from the validated Release output. Local and deployed hashes match exactly. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. Existing runtime evidence therefore remains applicable to the unchanged runtime code; the remaining controlled gates will be captured on the current deployed artifact.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `27423432...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
 ## Current-build runtime evidence
 

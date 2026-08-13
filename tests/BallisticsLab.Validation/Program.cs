@@ -24,10 +24,10 @@ int passed = 0;
 Dictionary<string, AmmoRow> ammunition = new(StringComparer.Ordinal);
 
 Check(
-    LabBuild.PluginGuid == "com.janky.ballisticslab"
-    && LabBuild.PluginName == "Janky-BallisticsLab"
-    && LabBuild.PluginVersion == "0.2.8"
-    && LabBuild.ReportSchema == 3,
+    ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginGuid), "com.janky.ballisticslab")
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginName), "Janky-BallisticsLab")
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginVersion), "0.2.8")
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 3),
     "report provenance constants match the current plugin build");
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
 Check(LabPolicies.OutcomeName(1, false, false) == "PENETRATED / DEVIATED", "deviation taxonomy");
@@ -79,8 +79,9 @@ Check(
     && Nearly(liveBodyArmorSettings.TrajectoryDeviationChance, 0.28f)
     && Nearly(liveBodyArmorSettings.TrajectoryDeviation, 0.463f),
     "Lab plates preserve all six installed BodyArmor ballistic fields");
+float[] invalidBodyArmorPreset = { 0f, 0.097f, 0.378f, 0f, 0.28f, 0.463f };
 LabColliderBallisticSettings fallbackBodyArmorSettings =
-    LabPolicies.ResolveBodyArmorBallisticSettings(new[] { 0f, 0.097f, 0.378f, 0f, 0.28f, 0.463f });
+    LabPolicies.ResolveBodyArmorBallisticSettings(invalidBodyArmorPreset);
 Check(
     Nearly(
         fallbackBodyArmorSettings.FragmentationChance,
@@ -136,7 +137,7 @@ Check(
         == "5c0d5e4486f77478390952fe"
     && LabPolicies.AuthoritativeAmmoValue(string.Empty, "5c0d688c86f77413ae3407b2")
         == "5c0d688c86f77413ae3407b2"
-    && LabPolicies.AuthoritativeAmmoValue(null, null) == string.Empty,
+    && string.IsNullOrEmpty(LabPolicies.AuthoritativeAmmoValue(null, null)),
     "runtime ammo template identity overrides stale item identity");
 Check(
     LabPolicies.ShouldDisplayBodyTelemetry(50f, 10f, string.Empty)
@@ -172,7 +173,9 @@ float backstopFrontFace = LabPolicies.BackstopCenterOffset(
 Check(
     Nearly(backstopFrontFace - lastPlateBackFace, 1f),
     "six-layer backstop retains one meter of face clearance");
-Check(LabPolicies.MaximumLayers == 6, "fixture layer limit remains six");
+Check(
+    ConstantMatches(typeof(LabPolicies), nameof(LabPolicies.MaximumLayers), 6),
+    "fixture layer limit remains six");
 
 if (!File.Exists(itemsPath))
 {
@@ -316,7 +319,7 @@ if (!string.IsNullOrEmpty(reportsPath))
                 bool hasReportedSpeed = record.TryGetProperty("templateSpeed", out JsonElement speedElement)
                     && TryGetFloat(speedElement, out reportedSpeed);
 
-                if (!ammunition.TryGetValue(templateId, out AmmoRow expected))
+                if (!ammunition.TryGetValue(templateId, out AmmoRow? expected))
                 {
                     identityFailure = reportName + ": unknown template " + templateId;
                     break;
@@ -426,6 +429,18 @@ void Check(bool condition, string name)
     }
 }
 
+bool ConstantMatches(Type declaringType, string fieldName, object expected)
+{
+    System.Reflection.FieldInfo? field = declaringType.GetField(
+        fieldName,
+        System.Reflection.BindingFlags.Static
+            | System.Reflection.BindingFlags.Public
+            | System.Reflection.BindingFlags.NonPublic);
+    return field != null
+        && field.IsLiteral
+        && Equals(field.GetRawConstantValue(), expected);
+}
+
 bool TryGetInt(JsonElement element, out int value)
 {
     if (element.ValueKind == JsonValueKind.Number)
@@ -474,7 +489,11 @@ bool ReportPairWriterCreatesOnlyACompletePair()
     try
     {
         ReportPairPaths paths = ReportPairWriter.Write(directory, "capture", "a,b\n1,2\n", "{\"records\":[]}");
-        string[] files = Directory.GetFiles(directory).Select(Path.GetFileName).OrderBy(name => name).ToArray();
+        string[] files = Directory.GetFiles(directory)
+            .Select(Path.GetFileName)
+            .OfType<string>()
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
         return files.SequenceEqual(new[] { "capture.csv", "capture.json" }, StringComparer.Ordinal)
             && File.ReadAllText(paths.CsvPath) == "a,b\n1,2\n"
             && File.ReadAllText(paths.JsonPath) == "{\"records\":[]}"
@@ -564,4 +583,4 @@ bool ChangedChainBatchKeepsUnchainedRecordsSeparate()
 
 internal sealed record PlateRow(string Id, string Name, int ArmorClass, string Material, int Durability);
 internal sealed record AmmoRow(string Name, float InitialSpeed);
-internal sealed record BatchRow(long Sequence, string ChainId);
+internal sealed record BatchRow(long Sequence, string? ChainId);

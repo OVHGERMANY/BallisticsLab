@@ -1,3 +1,4 @@
+using System;
 using EFT;
 using EFT.Ballistics;
 using UnityEngine;
@@ -5,9 +6,9 @@ using BallisticsLab.Core;
 
 namespace BallisticsLab.Runtime.Fixtures
 {
-    internal sealed class LabPlateCollider : BallisticCollider
+    public sealed class LabPlateCollider : BallisticCollider
     {
-        internal LabPlateRuntime Runtime { get; private set; }
+        internal LabPlateRuntime? Runtime { get; private set; }
 
         internal void Configure(LabPlateRuntime runtime)
         {
@@ -24,9 +25,9 @@ namespace BallisticsLab.Runtime.Fixtures
             Associate(TypeOfMaterial);
         }
 
-        private static float[] ReadBodyArmorPresetValues()
+        private static float[]? ReadBodyArmorPresetValues()
         {
-            BallisticPreset[] presets = EFTHardSettings.Instance?.ColliderPresets;
+            BallisticPreset[]? presets = EFTHardSettings.Instance?.ColliderPresets;
             if (presets != null)
             {
                 foreach (BallisticPreset preset in presets)
@@ -45,7 +46,7 @@ namespace BallisticsLab.Runtime.Fixtures
         }
 
         public override bool Deflects(
-            float hitCosDirectionToNormal,
+            float _hitCosDirectionToNormal,
             Shot shot,
             Vector3 hitPoint,
             Vector3 shotNormal,
@@ -67,6 +68,11 @@ namespace BallisticsLab.Runtime.Fixtures
 
         public override bool IsPenetrated(Shot shot, Vector3 hitPoint)
         {
+            if (shot == null)
+            {
+                throw new ArgumentNullException(nameof(shot));
+            }
+
             if (Runtime?.Armor == null || Runtime.Armor.Repairable.Durability <= 0f)
             {
                 return true;
@@ -85,7 +91,7 @@ namespace BallisticsLab.Runtime.Fixtures
             return shot.PenetrationPower * resistance.CF > PenetrationLevel;
         }
 
-        public override PlayerHitInfo ApplyHit(DamageInfo damageInfo, ShotId shotID)
+        public override PlayerHitInfo? ApplyHit(DamageInfo damageInfo, ShotId shotID)
         {
             base.ApplyHit(damageInfo, shotID);
             if (damageInfo.IsForwardHit && Runtime != null)

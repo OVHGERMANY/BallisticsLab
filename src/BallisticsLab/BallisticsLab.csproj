@@ -74,4 +74,27 @@
     <MakeDir Directories="$(DeployDirectory)" />
     <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(DeployDirectory)\$(TargetFileName)" SkipUnchangedFiles="true" />
   </Target>
+
+  <Target Name="VerifyDeployment" DependsOnTargets="Build" AfterTargets="Deploy">
+    <PropertyGroup>
+      <DeployedAssembly>$(DeployDirectory)\$(TargetFileName)</DeployedAssembly>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(DeployedAssembly)')" Text="The deployed BallisticsLab assembly was not found: $(DeployedAssembly)" />
+    <GetFileHash Files="$(TargetPath)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="CompiledAssemblyHash" />
+    </GetFileHash>
+    <GetFileHash Files="$(DeployedAssembly)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="DeployedAssemblyHash" />
+    </GetFileHash>
+    <PropertyGroup>
+      <CompiledAssemblySha256>@(CompiledAssemblyHash->'%(FileHash)')</CompiledAssemblySha256>
+      <DeployedAssemblySha256>@(DeployedAssemblyHash->'%(FileHash)')</DeployedAssemblySha256>
+    </PropertyGroup>
+    <Error
+      Condition="'$(CompiledAssemblySha256)' != '$(DeployedAssemblySha256)'"
+      Text="BallisticsLab deployment parity failed. Compiled SHA-256: $(CompiledAssemblySha256); deployed SHA-256: $(DeployedAssemblySha256)" />
+    <Message
+      Importance="high"
+      Text="BallisticsLab deployment parity passed: $(CompiledAssemblySha256)" />
+  </Target>
 </Project>

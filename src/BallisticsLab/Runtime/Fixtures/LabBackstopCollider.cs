@@ -3,7 +3,7 @@ using EFT.Ballistics;
 
 namespace BallisticsLab.Runtime.Fixtures
 {
-    internal sealed class LabBackstopCollider : BallisticCollider
+    public sealed class LabBackstopCollider : BallisticCollider
     {
         internal long FixtureId { get; private set; }
         internal int LayerCount { get; private set; }

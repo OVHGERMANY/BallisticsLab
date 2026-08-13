@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -12,31 +13,35 @@ using SPT.Reflection.Patching;
 
 namespace BallisticsLab
 {
+#pragma warning disable CA2243 // BepInEx uses reverse-domain plugin identifiers, not System.Guid values.
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
     [BepInProcess("EscapeFromTarkov.exe")]
     [BepInDependency(SptVersionCompatibility.CorePluginGuid, SptVersionCompatibility.SupportedCoreVersionText)]
+#pragma warning restore CA2243
     public sealed class Plugin : BaseUnityPlugin
     {
         internal const string PluginGuid = LabBuild.PluginGuid;
         internal const string PluginName = LabBuild.PluginName;
         internal const string PluginVersion = LabBuild.PluginVersion;
 
-        private CollisionCapturePatch _collisionCapturePatch;
-        private FragmentContinuationPatch _fragmentContinuationPatch;
-        private ShotApplicationPatch _shotApplicationPatch;
-        private PanelInputPatch _panelInputPatch;
+        private CollisionCapturePatch? _collisionCapturePatch;
+        private FragmentContinuationPatch? _fragmentContinuationPatch;
+        private ShotApplicationPatch? _shotApplicationPatch;
+        private PanelInputPatch? _panelInputPatch;
+        private bool _runtimeInitialized;
 
-        internal static PluginConfiguration Configuration { get; private set; }
-        internal static ManualLogSource Log { get; private set; }
+        internal static PluginConfiguration? Configuration { get; private set; }
+        internal static ManualLogSource? Log { get; private set; }
 
         private void Awake()
         {
             Log = Logger;
-            Configuration = new PluginConfiguration(Config);
+            PluginConfiguration configuration = new PluginConfiguration(Config);
+            Configuration = configuration;
 
             try
             {
-                if (!Configuration.Enabled.Value)
+                if (!configuration.Enabled.Value)
                 {
                     Logger.LogInfo(
                         PluginName + " " + PluginVersion
@@ -52,13 +57,22 @@ namespace BallisticsLab
                 MethodInfo application = TargetMethodResolver.ResolveShotDelegate();
                 MethodInfo playerCommand = TargetMethodResolver.ResolvePlayerCommand();
 
-                _collisionCapturePatch = new CollisionCapturePatch(collision);
-                _fragmentContinuationPatch = new FragmentContinuationPatch(fragments);
-                _shotApplicationPatch = new ShotApplicationPatch(application);
-                _panelInputPatch = new PanelInputPatch(playerCommand);
-                EnablePatchesTransactionally();
+                CollisionCapturePatch collisionCapturePatch = new CollisionCapturePatch(collision);
+                FragmentContinuationPatch fragmentContinuationPatch = new FragmentContinuationPatch(fragments);
+                ShotApplicationPatch shotApplicationPatch = new ShotApplicationPatch(application);
+                PanelInputPatch panelInputPatch = new PanelInputPatch(playerCommand);
+                _collisionCapturePatch = collisionCapturePatch;
+                _fragmentContinuationPatch = fragmentContinuationPatch;
+                _shotApplicationPatch = shotApplicationPatch;
+                _panelInputPatch = panelInputPatch;
+                EnablePatchesTransactionally(
+                    panelInputPatch,
+                    collisionCapturePatch,
+                    fragmentContinuationPatch,
+                    shotApplicationPatch);
 
                 LabRuntime.Initialize();
+                _runtimeInitialized = true;
                 Logger.LogInfo(
                     PluginName + " " + PluginVersion + " loaded for SPT "
                     + SptVersionCompatibility.SupportedCoreVersionText
@@ -74,29 +88,43 @@ namespace BallisticsLab
 
         private void Update()
         {
-            LabRuntime.Update();
+            if (_runtimeInitialized)
+            {
+                LabRuntime.Update();
+            }
         }
 
         private void LateUpdate()
         {
-            LabRuntime.LateUpdate();
+            if (_runtimeInitialized)
+            {
+                LabRuntime.LateUpdate();
+            }
         }
 
         private void OnGUI()
         {
-            LabRuntime.OnGUI();
+            if (_runtimeInitialized)
+            {
+                LabRuntime.OnGUI();
+            }
         }
 
         private void OnDestroy()
         {
-            LabRuntime.Shutdown();
+            if (_runtimeInitialized)
+            {
+                LabRuntime.Shutdown();
+                _runtimeInitialized = false;
+            }
             DisablePatches();
         }
 
-        private void RequireExactSptVersion()
+        private static void RequireExactSptVersion()
         {
-            PluginInfo core;
-            if (!Chainloader.PluginInfos.TryGetValue(SptVersionCompatibility.CorePluginGuid, out core)
+            if (!Chainloader.PluginInfos.TryGetValue(
+                    SptVersionCompatibility.CorePluginGuid,
+                    out PluginInfo? core)
                 || core?.Metadata?.Version == null
                 || !SptVersionCompatibility.IsExactSupportedCoreVersion(core.Metadata.Version))
             {
@@ -130,7 +158,8 @@ namespace BallisticsLab
             using (FileStream stream = File.OpenRead(location))
             using (SHA256 sha = SHA256.Create())
             {
-                string actual = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", string.Empty);
+                string actual = BitConverter.ToString(sha.ComputeHash(stream))
+                    .Replace("-", string.Empty, StringComparison.Ordinal);
                 if (!string.Equals(actual, SptVersionCompatibility.VerifiedAssemblyHash, StringComparison.OrdinalIgnoreCase))
                 {
                     Logger.LogWarning(
@@ -141,14 +170,18 @@ namespace BallisticsLab
             }
         }
 
-        private void EnablePatchesTransactionally()
+        private void EnablePatchesTransactionally(
+            PanelInputPatch panelInputPatch,
+            CollisionCapturePatch collisionCapturePatch,
+            FragmentContinuationPatch fragmentContinuationPatch,
+            ShotApplicationPatch shotApplicationPatch)
         {
             try
             {
-                _panelInputPatch.Enable();
-                _collisionCapturePatch.Enable();
-                _fragmentContinuationPatch.Enable();
-                _shotApplicationPatch.Enable();
+                panelInputPatch.Enable();
+                collisionCapturePatch.Enable();
+                fragmentContinuationPatch.Enable();
+                shotApplicationPatch.Enable();
             }
             catch
             {
@@ -165,7 +198,11 @@ namespace BallisticsLab
             Disable(_panelInputPatch);
         }
 
-        private void Disable(ModulePatch patch)
+        [SuppressMessage(
+            "Design",
+            "CA1031:Do not catch general exception types",
+            Justification = "Patch rollback must continue and must not replace the original startup failure.")]
+        private void Disable(ModulePatch? patch)
         {
             if (patch?.TargetMethod == null)
             {

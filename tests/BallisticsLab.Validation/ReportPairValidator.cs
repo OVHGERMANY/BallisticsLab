@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 
@@ -6,14 +7,16 @@ internal static class ReportPairValidator
 {
     private const string Header =
         "schema,pluginVersion,sequence,utc,chainId,fireIndex,fragmentIndex,parentDepth,rootRandomSeed,isForwardHit,ammoTemplateId,ammoName,shooter,targetKind,target,material,fixtureId,layer,layerCount,fixtureTemplateId,fixtureName,fixtureArmorClass,fixtureArmorMaterial,layerSpacing,colliderThickness,outcome,angleDegrees,impactSpeed,templateSpeed,fraction,incomingDamage,incomingPenetration,decisionDamage,decisionPenetration,armorRealResistance,armorClassResistance,armorCf,penetrationChancePercent,blockedBy,deflectedBy,fragments,durabilityBefore,durabilityAfter,fixtureMaximumDurability,bodyHealthBefore,bodyHealthAfter,targetAliveBefore,targetAliveAfter,armorChanges,continuationKind,continuationSourceFixtureId,continuationSourceLayer,continuationPenetrationFactor,continuationVelocityFactor,continuationOutcomeFactor,continuationArmorCf,continuationDamageBefore,continuationPenetrationBefore,continuationDamageAfter,continuationPenetrationAfter,hitX,hitY,hitZ";
+    private static readonly string[] ParserHeader = { "schema", "name", "notes" };
+    private static readonly string[] ParserValues = { "3", "a,b", "line1\r\nline2 \"quoted\"" };
 
     internal static bool ParserHandlesQuotedFields()
     {
         const string text = "schema,name,notes\r\n3,\"a,b\",\"line1\r\nline2 \"\"quoted\"\"\"\r\n";
-        IReadOnlyList<IReadOnlyList<string>> rows = ParseCsv(text);
+        List<IReadOnlyList<string>> rows = ParseCsv(text);
         return rows.Count == 2
-            && rows[0].SequenceEqual(new[] { "schema", "name", "notes" }, StringComparer.Ordinal)
-            && rows[1].SequenceEqual(new[] { "3", "a,b", "line1\r\nline2 \"quoted\"" }, StringComparer.Ordinal);
+            && rows[0].SequenceEqual(ParserHeader, StringComparer.Ordinal)
+            && rows[1].SequenceEqual(ParserValues, StringComparer.Ordinal);
     }
 
     internal static bool ValidatorMatchesSyntheticPair()
@@ -128,6 +131,10 @@ internal static class ReportPairValidator
         }
     }
 
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Arbitrary report faults are returned as validation failures by contract.")]
     internal static bool Validate(string jsonPath, out string failure)
     {
         failure = string.Empty;
@@ -151,7 +158,7 @@ internal static class ReportPairValidator
                 return false;
             }
 
-            IReadOnlyList<IReadOnlyList<string>> rows = ParseCsv(File.ReadAllText(csvPath));
+            List<IReadOnlyList<string>> rows = ParseCsv(File.ReadAllText(csvPath));
             if (rows.Count == 0)
             {
                 failure = "CSV is empty";
@@ -248,7 +255,7 @@ internal static class ReportPairValidator
         }
     }
 
-    private static IReadOnlyList<IReadOnlyList<string>> ParseCsv(string text)
+    private static List<IReadOnlyList<string>> ParseCsv(string text)
     {
         List<IReadOnlyList<string>> rows = new();
         List<string> row = new();
@@ -375,8 +382,14 @@ internal static class ReportPairValidator
 
     private static string Csv(string value)
     {
-        return value.IndexOfAny(new[] { ',', '"', '\r', '\n' }) < 0
-            ? value
-            : "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        foreach (char character in value)
+        {
+            if (character == ',' || character == '"' || character == '\r' || character == '\n')
+            {
+                return "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+            }
+        }
+
+        return value;
     }
 }

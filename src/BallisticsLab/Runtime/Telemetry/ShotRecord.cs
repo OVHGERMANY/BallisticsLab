@@ -14,7 +14,7 @@ namespace BallisticsLab.Runtime.Telemetry
         internal static ShotRecord Complete(long sequence, ShotApplicationState state)
         {
             Shot shot = state.Shot;
-            AmmoTemplate ammoTemplate = shot.Ammo?.Template as AmmoTemplate;
+            AmmoTemplate? ammoTemplate = shot.Ammo?.Template as AmmoTemplate;
             float templateSpeed = ammoTemplate?.InitialSpeed ?? 0f;
             float durabilityAfter = state.LabPlate?.Durability ?? 0f;
             float healthAfter = state.TargetPlayer != null
@@ -140,25 +140,25 @@ namespace BallisticsLab.Runtime.Telemetry
 
         internal long Sequence { get; private set; }
         internal DateTime Utc { get; private set; }
-        internal string ChainId { get; private set; }
+        internal string ChainId { get; private set; } = string.Empty;
         internal int FireIndex { get; private set; }
         internal int FragmentIndex { get; private set; }
         internal int ParentDepth { get; private set; }
         internal int RootRandomSeed { get; private set; }
         internal bool IsForwardHit { get; private set; }
-        internal string AmmoTemplateId { get; private set; }
-        internal string AmmoName { get; private set; }
-        internal string ShooterProfileId { get; private set; }
-        internal string Target { get; private set; }
-        internal string TargetKind { get; private set; }
-        internal string Material { get; private set; }
+        internal string AmmoTemplateId { get; private set; } = string.Empty;
+        internal string AmmoName { get; private set; } = string.Empty;
+        internal string ShooterProfileId { get; private set; } = string.Empty;
+        internal string Target { get; private set; } = string.Empty;
+        internal string TargetKind { get; private set; } = string.Empty;
+        internal string Material { get; private set; } = string.Empty;
         internal long FixtureId { get; private set; }
         internal int LayerIndex { get; private set; }
         internal int FixtureLayerCount { get; private set; }
-        internal string FixtureTemplateId { get; private set; }
-        internal string FixtureName { get; private set; }
+        internal string FixtureTemplateId { get; private set; } = string.Empty;
+        internal string FixtureName { get; private set; } = string.Empty;
         internal int FixtureArmorClass { get; private set; }
-        internal string FixtureArmorMaterial { get; private set; }
+        internal string FixtureArmorMaterial { get; private set; } = string.Empty;
         internal float FixtureMaximumDurability { get; private set; }
         internal float FixtureLayerSpacing { get; private set; }
         internal float FixtureColliderThickness { get; private set; }
@@ -168,7 +168,7 @@ namespace BallisticsLab.Runtime.Telemetry
         internal float ArmorCf { get; private set; }
         internal float PenetrationChancePercent { get; private set; }
         internal int BulletState { get; private set; }
-        internal string Outcome { get; private set; }
+        internal string Outcome { get; private set; } = string.Empty;
         internal float ImpactAngle { get; private set; }
         internal float ImpactSpeed { get; private set; }
         internal float TemplateSpeed { get; private set; }
@@ -177,8 +177,8 @@ namespace BallisticsLab.Runtime.Telemetry
         internal float IncomingPenetration { get; private set; }
         internal float DecisionDamage { get; private set; }
         internal float DecisionPenetration { get; private set; }
-        internal string BlockedBy { get; private set; }
-        internal string DeflectedBy { get; private set; }
+        internal string BlockedBy { get; private set; } = string.Empty;
+        internal string DeflectedBy { get; private set; } = string.Empty;
         internal int FragmentCount { get; private set; }
         internal float DurabilityBefore { get; private set; }
         internal float DurabilityAfter { get; private set; }
@@ -186,8 +186,8 @@ namespace BallisticsLab.Runtime.Telemetry
         internal float BodyHealthAfter { get; private set; }
         internal bool TargetAliveBefore { get; private set; }
         internal bool TargetAliveAfter { get; private set; }
-        internal string ArmorChanges { get; private set; }
-        internal string ContinuationKind { get; private set; }
+        internal string ArmorChanges { get; private set; } = string.Empty;
+        internal string ContinuationKind { get; private set; } = string.Empty;
         internal long ContinuationSourceFixtureId { get; private set; }
         internal int ContinuationSourceLayerIndex { get; private set; }
         internal float ContinuationPenetrationFactor { get; private set; }
@@ -199,7 +199,7 @@ namespace BallisticsLab.Runtime.Telemetry
         internal float ContinuationDamageAfter { get; private set; }
         internal float ContinuationPenetrationAfter { get; private set; }
         internal Vector3 HitPoint { get; private set; }
-        internal List<Vector3> Path { get; private set; }
+        internal List<Vector3> Path { get; private set; } = new List<Vector3>();
 
         private static bool IsFinite(Vector3 value)
         {

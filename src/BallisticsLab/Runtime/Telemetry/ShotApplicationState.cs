@@ -38,7 +38,7 @@ namespace BallisticsLab.Runtime.Telemetry
 
     internal sealed class ShotApplicationState
     {
-        internal ShotApplicationState(Shot shot, CollisionSnapshot collision)
+        internal ShotApplicationState(Shot shot, CollisionSnapshot? collision)
         {
             Shot = shot;
             Collision = collision;
@@ -113,8 +113,8 @@ namespace BallisticsLab.Runtime.Telemetry
         }
 
         internal Shot Shot { get; }
-        internal CollisionSnapshot Collision { get; }
-        internal ContinuationAdjustment Continuation { get; }
+        internal CollisionSnapshot? Collision { get; }
+        internal ContinuationAdjustment? Continuation { get; }
         internal string ChainId { get; }
         internal int FireIndex { get; }
         internal int FragmentIndex { get; }
@@ -127,14 +127,14 @@ namespace BallisticsLab.Runtime.Telemetry
         internal string TargetName { get; }
         internal string TargetKind { get; }
         internal string Material { get; }
-        internal LabPlateRuntime LabPlate { get; }
+        internal LabPlateRuntime? LabPlate { get; }
         internal long FixtureId { get; }
         internal int LayerIndex { get; } = -1;
         internal int FixtureLayerCount { get; }
-        internal string FixtureTemplateId { get; }
-        internal string FixtureName { get; }
+        internal string FixtureTemplateId { get; } = string.Empty;
+        internal string FixtureName { get; } = string.Empty;
         internal int FixtureArmorClass { get; }
-        internal string FixtureArmorMaterial { get; }
+        internal string FixtureArmorMaterial { get; } = string.Empty;
         internal float FixtureMaximumDurability { get; }
         internal float FixtureLayerSpacing { get; }
         internal float FixtureColliderThickness { get; }
@@ -144,11 +144,12 @@ namespace BallisticsLab.Runtime.Telemetry
         internal float ArmorCf { get; }
         internal float PenetrationChancePercent { get; }
         internal float DurabilityBefore { get; }
-        internal Player TargetPlayer { get; }
+        internal Player? TargetPlayer { get; }
         internal EBodyPart BodyPart { get; }
         internal float HealthBefore { get; }
         internal bool TargetAliveBefore { get; }
-        internal Dictionary<string, ArmorTelemetrySnapshot> ArmorBefore { get; }
+        internal Dictionary<string, ArmorTelemetrySnapshot> ArmorBefore { get; } =
+            new Dictionary<string, ArmorTelemetrySnapshot>();
 
         internal static Dictionary<string, ArmorTelemetrySnapshot> CaptureArmors(Player player)
         {
