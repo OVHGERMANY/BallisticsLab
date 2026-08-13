@@ -19,6 +19,13 @@ internal static class CampaignTests
         "Aramid",
         "Combined"
     };
+    private static readonly string[] RunnableProtocolThreatIds =
+    {
+        "gost-34286-br3-9x19-pst-7n21",
+        "gost-34286-br4-5.45x39-pp-7n10",
+        "gost-34286-br4-7.62x39-ps-57-n-231",
+        "gost-34286-br6-12.7x108-b32-57-bz-542"
+    };
 
     internal static bool SeedDerivationIsStableAndCaseSpecific()
     {
@@ -418,6 +425,8 @@ internal static class CampaignTests
     {
         CampaignDefinition baseline = CampaignCatalog.ControlledFixtureBaseline();
         CampaignDefinition physical = CampaignCatalog.PhysicalMaterialMatrix();
+        IReadOnlyList<ProtocolThreatDefinition> protocolThreats =
+            CampaignCatalog.ProtocolScreeningThreats;
         return baseline.Cases.Count == 10
             && baseline.RequiredRepetitions == 10
             && baseline.Cases[0].CaseId == "steel-c6-one"
@@ -433,7 +442,179 @@ internal static class CampaignTests
             && physical.Cases.Where(campaignCase => campaignCase.Material != "Aramid")
                 .All(campaignCase => campaignCase.ArmorClass == 4)
             && physical.Cases.All(campaignCase => campaignCase.RequirePhysicalEvidence)
-            && physical.Cases.All(campaignCase => campaignCase.RequireConservationEvidence);
+            && physical.Cases.All(campaignCase => campaignCase.RequireConservationEvidence)
+            && protocolThreats.Count == 4
+            && protocolThreats.Select(threat => threat.ThreatId).SequenceEqual(
+                RunnableProtocolThreatIds,
+                StringComparer.Ordinal)
+            && protocolThreats.All(threat => threat.AmmunitionMappings.Count(mapping =>
+                mapping.CanQualifySimulationScreening) == 1)
+            && protocolThreats.All(threat =>
+                CampaignCatalog.GostSimulationScreening(threat.ThreatId).Cases.Single()
+                    .IsProtocolSequence)
+            && RejectsUnavailableProtocolCampaign();
+    }
+
+    internal static bool ProtocolTrackerPreservesOneSampleAcrossFiveAcceptedShots()
+    {
+        CampaignDefinition definition = CampaignCatalog.GostSimulationScreening(
+            "gost-34286-br4-7.62x39-ps-57-n-231");
+        CampaignCaseDefinition campaignCase = definition.Cases[0];
+        var tracker = new CampaignRunTracker(definition, 71UL);
+        if (!tracker.Start() || !tracker.AttachFixture(1000L))
+        {
+            return false;
+        }
+        for (int index = 0; index < 5; index++)
+        {
+            CampaignAttemptRecord? attempt = tracker.RecordShot(
+                ProtocolEvidence(campaignCase, 1000L, "protocol-" + index, index));
+            CampaignRunSnapshot snapshot = tracker.Snapshot();
+            if (attempt?.Status != CampaignAttemptStatus.Accepted
+                || attempt.SampleOrdinal != 0
+                || attempt.RepetitionIndex != index
+                || attempt.ProtocolQualificationReason
+                    != ProtocolShotQualificationReason.Qualifying
+                || (index < 4
+                    && (snapshot.State != CampaignRunState.AwaitingShot
+                        || snapshot.CurrentFixtureId != 1000L
+                        || snapshot.CurrentRepetitionIndex != index + 1)))
+            {
+                return false;
+            }
+        }
+        CampaignRunSnapshot completed = tracker.Snapshot();
+        CampaignResultMatrix matrix = CampaignResultMatrixBuilder.Build(definition, completed);
+        return completed.State == CampaignRunState.Completed
+            && completed.Attempts.Count == 5
+            && completed.Attempts.All(attempt => attempt.Evidence.FixtureId == 1000L)
+            && matrix.AcceptedCount == 5
+            && matrix.Complete;
+    }
+
+    internal static bool ProtocolRejectionInvalidatesPartialSampleAndRoundTripsEvidence()
+    {
+        CampaignDefinition definition = CampaignCatalog.GostSimulationScreening(
+            "gost-34286-br4-7.62x39-ps-57-n-231");
+        CampaignCaseDefinition campaignCase = definition.Cases[0];
+        var tracker = new CampaignRunTracker(definition, 72UL);
+        tracker.Start();
+        tracker.AttachFixture(1100L);
+        tracker.RecordShot(ProtocolEvidence(campaignCase, 1100L, "first-a", 0));
+        tracker.RecordShot(ProtocolEvidence(campaignCase, 1100L, "first-b", 1));
+        CampaignAttemptRecord? rejected = tracker.RecordShot(
+            ProtocolEvidence(campaignCase, 1100L, "first-rejected", 0));
+        CampaignRunSnapshot restarted = tracker.Snapshot();
+        if (rejected?.Status != CampaignAttemptStatus.ProtocolRejected
+            || rejected.ProtocolQualificationReason
+                != ProtocolShotQualificationReason.ExpectedPointMismatch
+            || restarted.State != CampaignRunState.AwaitingFixture
+            || restarted.CurrentFixtureId != 0L
+            || restarted.CurrentRepetitionIndex != 0
+            || restarted.Attempts.Take(2).Any(attempt =>
+                attempt.Status != CampaignAttemptStatus.SequenceInvalidated)
+            || tracker.ConfirmReset(1100L)
+            || !tracker.AttachFixture(1200L))
+        {
+            return false;
+        }
+        for (int index = 0; index < 5; index++)
+        {
+            CampaignAttemptRecord? attempt = tracker.RecordShot(
+                ProtocolEvidence(campaignCase, 1200L, "second-" + index, index));
+            if (attempt?.Status != CampaignAttemptStatus.Accepted
+                || attempt.SampleOrdinal != 1)
+            {
+                return false;
+            }
+        }
+
+        CampaignRunSnapshot completed = tracker.Snapshot();
+        CampaignResultMatrix matrix = CampaignResultMatrixBuilder.Build(definition, completed);
+        string report = PhysicalReportDocumentWriter.Build(
+            "[]",
+            Array.Empty<PhysicalTransitionRecord>(),
+            definition,
+            completed);
+        using JsonDocument document = JsonDocument.Parse(report);
+        JsonElement campaign = document.RootElement.GetProperty("campaign");
+        JsonElement definitionElement = campaign.GetProperty("cases")[0];
+        JsonElement firstAttempt = campaign.GetProperty("attempts")[0];
+        JsonElement rejectedAttempt = campaign.GetProperty("attempts")[2];
+        return completed.State == CampaignRunState.Completed
+            && completed.Attempts.Count == 8
+            && matrix.AcceptedCount == 5
+            && matrix.Rows[0].RejectedCount == 3
+            && matrix.Rows[0].ProtocolRejectCount == 1
+            && matrix.Rows[0].SequenceInvalidatedCount == 2
+            && definitionElement.GetProperty("shotSequencePolicy").GetString()
+                == "SameFixtureProtocolPattern"
+            && definitionElement.GetProperty("protocolThreatId").GetString()
+                == campaignCase.ProtocolThreatId
+            && firstAttempt.GetProperty("sampleOrdinal").GetInt32() == 0
+            && firstAttempt.GetProperty("status").GetString() == "SequenceInvalidated"
+            && rejectedAttempt.GetProperty("protocolQualificationReason").GetString()
+                == "ExpectedPointMismatch"
+            && CampaignReportInvariantValidator.Validate(
+                document.RootElement,
+                out int attemptCount,
+                out _)
+            && attemptCount == 8;
+    }
+
+    internal static bool QueuedSixthProtocolShotCannotCompleteAContaminatedSample()
+    {
+        CampaignDefinition definition = CampaignCatalog.GostSimulationScreening(
+            "gost-34286-br4-7.62x39-ps-57-n-231");
+        CampaignCaseDefinition campaignCase = definition.Cases[0];
+        var tracker = new CampaignRunTracker(definition, 73UL);
+        tracker.Start();
+        tracker.AttachFixture(1300L);
+        for (int index = 0; index < 4; index++)
+        {
+            tracker.RecordShot(ProtocolEvidence(campaignCase, 1300L, "queued-" + index, index));
+        }
+        CampaignAttemptRecord? fifth = tracker.RecordShot(
+            ProtocolEvidence(campaignCase, 1300L, "queued-4", 4),
+            deferProtocolCompletion: true);
+        CampaignRunSnapshot deferred = tracker.Snapshot();
+        CampaignAttemptRecord? sixth = tracker.RecordShot(
+            ProtocolEvidence(campaignCase, 1300L, "queued-5", 4));
+        CampaignRunSnapshot invalidated = tracker.Snapshot();
+        return fifth?.Status == CampaignAttemptStatus.Accepted
+            && deferred.State == CampaignRunState.AwaitingShot
+            && deferred.CurrentRepetitionIndex == 4
+            && sixth?.Status == CampaignAttemptStatus.ProtocolRejected
+            && sixth.ProtocolQualificationReason
+                == ProtocolShotQualificationReason.NeighbourDistanceInsufficient
+            && invalidated.State == CampaignRunState.AwaitingFixture
+            && invalidated.Attempts.Take(5).All(attempt =>
+                attempt.Status == CampaignAttemptStatus.SequenceInvalidated)
+            && invalidated.Attempts[5].Status == CampaignAttemptStatus.ProtocolRejected;
+    }
+
+    internal static bool InvalidProtocolEvidenceCanDiscardDamagedSampleWithoutResettingIt()
+    {
+        CampaignDefinition definition = CampaignCatalog.GostSimulationScreening(
+            "gost-34286-br4-7.62x39-ps-57-n-231");
+        CampaignCaseDefinition campaignCase = definition.Cases[0];
+        var tracker = new CampaignRunTracker(definition, 74UL);
+        tracker.Start();
+        tracker.AttachFixture(1400L);
+        tracker.RecordShot(ProtocolEvidence(campaignCase, 1400L, "valid-before-invalid", 0));
+        bool invalidated = tracker.InvalidateCurrentProtocolSample();
+        CampaignRunSnapshot snapshot = tracker.Snapshot();
+
+        var ordinary = new CampaignRunTracker(Definition(), 75UL);
+        ordinary.Start();
+        ordinary.AttachFixture(1500L);
+        return invalidated
+            && snapshot.State == CampaignRunState.AwaitingFixture
+            && snapshot.CurrentFixtureId == 0L
+            && snapshot.CurrentRepetitionIndex == 0
+            && snapshot.Attempts.Count == 1
+            && snapshot.Attempts[0].Status == CampaignAttemptStatus.SequenceInvalidated
+            && !ordinary.InvalidateCurrentProtocolSample();
     }
 
     internal static bool PhysicalEvidenceUsesExactHostIdentityAndChecksClosure()
@@ -504,6 +685,7 @@ internal static class CampaignTests
             tracker.Snapshot());
         using JsonDocument document = JsonDocument.Parse(report);
         JsonElement campaign = document.RootElement.GetProperty("campaign");
+        JsonElement caseDefinition = campaign.GetProperty("cases")[0];
         JsonElement attempt = campaign.GetProperty("attempts")[0];
         JsonElement protocol = attempt.GetProperty("protocolEvidence");
         JsonElement row = campaign.GetProperty("matrix").GetProperty("rows")[0];
@@ -516,7 +698,14 @@ internal static class CampaignTests
             && campaign.GetProperty("runSeed").GetUInt64() == 42UL
             && !campaign.GetProperty("gameShotSeedOverridden").GetBoolean()
             && campaign.GetProperty("state").GetString() == "Completed"
+            && caseDefinition.GetProperty("shotSequencePolicy").GetString()
+                == "IndependentShots"
+            && string.IsNullOrEmpty(
+                caseDefinition.GetProperty("protocolThreatId").GetString())
             && attempt.GetProperty("chainId").GetString() == "json-chain"
+            && attempt.GetProperty("sampleOrdinal").GetInt32() == 0
+            && string.IsNullOrEmpty(
+                attempt.GetProperty("protocolQualificationReason").GetString())
             && attempt.GetProperty("fixtureTemplateId").GetString() == "fixture-template"
             && attempt.GetProperty("fixtureArmorMaterial").GetString() == "ArmoredSteel"
             && attempt.GetProperty("fixtureArmorClass").GetInt32() == 6
@@ -623,6 +812,42 @@ internal static class CampaignTests
             && outsideFailure.Contains("attempt", StringComparison.OrdinalIgnoreCase)
             && outcomeRejected
             && outcomeFailure.Contains("attempt", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool CampaignReportRejectsCorruptedProtocolSequenceState()
+    {
+        string report = CreateInvalidatedProtocolReport();
+        using JsonDocument cleanDocument = JsonDocument.Parse(report);
+        bool cleanAccepted = CampaignReportInvariantValidator.Validate(
+            cleanDocument.RootElement,
+            out _,
+            out _);
+
+        JsonNode wrongSample = JsonNode.Parse(report)!;
+        wrongSample["campaign"]!["attempts"]![0]!["sampleOrdinal"] = 1;
+        using JsonDocument sampleDocument = JsonDocument.Parse(wrongSample.ToJsonString());
+        bool sampleRejected = !CampaignReportInvariantValidator.Validate(
+            sampleDocument.RootElement,
+            out _,
+            out _);
+
+        JsonNode wrongReason = JsonNode.Parse(report)!;
+        wrongReason["campaign"]!["attempts"]![2]!["protocolQualificationReason"] =
+            "Qualifying";
+        using JsonDocument reasonDocument = JsonDocument.Parse(wrongReason.ToJsonString());
+        bool reasonRejected = !CampaignReportInvariantValidator.Validate(
+            reasonDocument.RootElement,
+            out _,
+            out _);
+
+        JsonNode wrongFinalStatus = JsonNode.Parse(report)!;
+        wrongFinalStatus["campaign"]!["attempts"]![0]!["status"] = "Accepted";
+        using JsonDocument statusDocument = JsonDocument.Parse(wrongFinalStatus.ToJsonString());
+        bool statusRejected = !CampaignReportInvariantValidator.Validate(
+            statusDocument.RootElement,
+            out _,
+            out _);
+        return cleanAccepted && sampleRejected && reasonRejected && statusRejected;
     }
 
     internal static bool CampaignReportRejectsCorruptedAttemptAndHeaderCursors()
@@ -860,5 +1085,99 @@ internal static class CampaignTests
                 8d,
                 true,
                 reachedBackstop));
+    }
+
+    private static CampaignShotEvidence ProtocolEvidence(
+        CampaignCaseDefinition campaignCase,
+        long fixtureId,
+        string chainId,
+        int pointIndex)
+    {
+        if (!campaignCase.TryGetProtocolDefinition(
+                out ProtocolThreatDefinition? threat,
+                out ProtocolAmmunitionMapping? mapping)
+            || threat == null
+            || mapping == null
+            || !ProtocolImpactPattern.TryCreate(
+                threat,
+                mapping,
+                1d,
+                1.5d,
+                out ProtocolImpactPattern? pattern,
+                out _)
+            || pattern == null)
+        {
+            throw new InvalidOperationException("Protocol test fixture could not be constructed.");
+        }
+        ProtocolImpactPoint point = pattern.Points[pointIndex];
+        double velocity = (threat.MinimumVelocityMetresPerSecond
+            + threat.MaximumVelocityMetresPerSecond) * 0.5d;
+        var protocol = new ProtocolShotEvidence(
+            fixtureId,
+            mapping.TemplateId,
+            ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
+            velocity,
+            mapping.InstalledProjectileMassKilograms,
+            mapping.InstalledProjectileDiameterMetres,
+            0d,
+            point.LocalXMetres,
+            point.LocalYMetres,
+            1d,
+            1.5d,
+            threat.TestDistanceMetres,
+            true,
+            false,
+            velocity);
+        return new CampaignShotEvidence(
+            fixtureId,
+            chainId,
+            "protocol-fixture",
+            "ArmoredSteel",
+            campaignCase.ArmorClass,
+            1,
+            17 + pointIndex,
+            12345 + pointIndex,
+            "profile",
+            mapping.TemplateId,
+            1d,
+            LayerZero,
+            "STOPPED",
+            false,
+            1,
+            1,
+            0d,
+            0d,
+            protocol);
+    }
+
+    private static bool RejectsUnavailableProtocolCampaign()
+    {
+        try
+        {
+            _ = CampaignCatalog.GostSimulationScreening("gost-34286-br2-9x21-p-7n28");
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
+        }
+    }
+
+    private static string CreateInvalidatedProtocolReport()
+    {
+        CampaignDefinition definition = CampaignCatalog.GostSimulationScreening(
+            "gost-34286-br4-7.62x39-ps-57-n-231");
+        CampaignCaseDefinition campaignCase = definition.Cases[0];
+        var tracker = new CampaignRunTracker(definition, 76UL);
+        tracker.Start();
+        tracker.AttachFixture(1600L);
+        tracker.RecordShot(ProtocolEvidence(campaignCase, 1600L, "corrupt-a", 0));
+        tracker.RecordShot(ProtocolEvidence(campaignCase, 1600L, "corrupt-b", 1));
+        tracker.RecordShot(ProtocolEvidence(campaignCase, 1600L, "corrupt-c", 0));
+        return PhysicalReportDocumentWriter.Build(
+            "[]",
+            Array.Empty<PhysicalTransitionRecord>(),
+            definition,
+            tracker.Snapshot());
     }
 }

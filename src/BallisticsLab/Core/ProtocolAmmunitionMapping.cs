@@ -13,6 +13,7 @@ namespace BallisticsLab.Core
     internal sealed class ProtocolAmmunitionMapping
     {
         private const double MassComparisonToleranceKilograms = 0.0000001d;
+        private const double DiameterComparisonToleranceMetres = 0.0000001d;
 
         private ProtocolAmmunitionMapping(
             ProtocolAmmunitionIdentityStatus identityStatus,
@@ -21,6 +22,7 @@ namespace BallisticsLab.Core
             string installedDisplayName,
             string installedCaliber,
             double installedProjectileMassKilograms,
+            double installedProjectileDiameterMetres,
             double localeProjectileMassKilograms,
             double installedInitialSpeedMetresPerSecond,
             string englishDesignationEvidence,
@@ -60,12 +62,16 @@ namespace BallisticsLab.Core
                 installedProjectileMassKilograms,
                 nameof(installedProjectileMassKilograms));
             ValidatePositive(
+                installedProjectileDiameterMetres,
+                nameof(installedProjectileDiameterMetres));
+            ValidatePositive(
                 localeProjectileMassKilograms,
                 nameof(localeProjectileMassKilograms));
             ValidatePositive(
                 installedInitialSpeedMetresPerSecond,
                 nameof(installedInitialSpeedMetresPerSecond));
             InstalledProjectileMassKilograms = installedProjectileMassKilograms;
+            InstalledProjectileDiameterMetres = installedProjectileDiameterMetres;
             LocaleProjectileMassKilograms = localeProjectileMassKilograms;
             InstalledInitialSpeedMetresPerSecond = installedInitialSpeedMetresPerSecond;
             EnglishDesignationEvidence = Required(
@@ -83,6 +89,7 @@ namespace BallisticsLab.Core
         internal string InstalledDisplayName { get; }
         internal string InstalledCaliber { get; }
         internal double InstalledProjectileMassKilograms { get; }
+        internal double InstalledProjectileDiameterMetres { get; }
         internal double LocaleProjectileMassKilograms { get; }
         internal double InstalledInitialSpeedMetresPerSecond { get; }
         internal string EnglishDesignationEvidence { get; }
@@ -101,6 +108,7 @@ namespace BallisticsLab.Core
             string installedDisplayName,
             string installedCaliber,
             double installedProjectileMassKilograms,
+            double installedProjectileDiameterMetres,
             double localeProjectileMassKilograms,
             double installedInitialSpeedMetresPerSecond,
             string englishDesignationEvidence,
@@ -119,6 +127,7 @@ namespace BallisticsLab.Core
                 installedDisplayName,
                 installedCaliber,
                 installedProjectileMassKilograms,
+                installedProjectileDiameterMetres,
                 localeProjectileMassKilograms,
                 installedInitialSpeedMetresPerSecond,
                 englishDesignationEvidence,
@@ -138,6 +147,7 @@ namespace BallisticsLab.Core
                 0d,
                 0d,
                 0d,
+                0d,
                 string.Empty,
                 string.Empty,
                 string.Empty,
@@ -151,6 +161,15 @@ namespace BallisticsLab.Core
                 && HasInstalledTemplate
                 && Math.Abs(projectileMassKilograms - InstalledProjectileMassKilograms)
                     <= MassComparisonToleranceKilograms;
+        }
+
+        internal bool MatchesRecordedProjectileDiameter(double projectileDiameterMetres)
+        {
+            return IsFinite(projectileDiameterMetres)
+                && projectileDiameterMetres > 0d
+                && HasInstalledTemplate
+                && Math.Abs(projectileDiameterMetres - InstalledProjectileDiameterMetres)
+                    <= DiameterComparisonToleranceMetres;
         }
 
         internal bool InstalledMassMatchesNominal(double nominalProjectileMassKilograms)

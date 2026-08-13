@@ -39,6 +39,7 @@ namespace BallisticsLab.Runtime
         private static Vector2 _scroll;
         private static int _layerCount = 1;
         private static int _selectedLayer;
+        private static int _protocolThreatIndex;
         private static float _distance = 8f;
         private static float _spacing = 0.15f;
         private static float _thickness = 0.0127f;
@@ -559,8 +560,25 @@ namespace BallisticsLab.Runtime
             GUILayout.Box(CampaignRuntimeController.Describe(), GUILayout.ExpandWidth(true));
             if (CampaignRuntimeController.IsRunning)
             {
-                GUILayout.Label(
-                    "Shoot one round at the center marker. The Lab waits for the full shot chain, records the result, restores durability, and advances the fixture.");
+                if (CampaignRuntimeController.TryGetCurrentCase(
+                        out CampaignCaseDefinition? activeCase)
+                    && activeCase?.IsProtocolSequence == true
+                    && activeCase.TryGetProtocolDefinition(
+                        out ProtocolThreatDefinition? activeThreat,
+                        out ProtocolAmmunitionMapping? activeMapping)
+                    && activeThreat != null
+                    && activeMapping != null)
+                {
+                    GUILayout.Label(
+                        "Use " + activeMapping.InstalledDisplayName + " ("
+                        + activeThreat.CartridgeDesignation
+                        + "). Shoot only the current red marker. Qualifying hits keep accumulated damage; any rejected hit starts a fresh sample.");
+                }
+                else
+                {
+                    GUILayout.Label(
+                        "Shoot one round at the center marker. The Lab waits for the full shot chain, records the result, restores durability, and advances the fixture.");
+                }
                 if (GUILayout.Button("STOP GUIDED CAMPAIGN", buttonStyle, GUILayout.Height(52f)))
                 {
                     StopCampaign("Guided campaign stopped. Captured attempts remain in reports.");
@@ -606,6 +624,43 @@ namespace BallisticsLab.Runtime
                 StartCampaign(CampaignCatalog.PhysicalMaterialMatrix());
             }
             GUILayout.EndHorizontal();
+            IReadOnlyList<ProtocolThreatDefinition> threats = CampaignCatalog.ProtocolScreeningThreats;
+            if (threats.Count != 0)
+            {
+                _protocolThreatIndex = Math.Max(
+                    0,
+                    Math.Min(_protocolThreatIndex, threats.Count - 1));
+                ProtocolThreatDefinition threat = threats[_protocolThreatIndex];
+                ProtocolAmmunitionMapping mapping = threat.AmmunitionMappings.Single(candidate =>
+                    candidate.CanQualifySimulationScreening);
+                GUILayout.Space(8f);
+                GUILayout.Label("GOST-ORIENTED SIMULATION SCREENING", sectionStyle);
+                GUILayout.Box(
+                    threat.ProtectionClass + " | " + threat.CartridgeDesignation + "\n"
+                    + mapping.InstalledDisplayName + " | five shots on one sample | "
+                    + threat.TestDistanceMetres.ToString("0.#", CultureInfo.InvariantCulture) + " m",
+                    GUILayout.ExpandWidth(true));
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("PREVIOUS", buttonStyle, GUILayout.Height(46f)))
+                {
+                    _protocolThreatIndex = (_protocolThreatIndex + threats.Count - 1) % threats.Count;
+                }
+                if (GUILayout.Button("NEXT", buttonStyle, GUILayout.Height(46f)))
+                {
+                    _protocolThreatIndex = (_protocolThreatIndex + 1) % threats.Count;
+                }
+                GUILayout.EndHorizontal();
+                if (GUILayout.Button(
+                        "START " + threat.ProtectionClass + " SCREENING\n"
+                        + mapping.InstalledDisplayName,
+                        buttonStyle,
+                        GUILayout.Height(66f)))
+                {
+                    StartCampaign(CampaignCatalog.GostSimulationScreening(threat.ThreatId));
+                }
+                GUILayout.Label(
+                    "This is a non-certifying simulation screen. The Lab guides placement and records evidence; it never fires the weapon.");
+            }
             GUILayout.Label(
                 "The campaign automates fixture selection, repeat counts, evidence gates, resets, and result matrices. It does not fire the weapon.");
         }
@@ -1023,7 +1078,10 @@ namespace BallisticsLab.Runtime
                 CampaignRuntimeController.Stop();
                 return;
             }
-            _status = "Campaign ready. Shoot one round at the center marker.";
+            if (string.IsNullOrEmpty(_status))
+            {
+                _status = "Campaign ready. Shoot the current marker.";
+            }
             SetPanelVisible(false);
         }
 
@@ -1094,6 +1152,19 @@ namespace BallisticsLab.Runtime
                     out CampaignAttemptRecord? attempt)
                 || attempt == null)
             {
+                if (CampaignRuntimeController.TryConsumeFixtureRestartRequest(
+                        out string restartReason))
+                {
+                    if (!PlaceCampaignFixture())
+                    {
+                        StopCampaign(restartReason + " A fresh protocol sample could not be placed.");
+                    }
+                    else
+                    {
+                        _status = restartReason
+                            + " The damaged sample was discarded; a fresh sample is ready at marker 1.";
+                    }
+                }
                 return;
             }
 
@@ -1130,12 +1201,33 @@ namespace BallisticsLab.Runtime
 
             if (snapshot.State == CampaignRunState.AwaitingFixture)
             {
+                bool restartedProtocolSample = attempt.Status != CampaignAttemptStatus.Accepted
+                    && CampaignRuntimeController.TryGetCurrentCase(
+                        out CampaignCaseDefinition? retryCase)
+                    && retryCase?.IsProtocolSequence == true;
                 if (!PlaceCampaignFixture())
                 {
                     StopCampaign(result + " The next fixture could not be placed; campaign stopped.");
                     return;
                 }
-                _status = result + " Next fixture placed; shoot its center marker.";
+                _status = restartedProtocolSample
+                    ? result + " The partial sample was invalidated; a fresh sample is ready at marker 1."
+                    : result + " Next fixture placed; shoot its marker.";
+                return;
+            }
+
+            if (snapshot.State == CampaignRunState.AwaitingShot
+                && attempt.Status == CampaignAttemptStatus.Accepted
+                && CampaignRuntimeController.TryGetCurrentCase(
+                    out CampaignCaseDefinition? continuingCase)
+                && continuingCase?.IsProtocolSequence == true)
+            {
+                if (!ConfigureCampaignAimMarker(out string markerInstruction))
+                {
+                    StopCampaign(result + " The next protocol marker could not be configured; campaign stopped.");
+                    return;
+                }
+                _status = result + " Durability preserved; " + markerInstruction;
                 return;
             }
 
@@ -1191,8 +1283,48 @@ namespace BallisticsLab.Runtime
                     + _rig.FixtureId.ToString(CultureInfo.InvariantCulture) + ".";
                 return false;
             }
+            if (!ConfigureCampaignAimMarker(out string markerInstruction))
+            {
+                _status = "Campaign marker setup failed for fixture #"
+                    + _rig.FixtureId.ToString(CultureInfo.InvariantCulture) + ".";
+                return false;
+            }
             _status = "Campaign case " + campaignCase.CaseId + " placed as fixture #"
-                + _rig.FixtureId.ToString(CultureInfo.InvariantCulture) + ".";
+                + _rig.FixtureId.ToString(CultureInfo.InvariantCulture) + "; "
+                + markerInstruction;
+            return true;
+        }
+
+        private static bool ConfigureCampaignAimMarker(out string instruction)
+        {
+            instruction = "shoot the center marker";
+            if (_rig == null
+                || !CampaignRuntimeController.TryGetCurrentCase(
+                    out CampaignCaseDefinition? campaignCase)
+                || campaignCase == null)
+            {
+                return false;
+            }
+            if (!campaignCase.IsProtocolSequence)
+            {
+                return true;
+            }
+            if (!CampaignRuntimeController.TryGetExpectedImpactPoint(
+                    FixtureRig.PlateFaceWidthMetres,
+                    FixtureRig.PlateFaceHeightMetres,
+                    out ProtocolImpactPoint point,
+                    out double projectileDiameterMetres,
+                    out int shotNumber,
+                    out int requiredShots,
+                    out string failure))
+            {
+                instruction = failure;
+                return false;
+            }
+            _rig.SetAimPoint(point, projectileDiameterMetres);
+            instruction = "shoot red marker "
+                + shotNumber.ToString(CultureInfo.InvariantCulture) + "/"
+                + requiredShots.ToString(CultureInfo.InvariantCulture);
             return true;
         }
 

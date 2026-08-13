@@ -14,12 +14,17 @@ namespace BallisticsLab.Runtime.Fixtures
     {
         private const float BackstopFaceClearance = 1f;
         private const float BackstopThickness = 0.08f;
+        internal const float PlateFaceWidthMetres = 1f;
+        internal const float PlateFaceHeightMetres = 1.5f;
 
         private static long _nextFixtureId;
 
         private readonly GameObject _root;
         private readonly List<LabPlateRuntime> _plates = new List<LabPlateRuntime>();
         private readonly List<Material> _materials = new List<Material>();
+        private LineRenderer? _aimHorizontal;
+        private LineRenderer? _aimVertical;
+        private float _aimMarkerZ;
 
         private FixtureRig(GameObject root, long fixtureId)
         {
@@ -119,7 +124,10 @@ namespace BallisticsLab.Runtime.Fixtures
                     0f,
                     LabPolicies.LayerCenterOffset(index, spacing, thickness));
                 plate.transform.localRotation = Quaternion.identity;
-                plate.transform.localScale = new Vector3(1f, 1.5f, thickness);
+                plate.transform.localScale = new Vector3(
+                    PlateFaceWidthMetres,
+                    PlateFaceHeightMetres,
+                    thickness);
 
                 Material material = CreateMaterial(MaterialColor(preset.Material));
                 _materials.Add(material);
@@ -165,6 +173,29 @@ namespace BallisticsLab.Runtime.Fixtures
             {
                 plate.ResetDurability();
             }
+        }
+
+        internal void SetAimPoint(ProtocolImpactPoint point, double projectileDiameterMetres)
+        {
+            if (_aimHorizontal == null || _aimVertical == null)
+            {
+                return;
+            }
+            float diameter = (float)projectileDiameterMetres;
+            float halfLength = (float)point.TargetToleranceMetres * 0.9f;
+            float width = Mathf.Clamp(diameter * 0.4f, 0.003f, 0.008f);
+            float x = (float)point.LocalXMetres;
+            float y = (float)point.LocalYMetres;
+            ConfigureAimLine(
+                _aimHorizontal,
+                new Vector3(x - halfLength, y, _aimMarkerZ),
+                new Vector3(x + halfLength, y, _aimMarkerZ),
+                width);
+            ConfigureAimLine(
+                _aimVertical,
+                new Vector3(x, y - halfLength, _aimMarkerZ),
+                new Vector3(x, y + halfLength, _aimMarkerZ),
+                width);
         }
 
         public void Dispose()
@@ -233,12 +264,36 @@ namespace BallisticsLab.Runtime.Fixtures
                 color = new Color(1f, 0.24f, 0.12f, 1f)
             };
             _materials.Add(material);
-            float z = -thickness * 0.51f - 0.002f;
-            CreateAimLine("BallisticsLab_AimHorizontal", material, new Vector3(-0.12f, 0f, z), new Vector3(0.12f, 0f, z));
-            CreateAimLine("BallisticsLab_AimVertical", material, new Vector3(0f, -0.12f, z), new Vector3(0f, 0.12f, z));
+            _aimMarkerZ = -thickness * 0.51f - 0.002f;
+            _aimHorizontal = CreateAimLine(
+                "BallisticsLab_AimHorizontal",
+                material,
+                new Vector3(-0.12f, 0f, _aimMarkerZ),
+                new Vector3(0.12f, 0f, _aimMarkerZ));
+            _aimVertical = CreateAimLine(
+                "BallisticsLab_AimVertical",
+                material,
+                new Vector3(0f, -0.12f, _aimMarkerZ),
+                new Vector3(0f, 0.12f, _aimMarkerZ));
         }
 
-        private void CreateAimLine(string name, Material material, Vector3 start, Vector3 end)
+        private static void ConfigureAimLine(
+            LineRenderer line,
+            Vector3 start,
+            Vector3 end,
+            float width)
+        {
+            line.SetPosition(0, start);
+            line.SetPosition(1, end);
+            line.startWidth = width;
+            line.endWidth = width;
+        }
+
+        private LineRenderer CreateAimLine(
+            string name,
+            Material material,
+            Vector3 start,
+            Vector3 end)
         {
             GameObject lineObject = new GameObject(name)
             {
@@ -255,6 +310,7 @@ namespace BallisticsLab.Runtime.Fixtures
             line.endWidth = 0.012f;
             line.startColor = material.color;
             line.endColor = material.color;
+            return line;
         }
     }
 }

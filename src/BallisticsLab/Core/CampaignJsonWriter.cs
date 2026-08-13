@@ -82,6 +82,17 @@ namespace BallisticsLab.Core
                 Boolean(builder, ref first, "backstopEnabled", campaignCase.BackstopEnabled);
                 Number(builder, ref first, "requiredRepetitions", campaignCase.RequiredRepetitions);
                 String(builder, ref first, "resetPolicy", campaignCase.ResetPolicy.ToString());
+                String(
+                    builder,
+                    ref first,
+                    "shotSequencePolicy",
+                    campaignCase.ShotSequencePolicy.ToString());
+                String(builder, ref first, "protocolThreatId", campaignCase.ProtocolThreatId);
+                String(
+                    builder,
+                    ref first,
+                    "protocolAmmunitionTemplateId",
+                    campaignCase.ProtocolAmmunitionTemplateId);
                 Number(builder, ref first, "minimumVelocityFraction", campaignCase.MinimumVelocityFraction);
                 Number(builder, ref first, "maximumVelocityFraction", campaignCase.MaximumVelocityFraction);
                 Boolean(builder, ref first, "requireBackstopEvidence", campaignCase.RequireBackstopEvidence);
@@ -122,10 +133,16 @@ namespace BallisticsLab.Core
                 Number(builder, ref first, "attemptOrdinal", attempt.AttemptOrdinal);
                 Number(builder, ref first, "caseIndex", attempt.CaseIndex);
                 String(builder, ref first, "caseId", attempt.CaseId);
+                Number(builder, ref first, "sampleOrdinal", attempt.SampleOrdinal);
                 Number(builder, ref first, "repetitionIndex", attempt.RepetitionIndex);
                 Number(builder, ref first, "attemptIndex", attempt.AttemptIndex);
                 Number(builder, ref first, "labCaseSeed", attempt.LabCaseSeed);
                 String(builder, ref first, "status", attempt.Status.ToString());
+                String(
+                    builder,
+                    ref first,
+                    "protocolQualificationReason",
+                    attempt.ProtocolQualificationReason?.ToString() ?? string.Empty);
                 Number(builder, ref first, "fixtureId", evidence.FixtureId);
                 String(builder, ref first, "chainId", evidence.ChainId);
                 String(builder, ref first, "fixtureTemplateId", evidence.FixtureTemplateId);
@@ -290,6 +307,12 @@ namespace BallisticsLab.Core
                     "missingConservationRejectCount",
                     row.MissingConservationRejectCount);
                 Number(builder, ref rowFirst, "conservationRejectCount", row.ConservationRejectCount);
+                Number(builder, ref rowFirst, "protocolRejectCount", row.ProtocolRejectCount);
+                Number(
+                    builder,
+                    ref rowFirst,
+                    "sequenceInvalidatedCount",
+                    row.SequenceInvalidatedCount);
                 Number(builder, ref rowFirst, "meanVelocityFraction", row.MeanVelocityFraction);
                 Number(builder, ref rowFirst, "meanLayersHit", row.MeanLayersHit);
                 Number(

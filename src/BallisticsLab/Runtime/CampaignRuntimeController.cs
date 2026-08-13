@@ -22,9 +22,13 @@ namespace BallisticsLab.Runtime
         private static CampaignAttemptRecord? _latestAttempt;
         private static readonly HashSet<string> IgnoredChainIds =
             new HashSet<string>(StringComparer.Ordinal);
+        private static readonly List<string> QueuedProtocolChainIds = new List<string>();
+        private static readonly Dictionary<string, DateTime> QueuedProtocolChainTimes =
+            new Dictionary<string, DateTime>(StringComparer.Ordinal);
         private static string _pendingChainId = string.Empty;
         private static DateTime _pendingLastObservedUtc;
         private static string _lastFailure = string.Empty;
+        private static bool _fixtureRestartRequested;
 
         internal static bool HasCampaign
         {
@@ -74,7 +78,9 @@ namespace BallisticsLab.Runtime
                 _pendingChainId = string.Empty;
                 _pendingLastObservedUtc = DateTime.MinValue;
                 _lastFailure = string.Empty;
+                _fixtureRestartRequested = false;
                 IgnoredChainIds.Clear();
+                ClearQueuedProtocolChains();
                 EvidenceRevision.ResetTimestamp();
                 return true;
             }
@@ -90,6 +96,8 @@ namespace BallisticsLab.Runtime
                 }
                 _pendingChainId = string.Empty;
                 _pendingLastObservedUtc = DateTime.MinValue;
+                _fixtureRestartRequested = false;
+                ClearQueuedProtocolChains();
                 if (_tracker.Snapshot().Attempts.Count != 0)
                 {
                     MarkEvidenceChanged();
@@ -108,7 +116,9 @@ namespace BallisticsLab.Runtime
                 _pendingChainId = string.Empty;
                 _pendingLastObservedUtc = DateTime.MinValue;
                 _lastFailure = string.Empty;
+                _fixtureRestartRequested = false;
                 IgnoredChainIds.Clear();
+                ClearQueuedProtocolChains();
                 EvidenceRevision.ResetTimestamp();
             }
         }
@@ -166,6 +176,11 @@ namespace BallisticsLab.Runtime
                 }
                 else if (!string.Equals(_pendingChainId, record.ChainId, StringComparison.Ordinal))
                 {
+                    if (CurrentCaseIsProtocolSequence(_tracker, _definition))
+                    {
+                        QueueProtocolChain(record.ChainId, DateTime.UtcNow);
+                        return;
+                    }
                     IgnoredChainIds.Add(record.ChainId);
                     return;
                 }
@@ -226,6 +241,13 @@ namespace BallisticsLab.Runtime
                 lock (Sync)
                 {
                     _lastFailure = "The pending chain did not contain valid fixture evidence.";
+                    if (ReferenceEquals(_tracker, tracker)
+                        && tracker.InvalidateCurrentProtocolSample())
+                    {
+                        _fixtureRestartRequested = true;
+                        PromoteOrDiscardQueuedProtocolChains(tracker);
+                        MarkEvidenceChanged();
+                    }
                     _pendingChainId = string.Empty;
                     _pendingLastObservedUtc = DateTime.MinValue;
                 }
@@ -239,7 +261,9 @@ namespace BallisticsLab.Runtime
                 {
                     return false;
                 }
-                attempt = tracker.RecordShot(evidence);
+                attempt = tracker.RecordShot(
+                    evidence,
+                    deferProtocolCompletion: QueuedProtocolChainIds.Count != 0);
                 _pendingChainId = string.Empty;
                 _pendingLastObservedUtc = DateTime.MinValue;
                 if (attempt == null)
@@ -249,6 +273,7 @@ namespace BallisticsLab.Runtime
                 }
                 _latestAttempt = attempt;
                 _lastFailure = string.Empty;
+                PromoteOrDiscardQueuedProtocolChains(tracker);
                 MarkEvidenceChanged();
                 return true;
             }
@@ -273,6 +298,84 @@ namespace BallisticsLab.Runtime
                     return false;
                 }
                 campaignCase = _definition.Cases[snapshot.CurrentCaseIndex];
+                return true;
+            }
+        }
+
+        internal static bool TryConsumeFixtureRestartRequest(out string reason)
+        {
+            lock (Sync)
+            {
+                if (!_fixtureRestartRequested)
+                {
+                    reason = string.Empty;
+                    return false;
+                }
+                _fixtureRestartRequested = false;
+                reason = _lastFailure;
+                return true;
+            }
+        }
+
+        internal static bool TryGetExpectedImpactPoint(
+            double faceWidthMetres,
+            double faceHeightMetres,
+            out ProtocolImpactPoint point,
+            out double projectileDiameterMetres,
+            out int shotNumber,
+            out int requiredShots,
+            out string failure)
+        {
+            lock (Sync)
+            {
+                point = default;
+                projectileDiameterMetres = 0d;
+                shotNumber = 0;
+                requiredShots = 0;
+                failure = string.Empty;
+                if (_tracker == null || _definition == null)
+                {
+                    failure = "No guided campaign is loaded.";
+                    return false;
+                }
+                CampaignRunSnapshot snapshot = _tracker.Snapshot();
+                if (snapshot.CurrentCaseIndex < 0
+                    || snapshot.CurrentCaseIndex >= _definition.Cases.Count)
+                {
+                    failure = "The campaign has no current case.";
+                    return false;
+                }
+                CampaignCaseDefinition campaignCase = _definition.Cases[snapshot.CurrentCaseIndex];
+                if (!campaignCase.IsProtocolSequence)
+                {
+                    return false;
+                }
+                if (!campaignCase.TryGetProtocolDefinition(
+                        out ProtocolThreatDefinition? threat,
+                        out ProtocolAmmunitionMapping? mapping)
+                    || threat == null
+                    || mapping == null
+                    || !ProtocolImpactPattern.TryCreate(
+                        threat,
+                        mapping,
+                        faceWidthMetres,
+                        faceHeightMetres,
+                        out ProtocolImpactPattern? pattern,
+                        out failure)
+                    || pattern == null
+                    || snapshot.CurrentRepetitionIndex < 0
+                    || snapshot.CurrentRepetitionIndex >= pattern.Points.Count)
+                {
+                    if (string.IsNullOrEmpty(failure))
+                    {
+                        failure = "The next protocol impact point could not be resolved.";
+                    }
+                    return false;
+                }
+                point = pattern.Points[snapshot.CurrentRepetitionIndex];
+                projectileDiameterMetres = pattern.ProjectileDiameterMetres;
+                shotNumber = snapshot.CurrentRepetitionIndex + 1;
+                requiredShots = threat.RequiredQualifyingShots;
                 return true;
             }
         }
@@ -314,16 +417,32 @@ namespace BallisticsLab.Runtime
                     : "all cases processed";
                 string latest = _latestAttempt == null
                     ? string.Empty
-                    : " | last " + _latestAttempt.Status;
+                    : " | last " + _latestAttempt.Status
+                        + (_latestAttempt.ProtocolQualificationReason.HasValue
+                            ? " (" + _latestAttempt.ProtocolQualificationReason.Value + ")"
+                            : string.Empty);
+                CampaignCaseDefinition? currentCase = snapshot.CurrentCaseIndex >= 0
+                    && snapshot.CurrentCaseIndex < _definition.Cases.Count
+                        ? _definition.Cases[snapshot.CurrentCaseIndex]
+                        : null;
+                string sequence = currentCase?.IsProtocolSequence == true
+                    ? " | sample shot "
+                        + (snapshot.CurrentRepetitionIndex + 1).ToString(CultureInfo.InvariantCulture)
+                        + "/" + currentCase.RequiredRepetitions.ToString(CultureInfo.InvariantCulture)
+                    : string.Empty;
                 string ignored = IgnoredChainIds.Count == 0
                     ? string.Empty
                     : " | " + IgnoredChainIds.Count.ToString(CultureInfo.InvariantCulture)
                         + " rapid extra chain(s) ignored";
+                string queued = QueuedProtocolChainIds.Count == 0
+                    ? string.Empty
+                    : " | " + QueuedProtocolChainIds.Count.ToString(CultureInfo.InvariantCulture)
+                        + " rapid protocol chain(s) queued";
                 string failure = string.IsNullOrEmpty(_lastFailure)
                     ? string.Empty
                     : " | " + _lastFailure;
                 return _definition.Name + " | " + snapshot.State + " | " + position
-                    + " | " + progress + latest + ignored + failure;
+                    + " | " + progress + sequence + latest + queued + ignored + failure;
             }
         }
 
@@ -446,6 +565,57 @@ namespace BallisticsLab.Runtime
             return state == CampaignRunState.AwaitingFixture
                 || state == CampaignRunState.AwaitingShot
                 || state == CampaignRunState.AwaitingReset;
+        }
+
+        private static bool CurrentCaseIsProtocolSequence(
+            CampaignRunTracker tracker,
+            CampaignDefinition? definition)
+        {
+            if (definition == null)
+            {
+                return false;
+            }
+            CampaignRunSnapshot snapshot = tracker.Snapshot();
+            return snapshot.CurrentCaseIndex >= 0
+                && snapshot.CurrentCaseIndex < definition.Cases.Count
+                && definition.Cases[snapshot.CurrentCaseIndex].IsProtocolSequence;
+        }
+
+        private static void QueueProtocolChain(string chainId, DateTime observedUtc)
+        {
+            if (!QueuedProtocolChainTimes.ContainsKey(chainId))
+            {
+                QueuedProtocolChainIds.Add(chainId);
+            }
+            QueuedProtocolChainTimes[chainId] = observedUtc;
+        }
+
+        private static void PromoteOrDiscardQueuedProtocolChains(CampaignRunTracker tracker)
+        {
+            if (QueuedProtocolChainIds.Count == 0)
+            {
+                return;
+            }
+            if (tracker.Snapshot().State == CampaignRunState.AwaitingShot)
+            {
+                string next = QueuedProtocolChainIds[0];
+                QueuedProtocolChainIds.RemoveAt(0);
+                _pendingChainId = next;
+                _pendingLastObservedUtc = QueuedProtocolChainTimes[next];
+                QueuedProtocolChainTimes.Remove(next);
+                return;
+            }
+            for (int index = 0; index < QueuedProtocolChainIds.Count; index++)
+            {
+                IgnoredChainIds.Add(QueuedProtocolChainIds[index]);
+            }
+            ClearQueuedProtocolChains();
+        }
+
+        private static void ClearQueuedProtocolChains()
+        {
+            QueuedProtocolChainIds.Clear();
+            QueuedProtocolChainTimes.Clear();
         }
 
         private static bool IsFiniteNonNegative(float value)

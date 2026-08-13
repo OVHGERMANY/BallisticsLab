@@ -11,7 +11,7 @@ Snapshot date: 2026-08-13
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
 - Currently deployed and playtested DLL SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
-- Current strict-build candidate SHA-256: `B23AB85E75956F5A60340E378EF9191D9833D7959F82CDD93237214E60D14710`
+- Current strict-build candidate SHA-256: `EA6B10BE1F2824A5132A845403AFC75528DEE13E22ADE81E98BB88C3912B2540`
 - Default configuration: disabled
 
 The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
@@ -32,23 +32,26 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Offline mass and energy closure validation across parent allocation, target spall, output counts, modeled losses, residual energy, output energy, and closure error.
 - Built-in controlled-fixture and seven-material campaigns with exact installed material/class selectors plus explicit velocity, layer, backstop, physical-transition, and conservation gates.
 - One accepted complete chain per attempt, exact fixture and lineage correlation, deterministic duplicate rejection, and a 350 ms evidence-settle window before evaluation.
-- Automatic durability reset between repeated shots, automatic fixture advancement between cases, and an accessible guided-campaign panel that does not fire the weapon.
+- Automatic durability reset between ordinary repeated shots, automatic fixture advancement between cases, and an accessible guided-campaign panel that does not fire the weapon.
 - Stable case-identification seeds derived from a configurable Lab seed. These seeds label repeatable cases; they do not replace EFT's observed shot seed.
 - Schema-4 campaign definitions, detached attempt evidence, and result matrices whose case seeds, statuses, counts, means, maxima, and completion state are independently recomputed by the offline validator.
 - A completed or stopped campaign cannot be silently replaced. Evidence revisions remain monotonic across replacements, unsaved attempts are checkpointed first, and a failed checkpoint blocks the new campaign start.
 - Per-attempt protocol evidence records absolute target-impact speed, projectile mass and diameter, actual incidence, fixture-local hit coordinates, face dimensions, fixture distance, and witness-backstop state without retaining a pooled shot or Unity object.
 - A nominal GOST 34286-2017 catalog represents all eight Br1-through-Br6 threat rows, including the two Br4 and two Br5 threats. The supported item and English/Russian locale snapshots establish five exact designation mappings, the `57-N-181S-01` Br1 variant, and the absence of both Br5 designations.
-- Mapping metadata keeps installed simulation mass, locale-described mass, initial speed, internal name, display name, caliber, and exact designation evidence separate. The evaluator admits only exact designations whose recorded projectile mass matches the installed simulation mass, while preserving flags for nominal-mass and locale-mass differences. Variants and unavailable threats fail closed.
+- Mapping metadata keeps installed simulation mass and diameter, locale-described mass, initial speed, internal name, display name, caliber, and exact designation evidence separate. The evaluator admits only exact designations whose recorded projectile mass and diameter match the installed simulation state, while preserving flags for nominal-mass and locale-mass differences. Variants and unavailable threats fail closed.
 - A pure GOST-oriented screening evaluator enforces the five-shot count, same-sample identity, five-caliber edge and neighbour spacing, 5-degree incidence limit, test-distance tolerance, velocity window, and the standard's more-severe low-velocity penetration and high-velocity stop exceptions.
+- Guided protocol campaigns exist for the four exact designations whose Br class also has an installed armored-steel sample. The exact Br2 ammunition mapping remains available to the pure evaluator, but it is not exposed as a runnable campaign because the supported database has no class-2 armored-steel plate. A deterministic five-region marker plan uses the installed projectile diameter and a tolerance/safety envelope that preserves at least five diameters between every accepted hit region and every plate edge.
+- Qualifying protocol hits retain the same fixture identity and accumulated durability. A rejected, malformed, or queued extra hit invalidates the partial sample, preserves its attempt evidence, marks prior hits as sequence-invalidated, and requires a fresh fixture instead of restoring damaged armor.
+- Schema-4 campaign evidence records the shot-sequence policy, threat and ammunition mapping, sample ordinal, per-shot protocol qualification reason, protocol rejection count, and invalidated-sequence count. Offline replay recomputes the final statuses and cursor.
 - Screening results are explicitly non-certifying. Runtime sampling reads cached EFT trajectory nodes without advancing the trajectory, measures cumulative path length, and interpolates velocity at 3 metres. A shot whose cached path is shorter remains `TargetImpactProxy` and cannot satisfy the protocol basis.
 
-This development layer has not been deployed or tested in-game. Same-sample five-point runtime sequencing and the formal protocol report remain next.
+This development layer has not been deployed or tested in-game. The formal protocol report remains next.
 
 ## Automated and startup verification
 
 - Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
-- Pure and installed-database validation: 124 checks passed.
-- Validation with all installed-runtime reports: 131 checks passed.
+- Pure and installed-database validation: 132 checks passed.
+- Validation with all installed-runtime reports: 139 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -60,7 +63,7 @@ This development layer has not been deployed or tested in-game. Same-sample five
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 - Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `B23AB85E...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `EA6B10BE...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
 ## Installed runtime evidence
 
@@ -137,9 +140,8 @@ Historical evidence does not satisfy a missing `0.2.8` gate.
 
 ## Remaining development sequence
 
-- Verify exact EFT ammunition-template mappings for each nominal protocol threat; do not infer mappings from display names alone.
-- Add a same-sample five-point protocol campaign that preserves durability between qualifying shots and places impacts at least five projectile diameters from every edge and earlier qualifying hit.
-- Add protocol reports and cross-campaign material comparisons that distinguish simulation-screening outcome from accredited certification.
+- Add a dedicated protocol result document and cross-campaign material comparisons that distinguish simulation-screening outcome from accredited certification.
+- Review the guided protocol panel and marker visibility offline; in-game interaction remains deferred to the final integrated campaign.
 - Run the final integrated in-game campaign only after every offline development layer is complete.
 
 Existing Granit BR4 and BR5 labels are repeatable EFT database presets only. They are not certification tests.

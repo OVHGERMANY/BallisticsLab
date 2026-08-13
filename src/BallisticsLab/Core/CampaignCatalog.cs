@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 
 namespace BallisticsLab.Core
 {
@@ -10,6 +13,17 @@ namespace BallisticsLab.Core
         private const double DefaultThicknessMetres = 0.0127d;
         private const double DefaultDistanceMetres = 8d;
         private const double MaximumUnallocatedEnergyJoules = 1000000000000d;
+        private const int MinimumInstalledSteelArmorClass = 3;
+        private const int MaximumInstalledSteelArmorClass = 6;
+        private static readonly IReadOnlyList<ProtocolThreatDefinition> ScreeningThreats =
+            Array.AsReadOnly(GostProtocolCatalog.All
+                .Where(threat => threat.AmmunitionMappings.Count(mapping =>
+                    mapping.CanQualifySimulationScreening) == 1
+                    && TryParseInstalledSteelArmorClass(threat, out _))
+                .ToArray());
+
+        internal static IReadOnlyList<ProtocolThreatDefinition> ProtocolScreeningThreats =>
+            ScreeningThreats;
 
         internal static CampaignDefinition ControlledFixtureBaseline()
         {
@@ -52,6 +66,69 @@ namespace BallisticsLab.Core
                     PhysicalMaterialCase("aramid", "Aramid", "Aramid", armorClass: 2),
                     PhysicalMaterialCase("combined", "Combined", "Combined")
                 });
+        }
+
+        internal static CampaignDefinition GostSimulationScreening(string threatId)
+        {
+            if (!GostProtocolCatalog.TryGet(threatId, out ProtocolThreatDefinition? threat)
+                || threat == null)
+            {
+                throw new ArgumentException("Unknown protocol threat.", nameof(threatId));
+            }
+            ProtocolAmmunitionMapping[] exactMappings = threat.AmmunitionMappings
+                .Where(mapping => mapping.CanQualifySimulationScreening)
+                .ToArray();
+            if (exactMappings.Length != 1
+                || !TryParseInstalledSteelArmorClass(threat, out int armorClass))
+            {
+                throw new InvalidOperationException(
+                    "The selected threat does not have one unambiguous installed ammunition mapping and armored-steel sample class.");
+            }
+            ProtocolAmmunitionMapping mapping = exactMappings[0];
+            var campaignCase = new CampaignCaseDefinition(
+                threat.ThreatId,
+                threat.ProtectionClass + " - " + threat.CartridgeDesignation,
+                CampaignFixtureSelectorKind.MaterialAndArmorClass,
+                string.Empty,
+                "ArmoredSteel",
+                armorClass,
+                1,
+                DefaultSpacingMetres,
+                DefaultThicknessMetres,
+                threat.TestDistanceMetres,
+                0d,
+                true,
+                threat.RequiredQualifyingShots,
+                CampaignResetPolicy.BeforeEachCase,
+                0d,
+                10d,
+                false,
+                true,
+                true,
+                0.000001d,
+                MaximumUnallocatedEnergyJoules,
+                CampaignShotSequencePolicy.SameFixtureProtocolPattern,
+                threat.ThreatId,
+                mapping.TemplateId);
+            return new CampaignDefinition(
+                "simulation-screening-" + threat.ThreatId,
+                threat.ProtectionClass + " simulation screening",
+                new[] { campaignCase });
+        }
+
+        private static bool TryParseInstalledSteelArmorClass(
+            ProtocolThreatDefinition threat,
+            out int armorClass)
+        {
+            armorClass = 0;
+            return threat.ProtectionClass.Length >= 3
+                && int.TryParse(
+                    threat.ProtectionClass.AsSpan(2),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out armorClass)
+                && armorClass >= MinimumInstalledSteelArmorClass
+                && armorClass <= MaximumInstalledSteelArmorClass;
         }
 
         private static CampaignCaseDefinition MaterialCase(

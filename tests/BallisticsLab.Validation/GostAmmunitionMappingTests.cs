@@ -87,6 +87,9 @@ internal static class GostAmmunitionMappingTests
             || !item.TryGetProperty("_props", out JsonElement properties)
             || !properties.TryGetProperty("Caliber", out JsonElement caliber)
             || !properties.TryGetProperty("BulletMassGram", out JsonElement mass)
+            || !properties.TryGetProperty(
+                "BulletDiameterMilimeters",
+                out JsonElement diameter)
             || !properties.TryGetProperty("InitialSpeed", out JsonElement speed)
             || !english.TryGetProperty(mapping.TemplateId + " Name", out JsonElement englishName)
             || !english.TryGetProperty(
@@ -116,6 +119,9 @@ internal static class GostAmmunitionMappingTests
             && Nearly(
                 mass.GetDouble() / 1000d,
                 mapping.InstalledProjectileMassKilograms)
+            && Nearly(
+                diameter.GetDouble() / 1000d,
+                mapping.InstalledProjectileDiameterMetres)
             && Nearly(speed.GetDouble(), mapping.InstalledInitialSpeedMetresPerSecond)
             && englishText.Contains(
                 mapping.EnglishDesignationEvidence,

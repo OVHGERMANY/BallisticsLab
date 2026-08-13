@@ -169,6 +169,18 @@ Check(
     CampaignTests.BuiltInCatalogsDeclareExpectedCasesAndEvidenceRules(),
     "built-in campaigns declare the controlled stacks and physical material evidence rules");
 Check(
+    CampaignTests.ProtocolTrackerPreservesOneSampleAcrossFiveAcceptedShots(),
+    "protocol campaign preserves one fixture and accumulated damage across five accepted shots");
+Check(
+    CampaignTests.ProtocolRejectionInvalidatesPartialSampleAndRoundTripsEvidence(),
+    "a rejected protocol hit preserves evidence and restarts on a fresh physical sample");
+Check(
+    CampaignTests.QueuedSixthProtocolShotCannotCompleteAContaminatedSample(),
+    "a queued sixth hit cannot complete a contaminated five-shot sample");
+Check(
+    CampaignTests.InvalidProtocolEvidenceCanDiscardDamagedSampleWithoutResettingIt(),
+    "invalid protocol evidence discards the damaged sample instead of silently reusing it");
+Check(
     CampaignTests.PhysicalEvidenceUsesExactHostIdentityAndChecksClosure(),
     "campaign physical evidence uses exact host identity and measures mass and energy closure");
 Check(
@@ -186,6 +198,9 @@ Check(
 Check(
     CampaignTests.CampaignReportRejectsCorruptedProtocolEvidence(),
     "campaign report validation rejects impossible protocol geometry and outcome evidence");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedProtocolSequenceState(),
+    "campaign report validation rejects forged protocol samples, reasons, and final statuses");
 Check(
     CampaignTests.CampaignReportRejectsCorruptedAttemptAndHeaderCursors(),
     "campaign report validation rejects impossible attempt order and header cursors");
@@ -223,8 +238,14 @@ Check(
     ProtocolTests.ExactIdentityReportsKnownGameRepresentationMismatches(),
     "simulation screening reports known nominal and locale mass mismatches");
 Check(
-    ProtocolTests.RecordedMassMustMatchMappedGameRepresentation(),
-    "protocol evidence must match the mapped installed projectile mass");
+    ProtocolTests.RecordedPhysicalStateMustMatchMappedGameRepresentation(),
+    "protocol evidence must match the mapped installed projectile mass and diameter");
+Check(
+    ProtocolTests.DeterministicImpactPatternPreservesFiveDiameterClearance(),
+    "deterministic protocol markers preserve five-diameter edge and neighbour clearance");
+Check(
+    ProtocolTests.DeterministicImpactPatternRejectsUndersizedFaces(),
+    "protocol marker planning fails closed when the sample face is too small");
 Check(
     ProtocolTests.ValidFiveShotPatternCompletesSimulationScreening(),
     "five qualifying spaced V3 observations complete simulation screening without certification");
@@ -461,6 +482,16 @@ else
                 plate => plate.Material == campaignCase.Material
                     && plate.ArmorClass == campaignCase.ArmorClass)),
         "every physical material campaign case resolves an exact installed material and armor class");
+    Check(
+        CampaignCatalog.ProtocolScreeningThreats.All(threat =>
+        {
+            CampaignCaseDefinition campaignCase = CampaignCatalog
+                .GostSimulationScreening(threat.ThreatId)
+                .Cases[0];
+            return plates.Any(plate => plate.Material == campaignCase.Material
+                && plate.ArmorClass == campaignCase.ArmorClass);
+        }),
+        "every available protocol screening resolves an installed armored-steel sample class");
 
     Console.WriteLine("Catalog: " + plates.Count.ToString(CultureInfo.InvariantCulture) + " usable plates");
     foreach (IGrouping<string, PlateRow> group in plates.GroupBy(plate => plate.Material).OrderBy(group => group.Key, StringComparer.Ordinal))

@@ -19,6 +19,12 @@ namespace BallisticsLab.Core
         BeforeEachShot = 1
     }
 
+    internal enum CampaignShotSequencePolicy
+    {
+        IndependentShots = 0,
+        SameFixtureProtocolPattern = 1
+    }
+
     internal enum CampaignRunState
     {
         Idle = 0,
@@ -38,7 +44,9 @@ namespace BallisticsLab.Core
         MissingBackstop = 4,
         MissingPhysicalEvidence = 5,
         ConservationFailure = 6,
-        MissingConservationEvidence = 7
+        MissingConservationEvidence = 7,
+        ProtocolRejected = 8,
+        SequenceInvalidated = 9
     }
 
     internal sealed class CampaignCaseDefinition
@@ -64,7 +72,11 @@ namespace BallisticsLab.Core
             bool requirePhysicalEvidence,
             bool requireConservationEvidence,
             double maximumMassClosureErrorKilograms,
-            double maximumEnergyClosureErrorJoules)
+            double maximumEnergyClosureErrorJoules,
+            CampaignShotSequencePolicy shotSequencePolicy =
+                CampaignShotSequencePolicy.IndependentShots,
+            string protocolThreatId = "",
+            string protocolAmmunitionTemplateId = "")
         {
             CaseId = Required(caseId, nameof(caseId));
             Label = Required(label, nameof(label));
@@ -91,6 +103,15 @@ namespace BallisticsLab.Core
             ValidateNonNegative(
                 maximumEnergyClosureErrorJoules,
                 nameof(maximumEnergyClosureErrorJoules));
+            ValidateShotSequence(
+                shotSequencePolicy,
+                protocolThreatId,
+                protocolAmmunitionTemplateId,
+                resetPolicy,
+                requiredRepetitions,
+                distanceMetres,
+                angleDegrees,
+                backstopEnabled);
 
             SelectorKind = selectorKind;
             TemplateId = templateId ?? string.Empty;
@@ -111,6 +132,9 @@ namespace BallisticsLab.Core
             RequireConservationEvidence = requireConservationEvidence;
             MaximumMassClosureErrorKilograms = maximumMassClosureErrorKilograms;
             MaximumEnergyClosureErrorJoules = maximumEnergyClosureErrorJoules;
+            ShotSequencePolicy = shotSequencePolicy;
+            ProtocolThreatId = protocolThreatId ?? string.Empty;
+            ProtocolAmmunitionTemplateId = protocolAmmunitionTemplateId ?? string.Empty;
         }
 
         internal string CaseId { get; }
@@ -134,6 +158,25 @@ namespace BallisticsLab.Core
         internal bool RequireConservationEvidence { get; }
         internal double MaximumMassClosureErrorKilograms { get; }
         internal double MaximumEnergyClosureErrorJoules { get; }
+        internal CampaignShotSequencePolicy ShotSequencePolicy { get; }
+        internal string ProtocolThreatId { get; }
+        internal string ProtocolAmmunitionTemplateId { get; }
+        internal bool IsProtocolSequence => ShotSequencePolicy
+            == CampaignShotSequencePolicy.SameFixtureProtocolPattern;
+
+        internal bool TryGetProtocolDefinition(
+            out ProtocolThreatDefinition? threat,
+            out ProtocolAmmunitionMapping? mapping)
+        {
+            threat = null;
+            mapping = null;
+            return IsProtocolSequence
+                && GostProtocolCatalog.TryGet(ProtocolThreatId, out threat)
+                && threat != null
+                && threat.TryGetAmmunitionMapping(ProtocolAmmunitionTemplateId, out mapping)
+                && mapping != null
+                && mapping.CanQualifySimulationScreening;
+        }
 
         private static void ValidateSelector(
             CampaignFixtureSelectorKind selectorKind,
@@ -158,6 +201,55 @@ namespace BallisticsLab.Core
                 return;
             }
             ThrowUnsupportedSelector(selectorKind);
+        }
+
+        private static void ValidateShotSequence(
+            CampaignShotSequencePolicy policy,
+            string protocolThreatId,
+            string protocolAmmunitionTemplateId,
+            CampaignResetPolicy resetPolicy,
+            int requiredRepetitions,
+            double distanceMetres,
+            double angleDegrees,
+            bool backstopEnabled)
+        {
+            if (policy == CampaignShotSequencePolicy.IndependentShots)
+            {
+                if (!string.IsNullOrEmpty(protocolThreatId)
+                    || !string.IsNullOrEmpty(protocolAmmunitionTemplateId))
+                {
+                    ThrowUnexpectedProtocolIdentity();
+                }
+                return;
+            }
+            if (policy != CampaignShotSequencePolicy.SameFixtureProtocolPattern)
+            {
+                ThrowUnsupportedShotSequence(policy);
+            }
+            ProtocolThreatDefinition? threat = null;
+            ProtocolAmmunitionMapping? mapping = null;
+            if (string.IsNullOrWhiteSpace(protocolThreatId)
+                || string.IsNullOrWhiteSpace(protocolAmmunitionTemplateId)
+                || !GostProtocolCatalog.TryGet(protocolThreatId, out threat)
+                || threat == null
+                || !threat.TryGetAmmunitionMapping(
+                    protocolAmmunitionTemplateId,
+                    out mapping)
+                || mapping == null
+                || !mapping.CanQualifySimulationScreening)
+            {
+                ThrowInvalidProtocolIdentity();
+            }
+            ProtocolThreatDefinition validatedThreat = threat!;
+            if (resetPolicy != CampaignResetPolicy.BeforeEachCase
+                || requiredRepetitions != validatedThreat.RequiredQualifyingShots
+                || !backstopEnabled
+                || Math.Abs(distanceMetres - validatedThreat.TestDistanceMetres)
+                    > validatedThreat.TestDistanceToleranceMetres
+                || Math.Abs(angleDegrees) > validatedThreat.MaximumImpactAngleDegrees)
+            {
+                ThrowInvalidProtocolSequence();
+            }
         }
 
         private static string Required(string value, string parameterName)
@@ -263,6 +355,36 @@ namespace BallisticsLab.Core
             throw new ArgumentException(
                 "Conservation evidence cannot be required without physical-transition evidence.",
                 parameterName);
+        }
+
+        [DoesNotReturn]
+        private static void ThrowUnexpectedProtocolIdentity()
+        {
+            throw new ArgumentException(
+                "Independent-shot cases cannot carry a protocol threat or ammunition identity.");
+        }
+
+        [DoesNotReturn]
+        private static void ThrowUnsupportedShotSequence(CampaignShotSequencePolicy policy)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(policy),
+                policy,
+                "Unsupported campaign shot-sequence policy.");
+        }
+
+        [DoesNotReturn]
+        private static void ThrowInvalidProtocolIdentity()
+        {
+            throw new ArgumentException(
+                "A protocol sequence requires a verified exact threat and ammunition mapping.");
+        }
+
+        [DoesNotReturn]
+        private static void ThrowInvalidProtocolSequence()
+        {
+            throw new ArgumentException(
+                "A protocol sequence must preserve one fixture and match the threat's shot count, distance, angle, and witness-backstop requirements.");
         }
 
         private static bool IsFinite(double value)
@@ -560,30 +682,51 @@ namespace BallisticsLab.Core
             long attemptOrdinal,
             int caseIndex,
             string caseId,
+            int sampleOrdinal,
             int repetitionIndex,
             int attemptIndex,
             ulong labCaseSeed,
             CampaignAttemptStatus status,
+            ProtocolShotQualificationReason? protocolQualificationReason,
             CampaignShotEvidence evidence)
         {
             AttemptOrdinal = attemptOrdinal;
             CaseIndex = caseIndex;
             CaseId = caseId;
+            SampleOrdinal = sampleOrdinal;
             RepetitionIndex = repetitionIndex;
             AttemptIndex = attemptIndex;
             LabCaseSeed = labCaseSeed;
             Status = status;
+            ProtocolQualificationReason = protocolQualificationReason;
             Evidence = evidence;
         }
 
         internal long AttemptOrdinal { get; }
         internal int CaseIndex { get; }
         internal string CaseId { get; }
+        internal int SampleOrdinal { get; }
         internal int RepetitionIndex { get; }
         internal int AttemptIndex { get; }
         internal ulong LabCaseSeed { get; }
         internal CampaignAttemptStatus Status { get; }
+        internal ProtocolShotQualificationReason? ProtocolQualificationReason { get; }
         internal CampaignShotEvidence Evidence { get; }
+
+        internal CampaignAttemptRecord WithStatus(CampaignAttemptStatus status)
+        {
+            return new CampaignAttemptRecord(
+                AttemptOrdinal,
+                CaseIndex,
+                CaseId,
+                SampleOrdinal,
+                RepetitionIndex,
+                AttemptIndex,
+                LabCaseSeed,
+                status,
+                ProtocolQualificationReason,
+                Evidence);
+        }
     }
 
     internal sealed class CampaignRunSnapshot
@@ -666,6 +809,7 @@ namespace BallisticsLab.Core
         private readonly HashSet<string> _observedChains = new HashSet<string>(StringComparer.Ordinal);
         private CampaignRunState _state;
         private int _caseIndex;
+        private int _sampleOrdinal;
         private int _repetitionIndex;
         private int _attemptIndex;
         private long _fixtureId;
@@ -726,7 +870,9 @@ namespace BallisticsLab.Core
             }
         }
 
-        internal CampaignAttemptRecord? RecordShot(CampaignShotEvidence evidence)
+        internal CampaignAttemptRecord? RecordShot(
+            CampaignShotEvidence evidence,
+            bool deferProtocolCompletion = false)
         {
             if (evidence == null)
             {
@@ -744,10 +890,16 @@ namespace BallisticsLab.Core
 
                 CampaignCaseDefinition campaignCase = _definition.Cases[_caseIndex];
                 CampaignAttemptStatus status = CampaignEvidenceEvaluator.Evaluate(campaignCase, evidence);
+                ProtocolShotQualificationReason? protocolReason = null;
+                if (campaignCase.IsProtocolSequence && status == CampaignAttemptStatus.Accepted)
+                {
+                    status = EvaluateProtocolSequence(campaignCase, evidence, out protocolReason);
+                }
                 var record = new CampaignAttemptRecord(
                     ++_attemptOrdinal,
                     _caseIndex,
                     campaignCase.CaseId,
+                    _sampleOrdinal,
                     _repetitionIndex,
                     _attemptIndex,
                     CampaignSeedDeriver.Derive(
@@ -756,13 +908,18 @@ namespace BallisticsLab.Core
                         campaignCase.CaseId,
                         _repetitionIndex),
                     status,
+                    protocolReason,
                     evidence);
                 _attempts.Add(record);
                 _attemptIndex++;
 
                 if (status == CampaignAttemptStatus.Accepted)
                 {
-                    AcceptRepetition(campaignCase);
+                    AcceptRepetition(campaignCase, deferProtocolCompletion);
+                }
+                else if (campaignCase.IsProtocolSequence)
+                {
+                    InvalidateProtocolSample();
                 }
                 else if (campaignCase.ResetPolicy == CampaignResetPolicy.BeforeEachShot)
                 {
@@ -785,6 +942,22 @@ namespace BallisticsLab.Core
             }
         }
 
+        internal bool InvalidateCurrentProtocolSample()
+        {
+            lock (_sync)
+            {
+                if (_state != CampaignRunState.AwaitingShot
+                    || _caseIndex < 0
+                    || _caseIndex >= _definition.Cases.Count
+                    || !_definition.Cases[_caseIndex].IsProtocolSequence)
+                {
+                    return false;
+                }
+                InvalidateProtocolSample();
+                return true;
+            }
+        }
+
         internal CampaignRunSnapshot Snapshot()
         {
             lock (_sync)
@@ -802,7 +975,9 @@ namespace BallisticsLab.Core
             }
         }
 
-        private void AcceptRepetition(CampaignCaseDefinition campaignCase)
+        private void AcceptRepetition(
+            CampaignCaseDefinition campaignCase,
+            bool deferProtocolCompletion)
         {
             _repetitionIndex++;
             _attemptIndex = 0;
@@ -813,13 +988,91 @@ namespace BallisticsLab.Core
                     : CampaignRunState.AwaitingShot;
                 return;
             }
+            if (campaignCase.IsProtocolSequence && deferProtocolCompletion)
+            {
+                _repetitionIndex--;
+                _state = CampaignRunState.AwaitingShot;
+                return;
+            }
 
             _caseIndex++;
+            _sampleOrdinal = 0;
             _repetitionIndex = 0;
             _fixtureId = 0L;
             _state = _caseIndex >= _definition.Cases.Count
                 ? CampaignRunState.Completed
                 : CampaignRunState.AwaitingFixture;
+        }
+
+        private CampaignAttemptStatus EvaluateProtocolSequence(
+            CampaignCaseDefinition campaignCase,
+            CampaignShotEvidence evidence,
+            out ProtocolShotQualificationReason? reason)
+        {
+            reason = ProtocolShotQualificationReason.MissingEvidence;
+            if (!campaignCase.TryGetProtocolDefinition(
+                    out ProtocolThreatDefinition? threat,
+                    out ProtocolAmmunitionMapping? mapping)
+                || threat == null
+                || mapping == null
+                || evidence.ProtocolEvidence == null
+                || !ProtocolImpactPattern.TryCreate(
+                    threat,
+                    mapping,
+                    evidence.ProtocolEvidence.FixtureFaceWidthMetres,
+                    evidence.ProtocolEvidence.FixtureFaceHeightMetres,
+                    out ProtocolImpactPattern? pattern,
+                    out _)
+                || pattern == null
+                || _repetitionIndex < 0
+                || _repetitionIndex >= pattern.Points.Count)
+            {
+                return CampaignAttemptStatus.ProtocolRejected;
+            }
+
+            ProtocolImpactPoint expectedPoint = pattern.Points[_repetitionIndex];
+            if (!expectedPoint.Contains(
+                    evidence.ProtocolEvidence.FixtureLocalHitXMetres,
+                    evidence.ProtocolEvidence.FixtureLocalHitYMetres))
+            {
+                reason = ProtocolShotQualificationReason.ExpectedPointMismatch;
+                return CampaignAttemptStatus.ProtocolRejected;
+            }
+
+            ProtocolShotEvidence[] sequence = _attempts
+                .Where(attempt => attempt.CaseIndex == _caseIndex
+                    && attempt.SampleOrdinal == _sampleOrdinal
+                    && attempt.Status == CampaignAttemptStatus.Accepted
+                    && attempt.Evidence.ProtocolEvidence != null)
+                .Select(attempt => attempt.Evidence.ProtocolEvidence!)
+                .Concat(new[] { evidence.ProtocolEvidence })
+                .ToArray();
+            ProtocolScreeningEvaluation evaluation = ProtocolScreeningEvaluator.Evaluate(
+                threat,
+                sequence);
+            reason = evaluation.Shots[evaluation.Shots.Count - 1].Reason;
+            return reason == ProtocolShotQualificationReason.Qualifying
+                ? CampaignAttemptStatus.Accepted
+                : CampaignAttemptStatus.ProtocolRejected;
+        }
+
+        private void InvalidateProtocolSample()
+        {
+            for (int index = 0; index < _attempts.Count; index++)
+            {
+                CampaignAttemptRecord attempt = _attempts[index];
+                if (attempt.CaseIndex == _caseIndex
+                    && attempt.SampleOrdinal == _sampleOrdinal
+                    && attempt.Status == CampaignAttemptStatus.Accepted)
+                {
+                    _attempts[index] = attempt.WithStatus(CampaignAttemptStatus.SequenceInvalidated);
+                }
+            }
+            _sampleOrdinal++;
+            _repetitionIndex = 0;
+            _attemptIndex = 0;
+            _fixtureId = 0L;
+            _state = CampaignRunState.AwaitingFixture;
         }
 
         [DoesNotReturn]
@@ -1008,6 +1261,8 @@ namespace BallisticsLab.Core
             int physicalRejectCount,
             int conservationRejectCount,
             int missingConservationRejectCount,
+            int protocolRejectCount,
+            int sequenceInvalidatedCount,
             double meanVelocityFraction,
             double meanLayersHit,
             double maximumMassClosureErrorKilograms,
@@ -1026,6 +1281,8 @@ namespace BallisticsLab.Core
             PhysicalRejectCount = physicalRejectCount;
             ConservationRejectCount = conservationRejectCount;
             MissingConservationRejectCount = missingConservationRejectCount;
+            ProtocolRejectCount = protocolRejectCount;
+            SequenceInvalidatedCount = sequenceInvalidatedCount;
             MeanVelocityFraction = meanVelocityFraction;
             MeanLayersHit = meanLayersHit;
             MaximumMassClosureErrorKilograms = maximumMassClosureErrorKilograms;
@@ -1046,6 +1303,8 @@ namespace BallisticsLab.Core
         internal int PhysicalRejectCount { get; }
         internal int ConservationRejectCount { get; }
         internal int MissingConservationRejectCount { get; }
+        internal int ProtocolRejectCount { get; }
+        internal int SequenceInvalidatedCount { get; }
         internal double MeanVelocityFraction { get; }
         internal double MeanLayersHit { get; }
         internal double MaximumMassClosureErrorKilograms { get; }
@@ -1122,6 +1381,8 @@ namespace BallisticsLab.Core
                     Count(attempts, CampaignAttemptStatus.MissingPhysicalEvidence),
                     Count(attempts, CampaignAttemptStatus.ConservationFailure),
                     Count(attempts, CampaignAttemptStatus.MissingConservationEvidence),
+                    Count(attempts, CampaignAttemptStatus.ProtocolRejected),
+                    Count(attempts, CampaignAttemptStatus.SequenceInvalidated),
                     Mean(attempts, attempt => attempt.Evidence.VelocityFraction),
                     Mean(attempts, attempt => attempt.Evidence.HitLayers.Count),
                     Maximum(

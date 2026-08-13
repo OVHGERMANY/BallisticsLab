@@ -163,14 +163,19 @@ internal static class CampaignReportInvariantValidator
                 return false;
             }
 
-            CampaignAttemptRecord? replayed = tracker.RecordShot(recorded.Evidence);
+            bool deferProtocolCompletion = definition.Cases[recorded.CaseIndex].IsProtocolSequence
+                && attempts.Skip(index + 1).Any(later => later.CaseIndex == recorded.CaseIndex
+                    && later.SampleOrdinal == recorded.SampleOrdinal);
+            CampaignAttemptRecord? replayed = tracker.RecordShot(
+                recorded.Evidence,
+                deferProtocolCompletion);
             if (replayed == null
                 || replayed.AttemptOrdinal != recorded.AttemptOrdinal
                 || replayed.CaseIndex != recorded.CaseIndex
+                || replayed.SampleOrdinal != recorded.SampleOrdinal
                 || replayed.RepetitionIndex != recorded.RepetitionIndex
                 || replayed.AttemptIndex != recorded.AttemptIndex
-                || replayed.LabCaseSeed != recorded.LabCaseSeed
-                || replayed.Status != recorded.Status)
+                || replayed.LabCaseSeed != recorded.LabCaseSeed)
             {
                 failure = "campaign replay disagrees with attempt " + recorded.AttemptOrdinal;
                 return false;
@@ -178,6 +183,24 @@ internal static class CampaignReportInvariantValidator
         }
 
         CampaignRunSnapshot replay = tracker.Snapshot();
+        if (replay.Attempts.Count != attempts.Count)
+        {
+            failure = "campaign replay attempt count differs from the report";
+            return false;
+        }
+        for (int index = 0; index < attempts.Count; index++)
+        {
+            CampaignAttemptRecord expected = attempts[index];
+            CampaignAttemptRecord actual = replay.Attempts[index];
+            if (actual.Status != expected.Status
+                || actual.ProtocolQualificationReason != expected.ProtocolQualificationReason
+                || actual.SampleOrdinal != expected.SampleOrdinal)
+            {
+                failure = "campaign replay final status differs at attempt "
+                    + expected.AttemptOrdinal;
+                return false;
+            }
+        }
         if (expectedState == CampaignRunState.AwaitingShot)
         {
             if (replay.State == CampaignRunState.AwaitingReset)
@@ -234,6 +257,15 @@ internal static class CampaignReportInvariantValidator
                 || !TryBoolean(element, "backstopEnabled", out bool backstopEnabled)
                 || !TryInt32(element, "requiredRepetitions", out int repetitions)
                 || !TryEnum(element, "resetPolicy", out CampaignResetPolicy resetPolicy)
+                || !TryEnum(
+                    element,
+                    "shotSequencePolicy",
+                    out CampaignShotSequencePolicy shotSequencePolicy)
+                || !TryTextAllowEmpty(element, "protocolThreatId", out string protocolThreatId)
+                || !TryTextAllowEmpty(
+                    element,
+                    "protocolAmmunitionTemplateId",
+                    out string protocolAmmunitionTemplateId)
                 || !TryDouble(element, "minimumVelocityFraction", out double minimumVelocity)
                 || !TryDouble(element, "maximumVelocityFraction", out double maximumVelocity)
                 || !TryBoolean(element, "requireBackstopEvidence", out bool requireBackstop)
@@ -275,7 +307,10 @@ internal static class CampaignReportInvariantValidator
                 requirePhysical,
                 requireConservation,
                 maximumMassError,
-                maximumEnergyError));
+                maximumEnergyError,
+                shotSequencePolicy,
+                protocolThreatId,
+                protocolAmmunitionTemplateId));
             expectedIndex++;
         }
         if (cases.Count == 0)
@@ -310,6 +345,8 @@ internal static class CampaignReportInvariantValidator
                     caseId,
                     definition.Cases[caseIndex].CaseId,
                     StringComparison.Ordinal)
+                || !TryInt32(element, "sampleOrdinal", out int sampleOrdinal)
+                || sampleOrdinal < 0
                 || !TryInt32(element, "repetitionIndex", out int repetitionIndex)
                 || repetitionIndex < 0
                 || repetitionIndex >= definition.Cases[caseIndex].RequiredRepetitions
@@ -322,6 +359,13 @@ internal static class CampaignReportInvariantValidator
                     caseId,
                     repetitionIndex)
                 || !TryEnum(element, "status", out CampaignAttemptStatus status)
+                || !TryTextAllowEmpty(
+                    element,
+                    "protocolQualificationReason",
+                    out string protocolReasonText)
+                || !TryOptionalProtocolReason(
+                    protocolReasonText,
+                    out ProtocolShotQualificationReason? protocolReason)
                 || !TryInt64(element, "fixtureId", out long fixtureId)
                 || fixtureId <= 0L
                 || !TryText(element, "chainId", out string chainId)
@@ -382,7 +426,9 @@ internal static class CampaignReportInvariantValidator
                 maximumMassError,
                 maximumEnergyError,
                 protocolEvidence);
-            if (CampaignEvidenceEvaluator.Evaluate(definition.Cases[caseIndex], evidence) != status)
+            if (!definition.Cases[caseIndex].IsProtocolSequence
+                && (CampaignEvidenceEvaluator.Evaluate(definition.Cases[caseIndex], evidence) != status
+                    || protocolReason.HasValue))
             {
                 failure = "campaign attempt status does not match its evidence gates";
                 return false;
@@ -391,10 +437,12 @@ internal static class CampaignReportInvariantValidator
                 ordinal,
                 caseIndex,
                 caseId,
+                sampleOrdinal,
                 repetitionIndex,
                 attemptIndex,
                 labCaseSeed,
                 status,
+                protocolReason,
                 evidence));
             expectedOrdinal++;
         }
@@ -525,6 +573,11 @@ internal static class CampaignReportInvariantValidator
                     "missingConservationRejectCount",
                     expectedRow.MissingConservationRejectCount)
                 || !MatchesInt(row, "conservationRejectCount", expectedRow.ConservationRejectCount)
+                || !MatchesInt(row, "protocolRejectCount", expectedRow.ProtocolRejectCount)
+                || !MatchesInt(
+                    row,
+                    "sequenceInvalidatedCount",
+                    expectedRow.SequenceInvalidatedCount)
                 || !MatchesDouble(row, "meanVelocityFraction", expectedRow.MeanVelocityFraction)
                 || !MatchesDouble(row, "meanLayersHit", expectedRow.MeanLayersHit)
                 || !MatchesDouble(
@@ -641,5 +694,26 @@ internal static class CampaignReportInvariantValidator
         return TryText(owner, name, out string text)
             && Enum.TryParse(text, ignoreCase: false, out value)
             && Enum.IsDefined(value);
+    }
+
+    private static bool TryOptionalProtocolReason(
+        string text,
+        out ProtocolShotQualificationReason? value)
+    {
+        value = null;
+        if (string.IsNullOrEmpty(text))
+        {
+            return true;
+        }
+        if (!Enum.TryParse(
+                text,
+                ignoreCase: false,
+                out ProtocolShotQualificationReason parsed)
+            || !Enum.IsDefined(parsed))
+        {
+            return false;
+        }
+        value = parsed;
+        return true;
     }
 }

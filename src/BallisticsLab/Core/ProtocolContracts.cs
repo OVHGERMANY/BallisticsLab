@@ -27,7 +27,8 @@ namespace BallisticsLab.Core
         EdgeDistanceInsufficient = 10,
         NeighbourDistanceInsufficient = 11,
         AmmunitionDesignationVariant = 12,
-        AmmunitionPhysicalStateMismatch = 13
+        AmmunitionPhysicalStateMismatch = 13,
+        ExpectedPointMismatch = 14
     }
 
     internal enum ProtocolScreeningStatus
@@ -680,6 +681,10 @@ namespace BallisticsLab.Core
                     return ProtocolShotQualificationReason.AmmunitionIdentityUnverified;
                 }
                 if (!mapping.MatchesRecordedProjectileMass(shot.ProjectileMassKilograms))
+                {
+                    return ProtocolShotQualificationReason.AmmunitionPhysicalStateMismatch;
+                }
+                if (!mapping.MatchesRecordedProjectileDiameter(shot.ProjectileDiameterMetres))
                 {
                     return ProtocolShotQualificationReason.AmmunitionPhysicalStateMismatch;
                 }

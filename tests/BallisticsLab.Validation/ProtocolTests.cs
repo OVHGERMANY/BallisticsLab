@@ -13,6 +13,7 @@ internal static class ProtocolTests
             "Verified ammunition",
             "VerifiedCaliber",
             0.0079d,
+            0.00762d,
             0.0079d,
             720d,
             "Verified designation",
@@ -223,7 +224,8 @@ internal static class ProtocolTests
             ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
             720d,
             false,
-            ammunitionTemplateId: "5656d7c34bdc2d9d198b4587");
+            ammunitionTemplateId: "5656d7c34bdc2d9d198b4587",
+            projectileDiameterMetres: 0.00792d);
         ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(threat, shots);
         return result.Status == ProtocolScreeningStatus.SimulationScreeningComplete
             && result.QualifyingShotCount == 5
@@ -241,7 +243,7 @@ internal static class ProtocolTests
             false,
             ammunitionTemplateId: "56dff2ced2720bb4668b4567",
             projectileMassKilograms: 0.00368d,
-            projectileDiameterMetres: 0.00545d);
+            projectileDiameterMetres: 0.00562d);
         ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(threat, shots);
         return result.Status == ProtocolScreeningStatus.SimulationScreeningComplete
             && result.QualifyingShotCount == 5
@@ -250,21 +252,97 @@ internal static class ProtocolTests
             && !result.IsCertificationClaim;
     }
 
-    internal static bool RecordedMassMustMatchMappedGameRepresentation()
+    internal static bool RecordedPhysicalStateMustMatchMappedGameRepresentation()
     {
         ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br4")[0];
-        IReadOnlyList<ProtocolShotEvidence> shots = Pattern(
+        IReadOnlyList<ProtocolShotEvidence> wrongMass = Pattern(
             ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
             895d,
             false,
             ammunitionTemplateId: "56dff2ced2720bb4668b4567",
             projectileMassKilograms: 0.0035d,
+            projectileDiameterMetres: 0.00562d);
+        IReadOnlyList<ProtocolShotEvidence> wrongDiameter = Pattern(
+            ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres,
+            895d,
+            false,
+            ammunitionTemplateId: "56dff2ced2720bb4668b4567",
+            projectileMassKilograms: 0.00368d,
             projectileDiameterMetres: 0.00545d);
-        ProtocolScreeningEvaluation result = ProtocolScreeningEvaluator.Evaluate(threat, shots);
+        ProtocolScreeningEvaluation massResult = ProtocolScreeningEvaluator.Evaluate(
+            threat,
+            wrongMass);
+        ProtocolScreeningEvaluation diameterResult = ProtocolScreeningEvaluator.Evaluate(
+            threat,
+            wrongDiameter);
+        return IsPhysicalStateMismatch(massResult) && IsPhysicalStateMismatch(diameterResult);
+    }
+
+    private static bool IsPhysicalStateMismatch(ProtocolScreeningEvaluation result)
+    {
         return result.Status == ProtocolScreeningStatus.InsufficientEvidence
             && result.QualifyingShotCount == 0
             && result.Shots.All(shot => shot.Reason
                 == ProtocolShotQualificationReason.AmmunitionPhysicalStateMismatch);
+    }
+
+    internal static bool DeterministicImpactPatternPreservesFiveDiameterClearance()
+    {
+        ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br6")[0];
+        ProtocolAmmunitionMapping mapping = threat.AmmunitionMappings[0];
+        if (!ProtocolImpactPattern.TryCreate(
+                threat,
+                mapping,
+                1d,
+                1.5d,
+                out ProtocolImpactPattern? pattern,
+                out _)
+            || pattern == null
+            || pattern.Points.Count != 5)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < pattern.Points.Count; index++)
+        {
+            ProtocolImpactPoint point = pattern.Points[index];
+            double edgeDistance = Math.Min(
+                0.5d - Math.Abs(point.LocalXMetres) - point.TargetToleranceMetres,
+                0.75d - Math.Abs(point.LocalYMetres) - point.TargetToleranceMetres);
+            if (point.ShotIndex != index
+                || !point.Contains(point.LocalXMetres, point.LocalYMetres)
+                || edgeDistance < pattern.RequiredEdgeDistanceMetres)
+            {
+                return false;
+            }
+            for (int previousIndex = 0; previousIndex < index; previousIndex++)
+            {
+                ProtocolImpactPoint previous = pattern.Points[previousIndex];
+                double deltaX = point.LocalXMetres - previous.LocalXMetres;
+                double deltaY = point.LocalYMetres - previous.LocalYMetres;
+                double minimumPossibleDistance = Math.Sqrt(deltaX * deltaX + deltaY * deltaY)
+                    - point.TargetToleranceMetres
+                    - previous.TargetToleranceMetres;
+                if (minimumPossibleDistance < pattern.RequiredEdgeDistanceMetres)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    internal static bool DeterministicImpactPatternRejectsUndersizedFaces()
+    {
+        ProtocolThreatDefinition threat = GostProtocolCatalog.ForClass("Br6")[0];
+        return !ProtocolImpactPattern.TryCreate(
+            threat,
+            threat.AmmunitionMappings[0],
+            0.20d,
+            0.20d,
+            out _,
+            out string failure)
+            && failure.Contains("too small", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool ValidFiveShotPatternCompletesSimulationScreening()
