@@ -10,9 +10,10 @@ Snapshot date: 2026-08-12
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
 - Playtested deployed DLL SHA-256: `3C4BAAA940FB61CD557CC173B61A55FBAA9860A651DBEFA3A33A4DEC0171B5E6`
+- Reproducible pinned-toolchain build SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
 - Default configuration: disabled
 
-The runtime source has not changed since `e3dc463`; later commits record build, startup, and runtime evidence. The candidate is not tagged as an accepted baseline. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
+The runtime source has not changed since `e3dc463`; later commits record build, startup, runtime evidence, and validation tooling. The candidate is not tagged as an accepted baseline. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
 
 ## Automated and startup verification
 
@@ -27,8 +28,9 @@ The runtime source has not changed since `e3dc463`; later commits record build, 
 - Automatic saving emits nonempty changed-chain batches only. A later continuation includes its required parents but does not recopy unrelated saved chains.
 - Every admitted report must have schema `3`, plugin version `0.2.8`, a matching CSV partner, exact field equality, and valid ammunition identity, falloff, durability, trajectory, and lineage data.
 - The tracked coverage evaluator separates casual bot traffic from controlled fixture evidence. Synthetic regressions prove that bot records cannot satisfy a fixture gate and duplicate automatic batches cannot inflate coverage.
+- .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 
-A fresh rebuild and the deployed playtested DLL are not byte-identical. Rebuilding with `SourceRevisionId` pinned to `e3dc463` and with SDK `10.0.204` still did not reproduce the deployed hash, so the exact source of the binary drift is not established. No runtime source changed, and no rebuilt DLL was deployed. Before the baseline is tagged, the final candidate must be built once, deployed from that exact output, restarted, and rechecked for byte parity.
+The deployed playtested DLL predates the deterministic build contract above. Decompilation confirms that it and a pinned-revision rebuild contain identical runtime code, metadata tables, assembly references, resources, and version attributes; only MVID, deterministic PE content ID, and PDB checksum differ. No rebuilt DLL has been deployed. The final candidate must be built under the pinned SDK, deployed from that exact output, restarted, and rechecked for byte parity before the baseline is tagged.
 
 ## Current-build runtime evidence
 
