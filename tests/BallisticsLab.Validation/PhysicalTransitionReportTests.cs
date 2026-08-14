@@ -54,7 +54,7 @@ internal static class PhysicalTransitionReportTests
             && parent.GetProperty("orientation").GetArrayLength() == 4
             && parent.GetProperty("collisionHistory").GetArrayLength() == 1
             && parentOutput.GetProperty("kind").GetString() == "DeformedProjectile"
-            && parentOutput.GetProperty("isParentDerivedMass").GetBoolean()
+            && !parentOutput.GetProperty("isParentDerivedMass").GetBoolean()
             && !parentOutput.GetProperty("isTargetMaterialOrigin").GetBoolean()
             && output.GetProperty("kind").GetString() == "TargetSpall"
             && output.GetProperty("sourceMaterialClass").GetString() == "ArmoredSteel"

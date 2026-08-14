@@ -164,8 +164,23 @@ Check(
     PhysicalTransitionInvariantTests.RejectsInconsistentComponentKinematics(),
     "physical transition invariants recompute component speed, momentum, and energy");
 Check(
-    PhysicalTransitionInvariantTests.RejectsAmbiguousOutputMassProvenance(),
-    "physical transition invariants reject ambiguous output mass provenance");
+    PhysicalTransitionInvariantTests.RejectsLostPriorCollisionHistory(),
+    "physical transition invariants reject lost or rewritten prior collision history");
+Check(
+    PhysicalTransitionInvariantTests.RejectsPreparedResolvedContextMismatch(),
+    "physical transition invariants reject mismatched prepared and resolved contexts");
+Check(
+    PhysicalTransitionInvariantTests.RejectsOutputKindProvenanceMismatch(),
+    "physical transition invariants reject component kind and provenance mismatches");
+Check(
+    PhysicalTransitionInvariantTests.AcceptsTargetMaterialFragmentDerivedFromImmediateParent(),
+    "schema 4 preserves target origin while closing immediate-parent mass and energy ledgers");
+Check(
+    PhysicalTransitionInvariantTests.AcceptsSignedClosureRemaindersInsidePublisherTolerance(),
+    "physical transition invariants accept signed rounding remainders inside publisher tolerance");
+Check(
+    PhysicalTransitionInvariantTests.RejectsNegativeClosureBeyondPublisherTolerance(),
+    "physical transition invariants reject output energy beyond publisher tolerance");
 Check(
     PhysicalTransitionInvariantTests.RejectsInvalidImpactCoupling(),
     "physical transition invariants reject impact couplings outside zero to one");
@@ -277,6 +292,9 @@ Check(
 Check(
     CampaignTests.PhysicalEvidenceUsesExactHostIdentityAndChecksClosure(),
     "campaign physical evidence uses exact host identity and measures mass and energy closure");
+Check(
+    CampaignTests.PhysicalEvidenceSeparatesMaterialOriginFromImmediateMassSource(),
+    "campaign closure separates inherited target material from fresh target-spall mass");
 Check(
     CampaignTests.CampaignJsonContainsDefinitionAttemptsAndMatrix(),
     "schema 4 campaign JSON contains definitions, attempts, seed semantics, and result matrix");

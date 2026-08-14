@@ -141,13 +141,15 @@ namespace BallisticsLab.Core
             for (int index = 0; index < outputs.Count; index++)
             {
                 PhysicalComponentRecord output = outputs[index];
-                if (output.IsParentDerivedMass)
-                {
-                    parentDerivedMass += output.RetainedMassKilograms;
-                }
-                if (output.IsTargetMaterialOrigin)
+                if (string.Equals(output.Kind, "TargetSpall", StringComparison.Ordinal))
                 {
                     targetMaterialMass += output.RetainedMassKilograms;
+                }
+                else
+                {
+                    // An identity-preserving primary revision has no parent-projectile lineage,
+                    // but its mass still comes from the parent state of this transition.
+                    parentDerivedMass += output.RetainedMassKilograms;
                 }
             }
 

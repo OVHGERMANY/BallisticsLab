@@ -940,6 +940,49 @@ internal static class CampaignTests
             && missingProfile.TransitionCount == 0;
     }
 
+    internal static bool PhysicalEvidenceSeparatesMaterialOriginFromImmediateMassSource()
+    {
+        FakePhysicalEvent fake = FakePhysicalEvent.Resolved("campaign-target-spall-fragment");
+        var fragment = (FakeComponent)fake.Outputs[0];
+        fragment.Kind = FakeKind.TargetSpallFragment;
+        fragment.ProjectileId = "target-spall-fragment";
+        fragment.Construction = FakeConstruction.TargetMaterial;
+        fragment.ShapeClass = FakeShape.TargetSpallFlake;
+        fragment.ParentProjectileId = "target-spall-parent";
+        fragment.SourceProjectileId = "target-spall-parent";
+        fragment.SourceCollisionId = fake.Event.TransitionId;
+        fragment.FragmentIndex = 0;
+        fragment.FragmentGeneration = 2;
+        fragment.SourceMaterialId = "target-profile";
+        fragment.SourceMaterialClass = FakeMaterial.ArmoredSteel;
+        fragment.IsTargetMaterialOrigin = true;
+        fragment.IsParentDerivedMass = true;
+
+        if (!PhysicalTelemetryReflectionReader.TryCopy(
+                PhysicalTelemetryContract.SupportedPublisherSchema,
+                fake.Event,
+                out PhysicalTelemetryEventRecord? resolved,
+                out _)
+            || resolved == null)
+        {
+            return false;
+        }
+
+        var tracker = new PhysicalTransitionTracker(2);
+        tracker.Add(resolved);
+        CampaignPhysicalEvidenceSummary evidence = CampaignPhysicalEvidenceCalculator.Calculate(
+            tracker.Snapshot(),
+            17,
+            991,
+            "ammo-template",
+            "profile",
+            700L,
+            1);
+        return evidence.TransitionCount == 1
+            && evidence.ConservationRecordCount == 1
+            && Math.Abs(evidence.MaximumMassClosureErrorKilograms) < 0.000000000001d;
+    }
+
     internal static bool CampaignJsonContainsDefinitionAttemptsAndMatrix()
     {
         CampaignDefinition definition = new CampaignDefinition(

@@ -102,6 +102,13 @@ internal static class PhysicalTransitionInvariantValidator
                 failure = prefix + " resolved event: " + failure;
                 return false;
             }
+            if (hasPrepared
+                && hasResolved
+                && !ContextsMatch(prepared, resolved))
+            {
+                failure = prefix + " prepared and resolved contexts disagree";
+                return false;
+            }
         }
         return true;
     }
@@ -163,19 +170,19 @@ internal static class PhysicalTransitionInvariantValidator
                     output,
                     out double retainedMass,
                     out double kineticEnergy,
-                    out ComponentOrigin origin,
+                    out TransitionMassSource massSource,
                     out failure))
             {
                 failure = "output component: " + failure;
                 return false;
             }
             outputEnergy += kineticEnergy;
-            if (origin == ComponentOrigin.ParentDerived)
+            if (massSource == TransitionMassSource.ParentDerived)
             {
                 parentDerivedMass += retainedMass;
                 parentDerivedCount++;
             }
-            else if (origin == ComponentOrigin.TargetMaterial)
+            else if (massSource == TransitionMassSource.FreshTargetMaterial)
             {
                 targetMaterialMass += retainedMass;
                 targetMaterialCount++;
@@ -210,14 +217,25 @@ internal static class PhysicalTransitionInvariantValidator
             failure = "resolved event omits output or conservation data";
             return false;
         }
-        return ValidateConservation(
-            conservation,
+        if (!ValidateConservation(
+                conservation,
+                parent,
+                outputEnergy,
+                parentDerivedMass,
+                targetMaterialMass,
+                parentDerivedCount,
+                targetMaterialCount,
+                out failure))
+        {
+            return false;
+        }
+        return ValidateResolvedRelationships(
+            telemetryEvent,
+            transitionId,
             parent,
-            outputEnergy,
-            parentDerivedMass,
-            targetMaterialMass,
-            parentDerivedCount,
-            targetMaterialCount,
+            outputs,
+            impact,
+            conservation,
             out failure);
     }
 
@@ -234,6 +252,113 @@ internal static class PhysicalTransitionInvariantValidator
             && TryInt32(host, "parentDepth", out int parentDepth)
             && parentDepth >= 0
             && !string.IsNullOrEmpty(RequiredString(host, "ammunitionTemplateId"));
+    }
+
+    private static bool ContextsMatch(JsonElement prepared, JsonElement resolved)
+    {
+        return prepared.GetProperty("host").GetRawText()
+                == resolved.GetProperty("host").GetRawText()
+            && prepared.GetProperty("impact").GetRawText()
+                == resolved.GetProperty("impact").GetRawText()
+            && prepared.GetProperty("parent").GetRawText()
+                == resolved.GetProperty("parent").GetRawText();
+    }
+
+    private static bool ValidateResolvedRelationships(
+        JsonElement telemetryEvent,
+        string transitionId,
+        JsonElement parent,
+        JsonElement outputs,
+        JsonElement impact,
+        JsonElement conservation,
+        out string failure)
+    {
+        failure = string.Empty;
+        JsonElement parentHistory = parent.GetProperty("collisionHistory");
+        int parentHistoryCount = parentHistory.GetArrayLength();
+        string parentRootShotId = RequiredString(parent, "rootShotId");
+        var outputIds = new HashSet<string>(StringComparer.Ordinal);
+        JsonElement currentCollision = default;
+        bool hasCurrentCollision = false;
+        foreach (JsonElement output in outputs.EnumerateArray())
+        {
+            string outputId = RequiredString(output, "projectileId");
+            JsonElement outputHistory = output.GetProperty("collisionHistory");
+            if (!outputIds.Add(outputId)
+                || RequiredString(output, "rootShotId") != parentRootShotId
+                || outputHistory.GetArrayLength() != parentHistoryCount + 1)
+            {
+                failure = "output identity or collision-history length is inconsistent";
+                return false;
+            }
+            for (int index = 0; index < parentHistoryCount; index++)
+            {
+                if (parentHistory[index].GetRawText() != outputHistory[index].GetRawText())
+                {
+                    failure = "output does not preserve prior collision history";
+                    return false;
+                }
+            }
+            JsonElement candidate = outputHistory[parentHistoryCount];
+            if (hasCurrentCollision
+                && currentCollision.GetRawText() != candidate.GetRawText())
+            {
+                failure = "outputs disagree about the current collision record";
+                return false;
+            }
+            currentCollision = candidate;
+            hasCurrentCollision = true;
+        }
+        if (!hasCurrentCollision
+            || RequiredString(currentCollision, "collisionId") != transitionId
+            || RequiredString(currentCollision, "materialId")
+                != RequiredString(impact, "targetProfileId")
+            || RequiredString(currentCollision, "materialClass")
+                != RequiredString(impact, "targetMaterialClass")
+            || RequiredString(currentCollision, "outcome")
+                != RequiredString(telemetryEvent, "outcome")
+            || currentCollision.GetProperty("sequence").GetInt32() != parentHistoryCount
+            || !VectorsNearly(currentCollision, "positionMetres", impact, "positionMetres")
+            || !VectorsNearly(parent, "positionMetres", impact, "positionMetres")
+            || !VectorsNearly(
+                currentCollision,
+                "incomingVelocityMetresPerSecond",
+                parent,
+                "velocityMetresPerSecond")
+            || !Nearly(
+                currentCollision.GetProperty(
+                    "incomingTranslationalEnergyJoules").GetDouble(),
+                parent.GetProperty("translationalKineticEnergyJoules").GetDouble())
+            || !Nearly(
+                currentCollision.GetProperty(
+                    "outgoingTranslationalEnergyJoules").GetDouble(),
+                conservation.GetProperty("residualEnergyJoules").GetDouble())
+            || !Nearly(
+                currentCollision.GetProperty("effectivePathLengthMetres").GetDouble(),
+                impact.GetProperty("effectivePathLengthMetres").GetDouble()))
+        {
+            failure = "current collision does not match its transition context";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool VectorsNearly(
+        JsonElement left,
+        string leftName,
+        JsonElement right,
+        string rightName)
+    {
+        return TryVectorValues(left, leftName, out double lx, out double ly, out double lz)
+            && TryVectorValues(right, rightName, out double rx, out double ry, out double rz)
+            && Nearly(lx, rx)
+            && Nearly(ly, ry)
+            && Nearly(lz, rz);
+    }
+
+    private static double PublisherEnergyTolerance(double energyJoules)
+    {
+        return Math.Max(1d, energyJoules) * 0.000000001d;
     }
 
     private static bool ValidateImpact(JsonElement impact)
@@ -256,16 +381,17 @@ internal static class PhysicalTransitionInvariantValidator
         JsonElement component,
         out double retainedMass,
         out double kineticEnergy,
-        out ComponentOrigin origin,
+        out TransitionMassSource massSource,
         out string failure)
     {
         retainedMass = 0d;
         kineticEnergy = 0d;
-        origin = ComponentOrigin.Ambiguous;
+        massSource = TransitionMassSource.Ambiguous;
         failure = string.Empty;
+        string kind = RequiredString(component, "kind");
         if (string.IsNullOrEmpty(RequiredString(component, "projectileId"))
             || string.IsNullOrEmpty(RequiredString(component, "rootShotId"))
-            || string.IsNullOrEmpty(RequiredString(component, "kind"))
+            || string.IsNullOrEmpty(kind)
             || string.IsNullOrEmpty(RequiredString(component, "construction"))
             || string.IsNullOrEmpty(RequiredString(component, "shapeClass"))
             || string.IsNullOrEmpty(RequiredString(component, "sourceMaterialClass"))
@@ -277,7 +403,7 @@ internal static class PhysicalTransitionInvariantValidator
             return false;
         }
         if (!TryInt32(component, "fragmentIndex", out int fragmentIndex)
-            || fragmentIndex < 0
+            || fragmentIndex < -1
             || !TryInt32(component, "fragmentGeneration", out int fragmentGeneration)
             || fragmentGeneration < 0
             || !TryUInt64(component, "deterministicSeed", out _)
@@ -341,24 +467,40 @@ internal static class PhysicalTransitionInvariantValidator
             failure = "component speed, momentum, energy, or orientation is internally inconsistent";
             return false;
         }
+        var collisionIds = new HashSet<string>(StringComparer.Ordinal);
+        int expectedSequence = 0;
         foreach (JsonElement collision in history.EnumerateArray())
         {
-            if (string.IsNullOrEmpty(RequiredString(collision, "collisionId"))
+            string collisionId = RequiredString(collision, "collisionId");
+            if (string.IsNullOrEmpty(collisionId)
+                || !collisionIds.Add(collisionId)
+                || string.IsNullOrEmpty(RequiredString(collision, "materialId"))
                 || string.IsNullOrEmpty(RequiredString(collision, "materialClass"))
                 || string.IsNullOrEmpty(RequiredString(collision, "outcome"))
                 || !TryInt32(collision, "sequence", out int sequence)
-                || sequence < 0
+                || sequence != expectedSequence
                 || !TryVector(collision, "positionMetres")
                 || !TryVector(collision, "incomingVelocityMetresPerSecond")
                 || !TryVector(collision, "outgoingVelocityMetresPerSecond")
                 || !NonNegative(collision, "incomingTranslationalEnergyJoules")
                 || !NonNegative(collision, "outgoingTranslationalEnergyJoules")
                 || !NonNegative(collision, "impactAngleRadians")
+                || collision.GetProperty("impactAngleRadians").GetDouble() > Math.PI * 0.5d
                 || !NonNegative(collision, "effectivePathLengthMetres"))
             {
                 failure = "collision history entry is invalid";
                 return false;
             }
+            double incomingEnergy = collision.GetProperty(
+                "incomingTranslationalEnergyJoules").GetDouble();
+            double outgoingEnergy = collision.GetProperty(
+                "outgoingTranslationalEnergyJoules").GetDouble();
+            if (outgoingEnergy > incomingEnergy + PublisherEnergyTolerance(incomingEnergy))
+            {
+                failure = "collision history gains energy";
+                return false;
+            }
+            expectedSequence++;
         }
         if (!TryBoolean(component, "isTargetMaterialOrigin", out bool targetOrigin)
             || !TryBoolean(component, "isParentDerivedMass", out bool parentDerived))
@@ -366,19 +508,67 @@ internal static class PhysicalTransitionInvariantValidator
             failure = "component mass-origin flags are missing or invalid";
             return false;
         }
-        origin = targetOrigin == parentDerived
-            ? ComponentOrigin.Ambiguous
-            : targetOrigin
-                ? ComponentOrigin.TargetMaterial
-                : ComponentOrigin.ParentDerived;
-        if (origin == ComponentOrigin.TargetMaterial
-            && string.IsNullOrEmpty(RequiredString(component, "sourceMaterialId")))
+        string construction = RequiredString(component, "construction");
+        string shapeClass = RequiredString(component, "shapeClass");
+        string parentProjectileId = RequiredString(component, "parentProjectileId");
+        string sourceProjectileId = RequiredString(component, "sourceProjectileId");
+        string sourceMaterialId = RequiredString(component, "sourceMaterialId");
+        string sourceCollisionId = RequiredString(component, "sourceCollisionId");
+        bool hasParent = !string.IsNullOrEmpty(parentProjectileId);
+        bool isTargetSpall = string.Equals(kind, "TargetSpall", StringComparison.Ordinal);
+        bool isTargetSpallFragment = string.Equals(
+            kind,
+            "TargetSpallFragment",
+            StringComparison.Ordinal);
+        bool isProjectileFragment = string.Equals(
+            kind,
+            "ProjectileFragment",
+            StringComparison.Ordinal);
+        bool isPrimary = string.Equals(kind, "IntactProjectile", StringComparison.Ordinal)
+            || string.Equals(kind, "DeformedProjectile", StringComparison.Ordinal);
+        bool expectedTargetOrigin = isTargetSpall || isTargetSpallFragment;
+        bool expectedParentLineage = hasParent && !isTargetSpall;
+        bool hasTargetConstruction = string.Equals(
+            construction,
+            "TargetMaterial",
+            StringComparison.Ordinal);
+        bool hasTargetShape = string.Equals(
+                shapeClass,
+                "TargetSpallFlake",
+                StringComparison.Ordinal)
+            || string.Equals(shapeClass, "TargetSpallChunk", StringComparison.Ordinal);
+        if ((!isPrimary && !isProjectileFragment && !isTargetSpall && !isTargetSpallFragment)
+            || targetOrigin != expectedTargetOrigin
+            || parentDerived != expectedParentLineage
+            || hasTargetConstruction != expectedTargetOrigin
+            || hasTargetShape != expectedTargetOrigin)
+        {
+            failure = "component kind and provenance flags disagree";
+            return false;
+        }
+        if ((!hasParent
+                && (fragmentGeneration != 0
+                    || fragmentIndex != -1
+                    || !isPrimary))
+            || (hasParent
+                && (fragmentGeneration <= 0
+                    || fragmentIndex < 0
+                    || string.IsNullOrEmpty(sourceProjectileId)
+                    || string.IsNullOrEmpty(sourceMaterialId)
+                    || string.IsNullOrEmpty(sourceCollisionId))))
+        {
+            failure = "component lineage is inconsistent";
+            return false;
+        }
+        massSource = isTargetSpall
+            ? TransitionMassSource.FreshTargetMaterial
+            : TransitionMassSource.ParentDerived;
+        if (targetOrigin && string.IsNullOrEmpty(sourceMaterialId))
         {
             failure = "target-material output omits its source material";
             return false;
         }
-        if (origin == ComponentOrigin.ParentDerived
-            && string.IsNullOrEmpty(RequiredString(component, "sourceProjectileId")))
+        if (parentDerived && string.IsNullOrEmpty(sourceProjectileId))
         {
             failure = "parent-derived output omits its source projectile";
             return false;
@@ -423,13 +613,11 @@ internal static class PhysicalTransitionInvariantValidator
         {
             "parentMassKilograms",
             "allocatedParentMassKilograms",
-            "unallocatedParentMassKilograms",
             "targetSpallMassKilograms",
             "parentEnergyJoules",
             "modeledLossEnergyJoules",
             "residualEnergyJoules",
-            "outputEnergyJoules",
-            "energyClosureErrorJoules"
+            "outputEnergyJoules"
         };
         foreach (string field in conservationFields)
         {
@@ -438,6 +626,12 @@ internal static class PhysicalTransitionInvariantValidator
                 failure = "conservation " + field + " is invalid";
                 return false;
             }
+        }
+        if (!Finite(conservation, "unallocatedParentMassKilograms")
+            || !Finite(conservation, "energyClosureErrorJoules"))
+        {
+            failure = "signed conservation remainder is missing or non-finite";
+            return false;
         }
 
         double parentMass = conservation.GetProperty("parentMassKilograms").GetDouble();
@@ -455,22 +649,39 @@ internal static class PhysicalTransitionInvariantValidator
             + lossBudget.GetProperty("heatLossJoules").GetDouble()
             + lossBudget.GetProperty("otherLossJoules").GetDouble();
         double totalLoss = lossBudget.GetProperty("totalLossJoules").GetDouble();
+        double massTolerance = Math.Max(0.000000000001d, parentMass * 0.000000001d);
+        double targetMassTolerance = Math.Max(
+            0.000000000001d,
+            targetSpallMass * 0.000000001d);
+        double energyTolerance = Math.Max(1d, parentEnergy) * 0.000000001d;
         if (!TryInt32(conservation, "parentDerivedOutputCount", out int parentDerivedCount)
             || parentDerivedCount < 0
             || !TryInt32(conservation, "targetSpallOutputCount", out int targetSpallCount)
             || targetSpallCount < 0
-            || !Nearly(parentMass, parent.GetProperty("retainedMassKilograms").GetDouble())
-            || !Nearly(parentEnergy, parent.GetProperty("translationalKineticEnergyJoules").GetDouble())
-            || !Nearly(parentMass, allocatedMass + unallocatedMass)
-            || !Nearly(allocatedMass, calculatedParentDerivedMass)
-            || !Nearly(targetSpallMass, calculatedTargetMaterialMass)
+            || allocatedMass > parentMass + massTolerance
+            || unallocatedMass < -massTolerance
+            || outputEnergy > residualEnergy + energyTolerance
+            || !Within(
+                parentMass,
+                parent.GetProperty("retainedMassKilograms").GetDouble(),
+                massTolerance)
+            || !Within(
+                parentEnergy,
+                parent.GetProperty("translationalKineticEnergyJoules").GetDouble(),
+                energyTolerance)
+            || !Within(parentMass, allocatedMass + unallocatedMass, massTolerance)
+            || !Within(allocatedMass, calculatedParentDerivedMass, massTolerance)
+            || !Within(targetSpallMass, calculatedTargetMaterialMass, targetMassTolerance)
             || parentDerivedCount != calculatedParentDerivedCount
             || targetSpallCount != calculatedTargetMaterialCount
-            || !Nearly(totalLoss, lossSum)
-            || !Nearly(modeledLoss, totalLoss)
-            || !Nearly(residualEnergy, Math.Max(0d, parentEnergy - modeledLoss))
-            || !Nearly(outputEnergy, calculatedOutputEnergy)
-            || !Nearly(closureError, residualEnergy - outputEnergy))
+            || !Within(totalLoss, lossSum, energyTolerance)
+            || !Within(modeledLoss, totalLoss, energyTolerance)
+            || !Within(
+                residualEnergy,
+                Math.Max(0d, parentEnergy - modeledLoss),
+                energyTolerance)
+            || !Within(outputEnergy, calculatedOutputEnergy, energyTolerance)
+            || !Within(closureError, residualEnergy - outputEnergy, energyTolerance))
         {
             failure = "mass, output count, loss, or energy closure does not balance";
             return false;
@@ -646,11 +857,16 @@ internal static class PhysicalTransitionInvariantValidator
         return Math.Max(0.000000000001d, Math.Max(1d, scale) * 0.00000001d);
     }
 
-    private enum ComponentOrigin
+    private static bool Within(double left, double right, double tolerance)
+    {
+        return Math.Abs(left - right) <= tolerance;
+    }
+
+    private enum TransitionMassSource
     {
         Ambiguous = 0,
         ParentDerived = 1,
-        TargetMaterial = 2
+        FreshTargetMaterial = 2
     }
 }
 
@@ -717,7 +933,33 @@ internal static class PhysicalTransitionInvariantTests
             && failure.Contains("internally inconsistent", StringComparison.OrdinalIgnoreCase);
     }
 
-    internal static bool RejectsAmbiguousOutputMassProvenance()
+    internal static bool RejectsLostPriorCollisionHistory()
+    {
+        JsonNode root = JsonNode.Parse(CreateReport())!;
+        root["physicalTransitions"]![0]!["resolved"]!["outputs"]![0]![
+            "collisionHistory"]![0]!["collisionId"] = "altered-prior-collision";
+        using JsonDocument document = JsonDocument.Parse(root.ToJsonString());
+        return !PhysicalTransitionInvariantValidator.Validate(
+                document.RootElement,
+                out _,
+                out string failure)
+            && failure.Contains("prior collision history", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool RejectsPreparedResolvedContextMismatch()
+    {
+        JsonNode root = JsonNode.Parse(CreateReport())!;
+        root["physicalTransitions"]![0]!["resolved"]!["host"]![
+            "currentRandomSeed"] = 12345;
+        using JsonDocument document = JsonDocument.Parse(root.ToJsonString());
+        return !PhysicalTransitionInvariantValidator.Validate(
+                document.RootElement,
+                out _,
+                out string failure)
+            && failure.Contains("contexts disagree", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool RejectsOutputKindProvenanceMismatch()
     {
         JsonNode root = JsonNode.Parse(CreateReport())!;
         root["physicalTransitions"]![0]!["resolved"]!["outputs"]![0]![
@@ -727,7 +969,114 @@ internal static class PhysicalTransitionInvariantTests
                 document.RootElement,
                 out _,
                 out string failure)
-            && failure.Contains("ambiguous", StringComparison.OrdinalIgnoreCase);
+            && failure.Contains("provenance", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool AcceptsTargetMaterialFragmentDerivedFromImmediateParent()
+    {
+        FakePhysicalEvent resolved = FakePhysicalEvent.Resolved("target-spall-fragment");
+        var fragment = (FakeComponent)resolved.Outputs[0];
+        fragment.Kind = FakeKind.TargetSpallFragment;
+        fragment.ProjectileId = "target-spall-fragment";
+        fragment.Construction = FakeConstruction.TargetMaterial;
+        fragment.ShapeClass = FakeShape.TargetSpallFlake;
+        fragment.ParentProjectileId = "target-spall-parent";
+        fragment.SourceProjectileId = "target-spall-parent";
+        fragment.SourceCollisionId = resolved.Event.TransitionId;
+        fragment.FragmentIndex = 0;
+        fragment.FragmentGeneration = 2;
+        fragment.SourceMaterialId = "target-profile";
+        fragment.SourceMaterialClass = FakeMaterial.ArmoredSteel;
+        fragment.IsTargetMaterialOrigin = true;
+        fragment.IsParentDerivedMass = true;
+
+        using JsonDocument document = JsonDocument.Parse(CreateReport(resolved));
+        JsonElement transition = document.RootElement.GetProperty("physicalTransitions")[0];
+        JsonElement resolvedSnapshot = transition.GetProperty("resolved");
+        JsonElement output = resolvedSnapshot.GetProperty("outputs")[0];
+        JsonElement conservation = resolvedSnapshot.GetProperty("conservation");
+        return document.RootElement.GetProperty("schema").GetInt32() == 4
+            && output.GetProperty("kind").GetString() == "TargetSpallFragment"
+            && output.GetProperty("isTargetMaterialOrigin").GetBoolean()
+            && output.GetProperty("isParentDerivedMass").GetBoolean()
+            && Math.Abs(
+                conservation.GetProperty("allocatedParentMassKilograms").GetDouble()
+                - 0.003d) < 0.000000000001d
+            && Math.Abs(
+                conservation.GetProperty("unallocatedParentMassKilograms").GetDouble()
+                - 0.001d) < 0.000000000001d
+            && Math.Abs(
+                conservation.GetProperty("targetSpallMassKilograms").GetDouble()
+                - 0.0002d) < 0.000000000001d
+            && conservation.GetProperty("parentDerivedOutputCount").GetInt32() == 1
+            && conservation.GetProperty("targetSpallOutputCount").GetInt32() == 1
+            && Math.Abs(
+                conservation.GetProperty("residualEnergyJoules").GetDouble()
+                - 770d) < 0.000000001d
+            && Math.Abs(
+                conservation.GetProperty("outputEnergyJoules").GetDouble()
+                - 760d) < 0.000000001d
+            && Math.Abs(
+                conservation.GetProperty("energyClosureErrorJoules").GetDouble()
+                - 10d) < 0.000000001d
+            && PhysicalTransitionInvariantValidator.Validate(
+                document.RootElement,
+                out int count,
+                out _)
+            && count == 1;
+    }
+
+    internal static bool AcceptsSignedClosureRemaindersInsidePublisherTolerance()
+    {
+        JsonNode root = JsonNode.Parse(CreateReport())!;
+        JsonNode output = root["physicalTransitions"]![0]!["resolved"]!["outputs"]![0]!;
+        const double retainedMass = 0.003d;
+        const double outputEnergy = 670.0000001d;
+        double speed = Math.Sqrt((2d * outputEnergy) / retainedMass);
+        output["velocityMetresPerSecond"] = new JsonArray(0d, 0d, speed);
+        output["speedMetresPerSecond"] = speed;
+        output["momentumKilogramMetresPerSecond"] = new JsonArray(
+            0d,
+            0d,
+            retainedMass * speed);
+        output["translationalKineticEnergyJoules"] = outputEnergy;
+        JsonNode conservation = root["physicalTransitions"]![0]!["resolved"]![
+            "conservation"]!;
+        conservation["outputEnergyJoules"] = 770.0000001d;
+        conservation["energyClosureErrorJoules"] = -0.0000001d;
+
+        using JsonDocument document = JsonDocument.Parse(root.ToJsonString());
+        return PhysicalTransitionInvariantValidator.Validate(
+            document.RootElement,
+            out _,
+            out _);
+    }
+
+    internal static bool RejectsNegativeClosureBeyondPublisherTolerance()
+    {
+        JsonNode root = JsonNode.Parse(CreateReport())!;
+        JsonNode output = root["physicalTransitions"]![0]!["resolved"]!["outputs"]![0]!;
+        const double retainedMass = 0.003d;
+        const double outputEnergy = 670.01d;
+        double speed = Math.Sqrt((2d * outputEnergy) / retainedMass);
+        output["velocityMetresPerSecond"] = new JsonArray(0d, 0d, speed);
+        output["speedMetresPerSecond"] = speed;
+        output["momentumKilogramMetresPerSecond"] = new JsonArray(
+            0d,
+            0d,
+            retainedMass * speed);
+        output["translationalKineticEnergyJoules"] = outputEnergy;
+        JsonNode conservation = root["physicalTransitions"]![0]!["resolved"]![
+            "conservation"]!;
+        conservation["outputEnergyJoules"] = 770.01d;
+        conservation["energyClosureErrorJoules"] = -0.01d;
+
+        using JsonDocument document = JsonDocument.Parse(root.ToJsonString());
+        return !PhysicalTransitionInvariantValidator.Validate(
+                document.RootElement,
+                out _,
+                out string failure)
+            && failure.Contains("closure", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool RejectsInvalidImpactCoupling()
@@ -743,11 +1092,12 @@ internal static class PhysicalTransitionInvariantTests
             && failure.Contains("impact", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string CreateReport()
+    private static string CreateReport(FakePhysicalEvent? resolved = null)
     {
+        resolved ??= FakePhysicalEvent.Resolved("balanced");
         var tracker = new PhysicalTransitionTracker(2);
-        tracker.Add(Copy(FakePhysicalEvent.Prepared("balanced")));
-        tracker.Add(Copy(FakePhysicalEvent.Resolved("balanced")));
+        tracker.Add(Copy(FakePhysicalEvent.Prepared(resolved.Event.TransitionId)));
+        tracker.Add(Copy(resolved));
         var builder = new StringBuilder("{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],\"physicalTransitions\":");
         PhysicalTransitionJsonWriter.AppendArray(builder, tracker.Snapshot());
         builder.Append('}');

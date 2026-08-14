@@ -144,15 +144,17 @@ internal static class PhysicalTelemetryFoundationTests
             && captured.Outcome == "Fragmented"
             && output.Kind == "TargetSpall"
             && parentOutput.Kind == "DeformedProjectile"
-            && parentOutput.IsParentDerivedMass
+            && !parentOutput.IsParentDerivedMass
             && !parentOutput.IsTargetMaterialOrigin
             && output.ParentProjectileId == "projectile-parent"
             && output.SourceMaterialId == "target-profile"
             && output.SourceMaterialClass == "ArmoredSteel"
-            && output.SourceCollisionId == "collision-current"
+            && output.SourceCollisionId == "transition-resolved"
             && output.IsTargetMaterialOrigin
             && !output.IsParentDerivedMass
-            && output.CollisionHistory.Count == 1
+            && output.CollisionHistory.Count == 2
+            && output.CollisionHistory[0].CollisionId == "collision-prior"
+            && output.CollisionHistory[1].CollisionId == "transition-resolved"
             && Nearly(conservation.ParentMassKilograms, 0.004d)
             && Nearly(conservation.AllocatedParentMassKilograms, 0.003d)
             && Nearly(conservation.UnallocatedParentMassKilograms, 0.001d)
@@ -293,7 +295,7 @@ internal sealed class FakePhysicalEvent
 
     internal static FakePhysicalEvent Prepared(string transitionId = "transition-prepared")
     {
-        List<object> parentHistory = new() { Collision("collision-prior", FakeOutcome.Penetrated) };
+        List<object> parentHistory = new() { PriorCollision() };
         FakeComponent parent = ParentComponent(parentHistory);
         List<object> outputs = new();
         var value = new FakeTelemetryEvent
@@ -314,13 +316,13 @@ internal sealed class FakePhysicalEvent
         string transitionId = "transition-resolved",
         string targetSurfaceIdentity = "fixture/700/plate/0")
     {
-        List<object> parentHistory = new() { Collision("collision-prior", FakeOutcome.Penetrated) };
-        List<object> outputHistory = new() { Collision("collision-current", FakeOutcome.Fragmented) };
+        List<object> parentHistory = new() { PriorCollision() };
+        List<object> outputHistory = new() { PriorCollision(), CurrentCollision(transitionId) };
         FakeComponent parent = ParentComponent(parentHistory);
         List<object> outputs = new()
         {
             ParentOutputComponent(outputHistory),
-            SpallComponent(outputHistory)
+            SpallComponent(outputHistory, transitionId)
         };
         var value = new FakeTelemetryEvent
         {
@@ -405,7 +407,7 @@ internal sealed class FakePhysicalEvent
             SourceMaterialId = "projectile-steel-core",
             SourceMaterialClass = FakeMaterial.MildSteel,
             SourceCollisionId = null,
-            FragmentIndex = 0,
+            FragmentIndex = -1,
             FragmentGeneration = 0,
             DeterministicSeed = 123456789UL,
             Construction = FakeConstruction.SteelCoreJacketed,
@@ -420,7 +422,7 @@ internal sealed class FakePhysicalEvent
             AspectRatio = 4.4d,
             DragCoefficient = 0.3d,
             BallisticCoefficientKilogramsPerSquareMetre = 533.3d,
-            PositionMetres = new FakeVector(1d, 2d, 3d),
+            PositionMetres = new FakeVector(1.25d, 2.5d, 3.75d),
             VelocityMetresPerSecond = new FakeVector(0d, 0d, 800d),
             SpeedMetresPerSecond = 800d,
             MomentumKilogramMetresPerSecond = new FakeVector(0d, 0d, 3.2d),
@@ -438,7 +440,7 @@ internal sealed class FakePhysicalEvent
         };
     }
 
-    private static FakeComponent SpallComponent(List<object> history)
+    private static FakeComponent SpallComponent(List<object> history, string sourceCollisionId)
     {
         FakeComponent component = ParentComponent(history);
         component.Kind = FakeKind.TargetSpall;
@@ -447,7 +449,7 @@ internal sealed class FakePhysicalEvent
         component.SourceProjectileId = "projectile-parent";
         component.SourceMaterialId = "target-profile";
         component.SourceMaterialClass = FakeMaterial.ArmoredSteel;
-        component.SourceCollisionId = "collision-current";
+        component.SourceCollisionId = sourceCollisionId;
         component.FragmentIndex = 1;
         component.FragmentGeneration = 1;
         component.Construction = FakeConstruction.TargetMaterial;
@@ -468,36 +470,57 @@ internal sealed class FakePhysicalEvent
         FakeComponent component = ParentComponent(history);
         const double speed = 663.3249580710799d;
         component.Kind = FakeKind.DeformedProjectile;
-        component.ProjectileId = "projectile-output";
-        component.ParentProjectileId = "projectile-parent";
-        component.SourceProjectileId = "projectile-parent";
-        component.SourceCollisionId = "collision-current";
+        // A primary revision keeps its physical identity and root lineage. Its transition mass
+        // still comes from the incoming parent state even though it has no parent-projectile ID.
+        component.ProjectileId = "projectile-parent";
+        component.ParentProjectileId = null;
+        component.SourceProjectileId = null;
+        component.SourceCollisionId = null;
         component.RetainedMassKilograms = 0.003d;
         component.VelocityMetresPerSecond = new FakeVector(0d, 0d, speed);
         component.SpeedMetresPerSecond = speed;
         component.MomentumKilogramMetresPerSecond = new FakeVector(0d, 0d, 0.003d * speed);
         component.TranslationalKineticEnergyJoules = 660d;
         component.IsTargetMaterialOrigin = false;
-        component.IsParentDerivedMass = true;
+        component.IsParentDerivedMass = false;
         return component;
     }
 
-    private static FakeCollision Collision(string collisionId, FakeOutcome outcome)
+    private static FakeCollision PriorCollision()
+    {
+        return new FakeCollision
+        {
+            CollisionId = "collision-prior",
+            MaterialId = "prior-material",
+            MaterialClass = FakeMaterial.ArmoredSteel,
+            Sequence = 0,
+            PositionMetres = new FakeVector(0.5d, 1d, 1.5d),
+            IncomingVelocityMetresPerSecond = new FakeVector(0d, 0d, 900d),
+            OutgoingVelocityMetresPerSecond = new FakeVector(0d, 0d, 810d),
+            IncomingTranslationalEnergyJoules = 1620d,
+            OutgoingTranslationalEnergyJoules = 1312.2d,
+            ImpactAngleRadians = 0.25d,
+            EffectivePathLengthMetres = 0.01d,
+            Outcome = FakeOutcome.Penetrated
+        };
+    }
+
+    private static FakeCollision CurrentCollision(string collisionId)
     {
         return new FakeCollision
         {
             CollisionId = collisionId,
-            MaterialId = "material",
+            MaterialId = "target-profile",
             MaterialClass = FakeMaterial.ArmoredSteel,
             Sequence = 1,
-            PositionMetres = new FakeVector(1d, 2d, 3d),
+            PositionMetres = new FakeVector(1.25d, 2.5d, 3.75d),
             IncomingVelocityMetresPerSecond = new FakeVector(0d, 0d, 800d),
-            OutgoingVelocityMetresPerSecond = new FakeVector(0d, 0d, 600d),
+            OutgoingVelocityMetresPerSecond = new FakeVector(0d, 0d, 620.4836822995428d),
             IncomingTranslationalEnergyJoules = 1280d,
-            OutgoingTranslationalEnergyJoules = 720d,
+            OutgoingTranslationalEnergyJoules = 770d,
             ImpactAngleRadians = 0.25d,
             EffectivePathLengthMetres = 0.018d,
-            Outcome = outcome
+            Outcome = FakeOutcome.Fragmented
         };
     }
 }
