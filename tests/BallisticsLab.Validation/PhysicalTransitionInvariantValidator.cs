@@ -113,10 +113,23 @@ internal static class PhysicalTransitionInvariantValidator
         out string failure)
     {
         failure = string.Empty;
+        if (!TryInt32(telemetryEvent, "snapshotSchema", out int snapshotSchema)
+            || snapshotSchema != PhysicalTelemetryContract.SnapshotSchema
+            || !TryInt32(telemetryEvent, "publisherSchema", out int publisherSchema)
+            || publisherSchema != PhysicalTelemetryContract.SupportedPublisherSchema)
+        {
+            failure = "snapshot or publisher schema is unsupported";
+            return false;
+        }
         if (RequiredString(telemetryEvent, "transitionId") != transitionId
             || RequiredString(telemetryEvent, "stage") != expectedStage)
         {
             failure = "stage or transition identity is inconsistent";
+            return false;
+        }
+        if (string.IsNullOrEmpty(RequiredString(telemetryEvent, "outcome")))
+        {
+            failure = "outcome is missing";
             return false;
         }
         if (!TryObject(telemetryEvent, "host", out JsonElement host)
@@ -212,8 +225,10 @@ internal static class PhysicalTransitionInvariantValidator
     {
         return TryInt32(host, "rootFireIndex", out int rootFireIndex)
             && rootFireIndex >= 0
+            && TryInt32(host, "rootRandomSeed", out _)
             && TryInt32(host, "currentFireIndex", out int currentFireIndex)
             && currentFireIndex >= 0
+            && TryInt32(host, "currentRandomSeed", out _)
             && TryInt32(host, "currentFragmentIndex", out int fragmentIndex)
             && fragmentIndex >= 0
             && TryInt32(host, "parentDepth", out int parentDepth)
@@ -224,14 +239,16 @@ internal static class PhysicalTransitionInvariantValidator
     private static bool ValidateImpact(JsonElement impact)
     {
         return TryVector(impact, "positionMetres")
-            && TryVector(impact, "surfaceNormal")
+            && TryVectorValues(impact, "surfaceNormal", out double nx, out double ny, out double nz)
+            && NearlyUnit(Math.Sqrt(nx * nx + ny * ny + nz * nz))
             && NonNegative(impact, "physicalThicknessMetres")
             && NonNegative(impact, "effectivePathLengthMetres")
+            && !string.IsNullOrEmpty(RequiredString(impact, "targetMaterialClass"))
             && NonNegative(impact, "targetDensityKilogramsPerCubicMetre")
             && NonNegative(impact, "targetResistancePressurePascals")
-            && NonNegative(impact, "projectileDeformationCoupling")
-            && NonNegative(impact, "projectileFractureCoupling")
-            && NonNegative(impact, "heatLossFraction");
+            && Probability(impact, "projectileDeformationCoupling")
+            && Probability(impact, "projectileFractureCoupling")
+            && Probability(impact, "heatLossFraction");
     }
 
     private static bool ValidateComponent(
@@ -246,9 +263,26 @@ internal static class PhysicalTransitionInvariantValidator
         origin = ComponentOrigin.Ambiguous;
         failure = string.Empty;
         if (string.IsNullOrEmpty(RequiredString(component, "projectileId"))
-            || string.IsNullOrEmpty(RequiredString(component, "rootShotId")))
+            || string.IsNullOrEmpty(RequiredString(component, "rootShotId"))
+            || string.IsNullOrEmpty(RequiredString(component, "kind"))
+            || string.IsNullOrEmpty(RequiredString(component, "construction"))
+            || string.IsNullOrEmpty(RequiredString(component, "shapeClass"))
+            || string.IsNullOrEmpty(RequiredString(component, "sourceMaterialClass"))
+            || string.IsNullOrEmpty(RequiredString(component, "tumbleState"))
+            || string.IsNullOrEmpty(RequiredString(component, "terminalState"))
+            || string.IsNullOrEmpty(RequiredString(component, "renderState")))
         {
-            failure = "projectile or root-shot identity is missing";
+            failure = "component identity or state classification is missing";
+            return false;
+        }
+        if (!TryInt32(component, "fragmentIndex", out int fragmentIndex)
+            || fragmentIndex < 0
+            || !TryInt32(component, "fragmentGeneration", out int fragmentGeneration)
+            || fragmentGeneration < 0
+            || !TryUInt64(component, "deterministicSeed", out _)
+            || !Finite(component, "yawAngleRadians"))
+        {
+            failure = "fragment identity, deterministic seed, or yaw is invalid";
             return false;
         }
         foreach (string field in ComponentNonNegativeFields)
@@ -268,36 +302,86 @@ internal static class PhysicalTransitionInvariantValidator
             return false;
         }
         if (!TryVector(component, "positionMetres")
-            || !TryVector(component, "velocityMetresPerSecond")
-            || !TryVector(component, "momentumKilogramMetresPerSecond")
-            || !TryArray(component, "orientation", 4)
+            || !TryVectorValues(
+                component,
+                "velocityMetresPerSecond",
+                out double velocityX,
+                out double velocityY,
+                out double velocityZ)
+            || !TryVectorValues(
+                component,
+                "momentumKilogramMetresPerSecond",
+                out double momentumX,
+                out double momentumY,
+                out double momentumZ)
+            || !TryArrayValues(component, "orientation", 4, out double[] orientation)
             || !component.TryGetProperty("collisionHistory", out JsonElement history)
             || history.ValueKind != JsonValueKind.Array)
         {
             failure = "motion, orientation, or collision history is invalid";
             return false;
         }
+        double speed = component.GetProperty("speedMetresPerSecond").GetDouble();
+        double calculatedSpeed = Math.Sqrt(
+            velocityX * velocityX + velocityY * velocityY + velocityZ * velocityZ);
+        double calculatedEnergy = 0.5d * retainedMass * calculatedSpeed * calculatedSpeed;
+        double orientationMagnitude = Math.Sqrt(
+            orientation[0] * orientation[0]
+            + orientation[1] * orientation[1]
+            + orientation[2] * orientation[2]
+            + orientation[3] * orientation[3]);
+        if (!NearlyKinematic(speed, calculatedSpeed)
+            || !NearlyKinematic(momentumX, retainedMass * velocityX)
+            || !NearlyKinematic(momentumY, retainedMass * velocityY)
+            || !NearlyKinematic(momentumZ, retainedMass * velocityZ)
+            || !NearlyKinematic(kineticEnergy, calculatedEnergy)
+            || !NearlyUnit(orientationMagnitude))
+        {
+            failure = "component speed, momentum, energy, or orientation is internally inconsistent";
+            return false;
+        }
         foreach (JsonElement collision in history.EnumerateArray())
         {
             if (string.IsNullOrEmpty(RequiredString(collision, "collisionId"))
+                || string.IsNullOrEmpty(RequiredString(collision, "materialClass"))
+                || string.IsNullOrEmpty(RequiredString(collision, "outcome"))
+                || !TryInt32(collision, "sequence", out int sequence)
+                || sequence < 0
                 || !TryVector(collision, "positionMetres")
                 || !TryVector(collision, "incomingVelocityMetresPerSecond")
                 || !TryVector(collision, "outgoingVelocityMetresPerSecond")
                 || !NonNegative(collision, "incomingTranslationalEnergyJoules")
                 || !NonNegative(collision, "outgoingTranslationalEnergyJoules")
+                || !NonNegative(collision, "impactAngleRadians")
                 || !NonNegative(collision, "effectivePathLengthMetres"))
             {
                 failure = "collision history entry is invalid";
                 return false;
             }
         }
-        bool targetOrigin = component.GetProperty("isTargetMaterialOrigin").GetBoolean();
-        bool parentDerived = component.GetProperty("isParentDerivedMass").GetBoolean();
+        if (!TryBoolean(component, "isTargetMaterialOrigin", out bool targetOrigin)
+            || !TryBoolean(component, "isParentDerivedMass", out bool parentDerived))
+        {
+            failure = "component mass-origin flags are missing or invalid";
+            return false;
+        }
         origin = targetOrigin == parentDerived
             ? ComponentOrigin.Ambiguous
             : targetOrigin
                 ? ComponentOrigin.TargetMaterial
                 : ComponentOrigin.ParentDerived;
+        if (origin == ComponentOrigin.TargetMaterial
+            && string.IsNullOrEmpty(RequiredString(component, "sourceMaterialId")))
+        {
+            failure = "target-material output omits its source material";
+            return false;
+        }
+        if (origin == ComponentOrigin.ParentDerived
+            && string.IsNullOrEmpty(RequiredString(component, "sourceProjectileId")))
+        {
+            failure = "parent-derived output omits its source projectile";
+            return false;
+        }
         return true;
     }
 
@@ -426,25 +510,60 @@ internal static class PhysicalTransitionInvariantValidator
 
     private static bool TryVector(JsonElement source, string name)
     {
-        return TryArray(source, name, 3);
+        return TryVectorValues(source, name, out _, out _, out _);
     }
 
-    private static bool TryArray(JsonElement source, string name, int length)
+    private static bool TryVectorValues(
+        JsonElement source,
+        string name,
+        out double x,
+        out double y,
+        out double z)
     {
+        x = 0d;
+        y = 0d;
+        z = 0d;
+        if (!TryArrayValues(source, name, 3, out double[] values))
+        {
+            return false;
+        }
+        x = values[0];
+        y = values[1];
+        z = values[2];
+        return true;
+    }
+
+    private static bool TryArrayValues(
+        JsonElement source,
+        string name,
+        int length,
+        out double[] values)
+    {
+        values = Array.Empty<double>();
         if (!source.TryGetProperty(name, out JsonElement value)
             || value.ValueKind != JsonValueKind.Array
             || value.GetArrayLength() != length)
         {
             return false;
         }
+        values = new double[length];
+        int index = 0;
         foreach (JsonElement number in value.EnumerateArray())
         {
             if (!number.TryGetDouble(out double parsed) || !double.IsFinite(parsed))
             {
                 return false;
             }
+            values[index++] = parsed;
         }
         return true;
+    }
+
+    private static bool Finite(JsonElement source, string name)
+    {
+        return source.TryGetProperty(name, out JsonElement value)
+            && value.TryGetDouble(out double parsed)
+            && double.IsFinite(parsed);
     }
 
     private static bool NonNegative(JsonElement source, string name)
@@ -453,6 +572,23 @@ internal static class PhysicalTransitionInvariantValidator
             && value.TryGetDouble(out double parsed)
             && double.IsFinite(parsed)
             && parsed >= 0d;
+    }
+
+    private static bool Probability(JsonElement source, string name)
+    {
+        return NonNegative(source, name) && source.GetProperty(name).GetDouble() <= 1d;
+    }
+
+    private static bool TryBoolean(JsonElement source, string name, out bool value)
+    {
+        value = false;
+        if (!source.TryGetProperty(name, out JsonElement element)
+            || element.ValueKind != JsonValueKind.True && element.ValueKind != JsonValueKind.False)
+        {
+            return false;
+        }
+        value = element.GetBoolean();
+        return true;
     }
 
     private static string RequiredString(JsonElement source, string name)
@@ -475,9 +611,27 @@ internal static class PhysicalTransitionInvariantValidator
         return source.TryGetProperty(name, out JsonElement element) && element.TryGetInt64(out value);
     }
 
+    private static bool TryUInt64(JsonElement source, string name, out ulong value)
+    {
+        value = 0UL;
+        return source.TryGetProperty(name, out JsonElement element)
+            && element.TryGetUInt64(out value);
+    }
+
     private static bool Nearly(double actual, double expected)
     {
         return Math.Abs(actual - expected) <= Tolerance(Math.Max(Math.Abs(actual), Math.Abs(expected)));
+    }
+
+    private static bool NearlyKinematic(double actual, double expected)
+    {
+        double scale = Math.Max(1d, Math.Max(Math.Abs(actual), Math.Abs(expected)));
+        return Math.Abs(actual - expected) <= scale * 0.000001d;
+    }
+
+    private static bool NearlyUnit(double value)
+    {
+        return Math.Abs(value - 1d) <= 0.0001d;
     }
 
     private static double Tolerance(double scale)
@@ -529,6 +683,57 @@ internal static class PhysicalTransitionInvariantTests
                 out _,
                 out string failure)
             && failure.Contains("closure", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool RejectsUnsupportedTelemetrySchema()
+    {
+        JsonNode root = JsonNode.Parse(CreateReport())!;
+        root["physicalTransitions"]![0]!["prepared"]!["snapshotSchema"] = 2;
+        using JsonDocument document = JsonDocument.Parse(root.ToJsonString());
+        return !PhysicalTransitionInvariantValidator.Validate(
+                document.RootElement,
+                out _,
+                out string failure)
+            && failure.Contains("schema", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool RejectsInconsistentComponentKinematics()
+    {
+        JsonNode root = JsonNode.Parse(CreateReport())!;
+        root["physicalTransitions"]![0]!["resolved"]!["outputs"]![0]![
+            "speedMetresPerSecond"] = 1d;
+        using JsonDocument document = JsonDocument.Parse(root.ToJsonString());
+        return !PhysicalTransitionInvariantValidator.Validate(
+                document.RootElement,
+                out _,
+                out string failure)
+            && failure.Contains("internally inconsistent", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool RejectsAmbiguousOutputMassProvenance()
+    {
+        JsonNode root = JsonNode.Parse(CreateReport())!;
+        root["physicalTransitions"]![0]!["resolved"]!["outputs"]![0]![
+            "isTargetMaterialOrigin"] = true;
+        using JsonDocument document = JsonDocument.Parse(root.ToJsonString());
+        return !PhysicalTransitionInvariantValidator.Validate(
+                document.RootElement,
+                out _,
+                out string failure)
+            && failure.Contains("ambiguous", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool RejectsInvalidImpactCoupling()
+    {
+        JsonNode root = JsonNode.Parse(CreateReport())!;
+        root["physicalTransitions"]![0]!["prepared"]!["impact"]![
+            "projectileFractureCoupling"] = 1.01d;
+        using JsonDocument document = JsonDocument.Parse(root.ToJsonString());
+        return !PhysicalTransitionInvariantValidator.Validate(
+                document.RootElement,
+                out _,
+                out string failure)
+            && failure.Contains("impact", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string CreateReport()

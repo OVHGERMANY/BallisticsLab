@@ -11,10 +11,10 @@ Snapshot date: 2026-08-13
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
 - Currently deployed and playtested DLL SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
-- Current strict-build candidate SHA-256: `391382638040A43769B0CF24CB058E794994B8BEAFC01D074A7A9FC586743548`
+- Current strict-build candidate: 262,656 bytes, SHA-256 `7130A353664A84D2E485E9E84024425ADE7AEA96C59E760046B068268D6DDD38`
 - Default configuration: disabled
 
-The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
+The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The final offline UI, source, schema, accessibility, and invariant review is complete. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
 
 ## Active physical-telemetry development
 
@@ -48,14 +48,20 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Protocol completion is deferred while another physical hit remains queued. The campaign header, matrix, result document, runtime drain path, and replay validator share that state, so the fifth accepted hit cannot complete a screen until extra evidence is resolved. Stopping with unresolved protocol evidence invalidates the current sample rather than publishing a result from a damaged fixture.
 - The validation console can produce a standalone schema-1 cross-report comparison document from admitted schema-4 reports. It validates every source, deduplicates progressive snapshots by run ID, rejects divergent histories, and aggregates material rows only when a complete run used one exact ammunition template and identical fixture definitions. Incomplete and mixed-ammunition runs remain visible but ineligible. Protocol groups remain explicitly simulation-only and non-certifying.
 - Screening results are explicitly non-certifying. Runtime sampling reads cached EFT trajectory nodes without advancing the trajectory, measures cumulative path length, and interpolates velocity at 3 metres. A shot whose cached path is shorter remains `TargetImpactProxy` and cannot satisfy the protocol basis.
+- The panel refits to the current display on every draw, restores its preferred size when space returns, uses a compact advanced-control layout on narrow screens, and blocks translated game commands while visible.
+- The fixture aim marker is plate-plane aligned, casts no shadows, and hides behind the plate, behind the camera, or within 0.5 metres of the camera instead of becoming a camera-facing streak.
+- Offline schema-4 replay requires exact publisher and snapshot schemas, recomputes speed, momentum, and kinetic energy from every component's copied motion and mass, and rejects invalid orientation, impact coupling, provenance, collision history, mass, or energy evidence.
+- Build and validation entry points require an explicit `SptRoot` property or `SPT_ROOT` environment variable; no personal installation path remains in the project tree.
 
-This development layer has not been deployed or tested in-game. The final offline UI, source, schema, accessibility, and invariant review remains before the deferred integrated runtime campaign.
+This development layer has not been deployed or tested in-game. Its offline implementation and acceptance review are complete; the deferred integrated runtime campaign is the remaining acceptance layer.
 
 ## Automated and startup verification
 
-- Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
-- Pure and installed-database validation: 145 checks passed.
-- Validation with all installed-runtime reports: 152 checks passed.
+- Forced Release solution rebuild at the `latest-all` analyzer tier: 0 warnings, 0 errors in 7:08.20.
+- Forced Debug solution rebuild at the `latest-all` analyzer tier: 0 warnings, 0 errors in 7:08.16.
+- Whitespace, style, analyzer-format, and diff verification: passed without changes.
+- Pure and installed-database validation: 155 checks passed.
+- Validation with all installed-runtime reports: 162 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -67,7 +73,7 @@ This development layer has not been deployed or tested in-game. The final offlin
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 - Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `39138263...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `7130A353...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
 ## Installed runtime evidence
 
@@ -144,7 +150,6 @@ Historical evidence does not satisfy a missing `0.2.8` gate.
 
 ## Remaining development sequence
 
-- Complete the final offline UI, source, report-schema, and accessibility review; in-game interaction remains deferred to the final integrated campaign.
-- Run the final integrated in-game campaign only after every offline development layer is complete.
+- Run the final integrated in-game campaign against this exact candidate. It must confirm the modal panel and plate-plane marker behavior, collect the ten missing controlled fixture gates, and complete the direct corpse observations that reports cannot prove.
 
 Existing Granit BR4 and BR5 labels are repeatable EFT database presets only. They are not certification tests.

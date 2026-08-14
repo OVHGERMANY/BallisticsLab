@@ -14,7 +14,6 @@ using BallisticsLab.Runtime.Fixtures;
 using BallisticsLab.Runtime.Telemetry;
 using EFT;
 using EFT.Ballistics;
-using EFT.InputSystem;
 using EFT.InventoryLogic;
 using UnityEngine;
 
@@ -35,7 +34,11 @@ namespace BallisticsLab.Runtime
         private static bool _enteredShootingRange;
         private static PlateCatalog? _catalog;
         private static FixtureRig? _rig;
-        private static Rect _window = new Rect(40f, 60f, 840f, 900f);
+        private static Rect _window = new Rect(
+            40f,
+            60f,
+            LabPresentationPolicies.PreferredPanelWidth,
+            LabPresentationPolicies.PreferredPanelHeight);
         private static Vector2 _scroll;
         private static int _layerCount = 1;
         private static int _selectedLayer;
@@ -59,6 +62,7 @@ namespace BallisticsLab.Runtime
         private static GUIStyle? _sectionStyle;
         private static GUIStyle? _statusStyle;
         private static GUIStyle? _buttonStyle;
+        private static GUIStyle? _textFieldStyle;
 
         internal static bool IsSessionActive => _sessionActive;
 
@@ -70,18 +74,11 @@ namespace BallisticsLab.Runtime
             _catalog
             ?? throw new InvalidOperationException("The armor catalog is not initialized.");
 
-        internal static bool ShouldBlockShootingCommand(ECommand command)
+        internal static bool ShouldBlockGameInput()
         {
-            if (command != ECommand.ToggleShooting
-                || !_panelVisible
-                || Plugin.Configuration?.Enabled.Value != true)
-            {
-                return false;
-            }
-
-            Vector3 mouse = Input.mousePosition;
-            Vector2 guiPoint = new Vector2(mouse.x, Screen.height - mouse.y);
-            return _window.Contains(guiPoint);
+            return LabPresentationPolicies.ShouldCaptureGameInput(
+                _panelVisible,
+                Plugin.Configuration?.Enabled.Value == true);
         }
 
         internal static void Initialize()
@@ -143,6 +140,7 @@ namespace BallisticsLab.Runtime
                 UpdateCampaign();
                 BotController.Update();
                 RefreshHideoutShootingModeStatus();
+                _rig?.UpdateAimMarkerVisibility(Camera.main);
                 UpdateTrace();
                 SaveAutomaticReport(false);
             }
@@ -156,9 +154,7 @@ namespace BallisticsLab.Runtime
             }
 
             KeepPanelCursorAvailable();
-
-            _window.width = Mathf.Min(_window.width, Screen.width - 20f);
-            _window.height = Mathf.Min(_window.height, Screen.height - 20f);
+            FitPanelToScreen();
             _window = GUI.Window(WindowId, _window, DrawWindow, "Ballistics Lab " + Plugin.PluginVersion);
         }
 
@@ -228,7 +224,8 @@ namespace BallisticsLab.Runtime
                 };
                 _sectionStyle = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 16
+                    fontSize = 16,
+                    wordWrap = true
                 };
                 _statusStyle = new GUIStyle(GUI.skin.box)
                 {
@@ -242,12 +239,19 @@ namespace BallisticsLab.Runtime
                     wordWrap = true,
                     padding = new RectOffset(10, 10, 8, 8)
                 };
+                _textFieldStyle = new GUIStyle(GUI.skin.textField)
+                {
+                    fontSize = 15,
+                    padding = new RectOffset(8, 8, 7, 7)
+                };
             }
 
             GUIStyle sectionStyle = _sectionStyle
                 ?? throw new InvalidOperationException("The section style was not initialized.");
             GUIStyle buttonStyle = _buttonStyle
                 ?? throw new InvalidOperationException("The button style was not initialized.");
+            GUIStyle textFieldStyle = _textFieldStyle
+                ?? throw new InvalidOperationException("The text-field style was not initialized.");
 
             GUILayout.BeginVertical(GUILayout.ExpandHeight(true));
             GUILayout.Label("BALLISTICS LAB", _titleStyle);
@@ -282,11 +286,13 @@ namespace BallisticsLab.Runtime
             {
                 SetPanelVisible(false);
             }
+            GUILayout.Label(
+                "Game controls are paused while this panel is open. Close it or press the panel shortcut to resume.");
 
             DrawCampaignControls(sectionStyle, buttonStyle);
             if (!CampaignRuntimeController.IsRunning)
             {
-                DrawFixtureControls(sectionStyle, buttonStyle);
+                DrawFixtureControls(sectionStyle, buttonStyle, textFieldStyle);
             }
             DrawBotControls(sectionStyle, buttonStyle);
             DrawLatestShot();
@@ -335,7 +341,10 @@ namespace BallisticsLab.Runtime
             GUI.DragWindow(new Rect(0f, 0f, 10000f, 28f));
         }
 
-        private static void DrawFixtureControls(GUIStyle sectionStyle, GUIStyle buttonStyle)
+        private static void DrawFixtureControls(
+            GUIStyle sectionStyle,
+            GUIStyle buttonStyle,
+            GUIStyle textFieldStyle)
         {
             GUILayout.Space(12f);
             GUILayout.Label("QUICK FIXTURES - ONE CLICK BUILDS, PLACES, AND CLOSES", sectionStyle);
@@ -376,8 +385,8 @@ namespace BallisticsLab.Runtime
             }
             GUILayout.EndHorizontal();
 
+            GUILayout.Label("SAME PLATE, CHOOSE LAYERS:");
             GUILayout.BeginHorizontal();
-            GUILayout.Label("SAME PLATE, CHOOSE LAYERS:", GUILayout.Width(220f));
             for (int layers = 1; layers <= LabPolicies.MaximumLayers; layers++)
             {
                 int requestedLayers = layers;
@@ -431,79 +440,93 @@ namespace BallisticsLab.Runtime
 
             GUILayout.Space(8f);
             GUILayout.Label("ADVANCED FIXTURE CONTROLS", sectionStyle);
+            bool compactControls = LabPresentationPolicies.UseCompactControls(_window.width);
             GUILayout.BeginHorizontal();
             GUILayout.Label("Layers: " + _layerCount, GUILayout.Width(120f));
-            if (GUILayout.Button("-", GUILayout.Width(40f)))
+            if (GUILayout.Button("-", buttonStyle, GUILayout.Height(42f), GUILayout.Width(56f)))
             {
                 _layerCount = Math.Max(1, _layerCount - 1);
                 _selectedLayer = Math.Min(_selectedLayer, _layerCount - 1);
             }
-            if (GUILayout.Button("+", GUILayout.Width(40f)))
+            if (GUILayout.Button("+", buttonStyle, GUILayout.Height(42f), GUILayout.Width(56f)))
             {
                 _layerCount = Math.Min(LabPolicies.MaximumLayers, _layerCount + 1);
             }
-            GUILayout.Label("Edit layer " + (_selectedLayer + 1), GUILayout.Width(110f));
-            if (GUILayout.Button("Prev", GUILayout.Width(55f)))
+            if (!compactControls)
             {
-                _selectedLayer = (_selectedLayer + _layerCount - 1) % _layerCount;
-            }
-            if (GUILayout.Button("Next", GUILayout.Width(55f)))
-            {
-                _selectedLayer = (_selectedLayer + 1) % _layerCount;
+                GUILayout.Space(20f);
+                DrawLayerSelectionButtons(buttonStyle);
             }
             GUILayout.EndHorizontal();
+            if (compactControls)
+            {
+                GUILayout.BeginHorizontal();
+                DrawLayerSelectionButtons(buttonStyle);
+                GUILayout.EndHorizontal();
+            }
 
-            _search = GUILayout.TextField(_search ?? string.Empty);
+            GUILayout.Label("FILTER ARMOR PRESETS");
+            _search = GUILayout.TextField(
+                _search ?? string.Empty,
+                textFieldStyle,
+                GUILayout.Height(38f));
             List<int> matches = ActiveCatalog.Search(_search);
             int currentIndex = ClampPresetIndex(PresetIndices[_selectedLayer]);
             PlateCatalogEntry current = ActiveCatalog.Entries[currentIndex];
             GUILayout.Label("Preset: " + current.DisplayName);
             GUILayout.Label("Template: " + current.TemplateId + " | blunt throughput " + Invariant(current.BluntThroughput, "F3"));
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("< matching preset"))
+            if (GUILayout.Button("< MATCHING PRESET", buttonStyle, GUILayout.Height(42f)))
             {
                 PresetIndices[_selectedLayer] = CycleMatch(matches, currentIndex, -1);
             }
-            if (GUILayout.Button("matching preset >"))
+            if (GUILayout.Button("MATCHING PRESET >", buttonStyle, GUILayout.Height(42f)))
             {
                 PresetIndices[_selectedLayer] = CycleMatch(matches, currentIndex, 1);
             }
             GUILayout.EndHorizontal();
 
+            GUILayout.Label("SELECTED LAYER MATERIAL");
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Selected layer material:", GUILayout.Width(145f));
-            if (GUILayout.Button("Steel")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.ArmoredSteel);
-            if (GUILayout.Button("Ceramic")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Ceramic);
-            if (GUILayout.Button("UHMWPE")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.UHMWPE);
-            if (GUILayout.Button("Titan")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Titan);
+            if (GUILayout.Button("Steel", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.ArmoredSteel);
+            if (GUILayout.Button("Ceramic", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Ceramic);
+            if (GUILayout.Button("UHMWPE", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.UHMWPE);
+            if (GUILayout.Button("Titan", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Titan);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            GUILayout.Space(145f);
-            if (GUILayout.Button("Aluminium")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Aluminium);
-            if (GUILayout.Button("Aramid")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Aramid);
-            if (GUILayout.Button("Combined")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Combined);
+            if (GUILayout.Button("Aluminium", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Aluminium);
+            if (GUILayout.Button("Aramid", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Aramid);
+            if (GUILayout.Button("Combined", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Combined);
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Distance " + Invariant(_distance, "F1") + " m", GUILayout.Width(135f));
-            if (GUILayout.Button("-1m", GUILayout.Width(55f))) _distance = Mathf.Max(3f, _distance - 1f);
-            if (GUILayout.Button("+1m", GUILayout.Width(55f))) _distance = Mathf.Min(50f, _distance + 1f);
-            GUILayout.Label("Angle " + Invariant(_angle, "F0") + " deg", GUILayout.Width(120f));
-            if (GUILayout.Button("-5", GUILayout.Width(45f))) _angle = Mathf.Max(-75f, _angle - 5f);
-            if (GUILayout.Button("+5", GUILayout.Width(45f))) _angle = Mathf.Min(75f, _angle + 5f);
+            GUILayout.Label("Distance " + Invariant(_distance, "F1") + " m", GUILayout.Width(180f));
+            if (GUILayout.Button("-1 m", buttonStyle, GUILayout.Height(42f))) _distance = Mathf.Max(3f, _distance - 1f);
+            if (GUILayout.Button("+1 m", buttonStyle, GUILayout.Height(42f))) _distance = Mathf.Min(50f, _distance + 1f);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Angle " + Invariant(_angle, "F0") + " degrees", GUILayout.Width(180f));
+            if (GUILayout.Button("-5 deg", buttonStyle, GUILayout.Height(42f))) _angle = Mathf.Max(-75f, _angle - 5f);
+            if (GUILayout.Button("+5 deg", buttonStyle, GUILayout.Height(42f))) _angle = Mathf.Min(75f, _angle + 5f);
             GUILayout.EndHorizontal();
             GUILayout.Label("Thickness controls collider geometry; resistance and durability come from the selected EFT armor template.");
 
             GUILayout.BeginHorizontal();
             bool backstopEnabled = ActiveConfiguration.CatcherEnabled.Value;
-            if (GUILayout.Button("Backstop: " + (backstopEnabled ? "ON" : "OFF")))
+            if (GUILayout.Button(
+                    "Backstop: " + (backstopEnabled ? "ON" : "OFF"),
+                    buttonStyle,
+                    GUILayout.Height(42f)))
             {
                 ActiveConfiguration.CatcherEnabled.Value = !backstopEnabled;
                 _status = "Backstop " + (!backstopEnabled ? "enabled" : "disabled")
                     + "; rebuild the fixture to apply.";
             }
             bool traceEnabled = ActiveConfiguration.TraceEnabled.Value;
-            if (GUILayout.Button("Last-shot trace: " + (traceEnabled ? "ON" : "OFF")))
+            if (GUILayout.Button(
+                    "Last-shot trace: " + (traceEnabled ? "ON" : "OFF"),
+                    buttonStyle,
+                    GUILayout.Height(42f)))
             {
                 ActiveConfiguration.TraceEnabled.Value = !traceEnabled;
                 if (traceEnabled)
@@ -514,20 +537,22 @@ namespace BallisticsLab.Runtime
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Gap " + Invariant(_spacing, "F2") + " m", GUILayout.Width(135f));
-            if (GUILayout.Button("-0.05", GUILayout.Width(60f))) _spacing = Mathf.Max(0.02f, _spacing - 0.05f);
-            if (GUILayout.Button("+0.05", GUILayout.Width(60f))) _spacing = Mathf.Min(1f, _spacing + 0.05f);
-            GUILayout.Label("Thickness " + Invariant(_thickness * 1000f, "F1") + " mm", GUILayout.Width(145f));
-            if (GUILayout.Button("-1mm", GUILayout.Width(60f))) _thickness = Mathf.Max(0.003f, _thickness - 0.001f);
-            if (GUILayout.Button("+1mm", GUILayout.Width(60f))) _thickness = Mathf.Min(0.1f, _thickness + 0.001f);
+            GUILayout.Label("Layer gap " + Invariant(_spacing, "F2") + " m", GUILayout.Width(180f));
+            if (GUILayout.Button("-0.05 m", buttonStyle, GUILayout.Height(42f))) _spacing = Mathf.Max(0.02f, _spacing - 0.05f);
+            if (GUILayout.Button("+0.05 m", buttonStyle, GUILayout.Height(42f))) _spacing = Mathf.Min(1f, _spacing + 0.05f);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Thickness " + Invariant(_thickness * 1000f, "F1") + " mm", GUILayout.Width(180f));
+            if (GUILayout.Button("-1 mm", buttonStyle, GUILayout.Height(42f))) _thickness = Mathf.Max(0.003f, _thickness - 0.001f);
+            if (GUILayout.Button("+1 mm", buttonStyle, GUILayout.Height(42f))) _thickness = Mathf.Min(0.1f, _thickness + 0.001f);
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Place / Rebuild Fixture", GUILayout.Height(32f)))
+            if (GUILayout.Button("PLACE / REBUILD FIXTURE", buttonStyle, GUILayout.Height(46f)))
             {
                 PlaceFixture();
             }
-            if (GUILayout.Button("Reset Plate Durability", GUILayout.Height(32f)))
+            if (GUILayout.Button("RESET PLATE DURABILITY", buttonStyle, GUILayout.Height(46f)))
             {
                 if (_rig == null)
                 {
@@ -538,7 +563,11 @@ namespace BallisticsLab.Runtime
                     ResetFixtureDurability(false);
                 }
             }
-            if (GUILayout.Button("Reset Durability + Clear Records", GUILayout.Height(32f)))
+            GUILayout.EndHorizontal();
+            if (GUILayout.Button(
+                    "RESET DURABILITY + CLEAR RECORDS",
+                    buttonStyle,
+                    GUILayout.Height(46f)))
             {
                 if (_rig == null)
                 {
@@ -549,8 +578,19 @@ namespace BallisticsLab.Runtime
                     ResetFixtureDurability(true);
                 }
             }
-            GUILayout.EndHorizontal();
+        }
 
+        private static void DrawLayerSelectionButtons(GUIStyle buttonStyle)
+        {
+            GUILayout.Label("Edit layer " + (_selectedLayer + 1), GUILayout.Width(120f));
+            if (GUILayout.Button("PREVIOUS", buttonStyle, GUILayout.Height(42f)))
+            {
+                _selectedLayer = (_selectedLayer + _layerCount - 1) % _layerCount;
+            }
+            if (GUILayout.Button("NEXT", buttonStyle, GUILayout.Height(42f)))
+            {
+                _selectedLayer = (_selectedLayer + 1) % _layerCount;
+            }
         }
 
         private static void DrawCampaignControls(GUIStyle sectionStyle, GUIStyle buttonStyle)
@@ -1489,8 +1529,7 @@ namespace BallisticsLab.Runtime
                 _previousCursorVisible = Cursor.visible;
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
-                _window.x = Mathf.Clamp(_window.x, 0f, Math.Max(0f, Screen.width - _window.width));
-                _window.y = Mathf.Clamp(_window.y, 0f, Math.Max(0f, Screen.height - _window.height));
+                FitPanelToScreen();
             }
             else
             {
@@ -1503,6 +1542,16 @@ namespace BallisticsLab.Runtime
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
+        }
+
+        private static void FitPanelToScreen()
+        {
+            LabPanelBounds bounds = LabPresentationPolicies.FitPanelToScreen(
+                _window.x,
+                _window.y,
+                Screen.width,
+                Screen.height);
+            _window = new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height);
         }
 
         private static string DescribeWorld()
@@ -1564,6 +1613,9 @@ namespace BallisticsLab.Runtime
             _trace = host.AddComponent<LineRenderer>();
             _trace.sharedMaterial = _traceMaterial;
             _trace.useWorldSpace = true;
+            _trace.alignment = LineAlignment.View;
+            _trace.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            _trace.receiveShadows = false;
             _trace.startWidth = 0.012f;
             _trace.endWidth = 0.006f;
             _trace.startColor = _traceMaterial.color;

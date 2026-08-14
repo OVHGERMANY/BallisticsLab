@@ -55,20 +55,20 @@ namespace BallisticsLab.Runtime.Bots
                 return "Selected " + (player.Profile?.Nickname ?? player.ProfileId) + ".";
             }
 
-            return "No live AI target was under the crosshair.";
+            return "No live bot target was under the crosshair.";
         }
 
         internal string Freeze()
         {
             if (SelectedPlayer == null || !SelectedPlayer.HealthController.IsAlive)
             {
-                return "Select a live AI target first.";
+                return "Select a live bot target first.";
             }
 
             _owner ??= SelectedPlayer.AIData?.BotOwner;
             if (_owner == null)
             {
-                return "The selected AI target no longer has an active controller.";
+                return "The selected bot target no longer has an active controller.";
             }
 
             if (!_frozen)

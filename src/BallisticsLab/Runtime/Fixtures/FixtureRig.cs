@@ -7,6 +7,7 @@ using EFT.Ballistics;
 using EFT.InventoryLogic;
 using BallisticsLab.Core;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace BallisticsLab.Runtime.Fixtures
 {
@@ -24,6 +25,8 @@ namespace BallisticsLab.Runtime.Fixtures
         private readonly List<Material> _materials = new List<Material>();
         private LineRenderer? _aimHorizontal;
         private LineRenderer? _aimVertical;
+        private float _aimMarkerX;
+        private float _aimMarkerY;
         private float _aimMarkerZ;
 
         private FixtureRig(GameObject root, long fixtureId)
@@ -186,6 +189,8 @@ namespace BallisticsLab.Runtime.Fixtures
             float width = Mathf.Clamp(diameter * 0.4f, 0.003f, 0.008f);
             float x = (float)point.LocalXMetres;
             float y = (float)point.LocalYMetres;
+            _aimMarkerX = x;
+            _aimMarkerY = y;
             ConfigureAimLine(
                 _aimHorizontal,
                 new Vector3(x - halfLength, y, _aimMarkerZ),
@@ -196,6 +201,30 @@ namespace BallisticsLab.Runtime.Fixtures
                 new Vector3(x, y - halfLength, _aimMarkerZ),
                 new Vector3(x, y + halfLength, _aimMarkerZ),
                 width);
+        }
+
+        internal void UpdateAimMarkerVisibility(Camera? camera)
+        {
+            if (_aimHorizontal == null || _aimVertical == null)
+            {
+                return;
+            }
+
+            bool visible = false;
+            if (camera != null && _root != null)
+            {
+                Vector3 markerPosition = _root.transform.TransformPoint(
+                    new Vector3(_aimMarkerX, _aimMarkerY, _aimMarkerZ));
+                Vector3 cameraOffset = camera.transform.position - markerPosition;
+                Vector3 viewport = camera.WorldToViewportPoint(markerPosition);
+                visible = LabPresentationPolicies.ShouldShowAimMarker(
+                    cameraOffset.magnitude,
+                    Vector3.Dot(_root.transform.forward, cameraOffset),
+                    viewport.z);
+            }
+
+            _aimHorizontal.enabled = visible;
+            _aimVertical.enabled = visible;
         }
 
         public void Dispose()
@@ -303,6 +332,9 @@ namespace BallisticsLab.Runtime.Fixtures
             LineRenderer line = lineObject.AddComponent<LineRenderer>();
             line.sharedMaterial = material;
             line.useWorldSpace = false;
+            line.alignment = LineAlignment.TransformZ;
+            line.shadowCastingMode = ShadowCastingMode.Off;
+            line.receiveShadows = false;
             line.positionCount = 2;
             line.SetPosition(0, start);
             line.SetPosition(1, end);
@@ -310,6 +342,7 @@ namespace BallisticsLab.Runtime.Fixtures
             line.endWidth = 0.012f;
             line.startColor = material.color;
             line.endColor = material.color;
+            line.enabled = false;
             return line;
         }
     }

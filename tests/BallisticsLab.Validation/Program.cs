@@ -14,9 +14,28 @@ string[] positionalArguments = args
 bool requireReportCoverage = args.Contains(
     "--require-report-coverage",
     StringComparer.OrdinalIgnoreCase);
-string itemsPath = positionalArguments.Length > 0
-    ? Path.GetFullPath(positionalArguments[0])
-    : @"E:\Games\SPT\SPT_Runtime\SPT_Data\database\templates\items.json";
+string itemsPath;
+if (positionalArguments.Length > 0)
+{
+    itemsPath = Path.GetFullPath(positionalArguments[0]);
+}
+else
+{
+    string? sptRoot = Environment.GetEnvironmentVariable("SPT_ROOT");
+    if (string.IsNullOrWhiteSpace(sptRoot))
+    {
+        Console.Error.WriteLine(
+            "Pass items.json as the first positional argument or set the SPT_ROOT environment variable.");
+        return 2;
+    }
+    itemsPath = Path.GetFullPath(Path.Combine(
+        sptRoot,
+        "SPT_Runtime",
+        "SPT_Data",
+        "database",
+        "templates",
+        "items.json"));
+}
 string reportsPath = positionalArguments.Length > 1
     ? Path.GetFullPath(positionalArguments[1])
     : string.Empty;
@@ -139,6 +158,18 @@ Check(
     PhysicalTransitionInvariantTests.RejectsBrokenEnergyClosure(),
     "physical transition invariants reject broken energy closure");
 Check(
+    PhysicalTransitionInvariantTests.RejectsUnsupportedTelemetrySchema(),
+    "physical transition invariants reject altered publisher or snapshot schemas");
+Check(
+    PhysicalTransitionInvariantTests.RejectsInconsistentComponentKinematics(),
+    "physical transition invariants recompute component speed, momentum, and energy");
+Check(
+    PhysicalTransitionInvariantTests.RejectsAmbiguousOutputMassProvenance(),
+    "physical transition invariants reject ambiguous output mass provenance");
+Check(
+    PhysicalTransitionInvariantTests.RejectsInvalidImpactCoupling(),
+    "physical transition invariants reject impact couplings outside zero to one");
+Check(
     CampaignTests.SeedDerivationIsStableAndCaseSpecific(),
     "campaign case seeds are stable and distinct across cases and repetitions");
 Check(
@@ -222,6 +253,24 @@ Check(
 Check(
     CrossReportCampaignComparison.SyntheticComparisonWriterCommitsOneCompleteDocument(),
     "cross-report comparison writer atomically commits one complete document");
+Check(
+    PresentationPolicyTests.PanelRemainsFullyVisibleAtSmallResolutions(),
+    "lab panel remains fully visible after resolution changes and off-screen dragging");
+Check(
+    PresentationPolicyTests.PanelRestoresPreferredSizeWhenResolutionGrows(),
+    "lab panel restores its preferred size when screen space becomes available");
+Check(
+    PresentationPolicyTests.PanelRejectsInvalidCoordinates(),
+    "lab panel replaces invalid saved coordinates with a visible origin");
+Check(
+    PresentationPolicyTests.CompactControlsFollowVisiblePanelWidth(),
+    "advanced controls switch layout from the fitted visible panel width");
+Check(
+    PresentationPolicyTests.VisibleEnabledPanelOwnsGameInput(),
+    "visible enabled lab panel owns game input until its explicit close action");
+Check(
+    PresentationPolicyTests.AimMarkerRequiresSafeFrontFaceView(),
+    "plate marker hides behind, inside, or behind-camera instead of becoming a floating streak");
 Check(
     CampaignTests.PhysicalEvidenceUsesExactHostIdentityAndChecksClosure(),
     "campaign physical evidence uses exact host identity and measures mass and energy closure");
