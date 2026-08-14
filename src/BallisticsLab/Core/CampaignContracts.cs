@@ -734,6 +734,7 @@ namespace BallisticsLab.Core
         internal CampaignRunSnapshot(
             string campaignId,
             string campaignName,
+            string runInstanceId,
             ulong runSeed,
             CampaignRunState state,
             int currentCaseIndex,
@@ -749,6 +750,13 @@ namespace BallisticsLab.Core
             }
             CampaignId = campaignId;
             CampaignName = campaignName;
+            if (!CampaignRunIdentity.IsValid(runInstanceId))
+            {
+                throw new ArgumentException(
+                    "Campaign run instance ID must be a canonical N-format GUID.",
+                    nameof(runInstanceId));
+            }
+            RunInstanceId = runInstanceId;
             RunSeed = runSeed;
             State = state;
             CurrentCaseIndex = currentCaseIndex;
@@ -766,6 +774,7 @@ namespace BallisticsLab.Core
 
         internal string CampaignId { get; }
         internal string CampaignName { get; }
+        internal string RunInstanceId { get; }
         internal ulong RunSeed { get; }
         internal CampaignRunState State { get; }
         internal int CurrentCaseIndex { get; }
@@ -807,6 +816,7 @@ namespace BallisticsLab.Core
     {
         private readonly object _sync = new object();
         private readonly CampaignDefinition _definition;
+        private readonly string _runInstanceId;
         private readonly ulong _runSeed;
         private readonly List<CampaignAttemptRecord> _attempts = new List<CampaignAttemptRecord>();
         private readonly HashSet<string> _observedChains = new HashSet<string>(StringComparer.Ordinal);
@@ -819,13 +829,17 @@ namespace BallisticsLab.Core
         private long _attemptOrdinal;
         private bool _protocolCompletionDeferred;
 
-        internal CampaignRunTracker(CampaignDefinition definition, ulong runSeed)
+        internal CampaignRunTracker(
+            CampaignDefinition definition,
+            ulong runSeed,
+            string? runInstanceId = null)
         {
             if (definition == null)
             {
                 ThrowNullDefinition(nameof(definition));
             }
             _definition = definition;
+            _runInstanceId = CampaignRunIdentity.NormalizeOrCreate(runInstanceId);
             _runSeed = runSeed;
             _state = CampaignRunState.Idle;
         }
@@ -969,6 +983,7 @@ namespace BallisticsLab.Core
                 return new CampaignRunSnapshot(
                     _definition.CampaignId,
                     _definition.Name,
+                    _runInstanceId,
                     _runSeed,
                     _state,
                     _caseIndex,
@@ -1093,6 +1108,31 @@ namespace BallisticsLab.Core
         private static void ThrowNullEvidence(string parameterName)
         {
             throw new ArgumentNullException(parameterName);
+        }
+    }
+
+    internal static class CampaignRunIdentity
+    {
+        internal static bool IsValid(string? value)
+        {
+            return !string.IsNullOrEmpty(value)
+                && Guid.TryParseExact(value, "N", out Guid parsed)
+                && string.Equals(parsed.ToString("N"), value, StringComparison.Ordinal);
+        }
+
+        internal static string NormalizeOrCreate(string? value)
+        {
+            if (value == null)
+            {
+                return Guid.NewGuid().ToString("N");
+            }
+            if (!IsValid(value))
+            {
+                throw new ArgumentException(
+                    "Campaign run instance ID must be a canonical N-format GUID.",
+                    nameof(value));
+            }
+            return value;
         }
     }
 

@@ -32,8 +32,15 @@ internal static class CurrentReportSetValidator
                     out JsonElement transitions)
                 && transitions.ValueKind == JsonValueKind.Array
                 && transitions.GetArrayLength() > 0;
+            bool hasCampaignAttempts = candidate.RootElement.TryGetProperty(
+                    "campaign",
+                    out JsonElement campaign)
+                && campaign.ValueKind == JsonValueKind.Object
+                && campaign.TryGetProperty("attempts", out JsonElement attempts)
+                && attempts.ValueKind == JsonValueKind.Array
+                && attempts.GetArrayLength() > 0;
             if (currentSchema
-                && (hasRecords || hasPhysicalTransitions)
+                && (hasRecords || hasPhysicalTransitions || hasCampaignAttempts)
                 && string.Equals(pluginVersion, expectedPluginVersion, StringComparison.Ordinal))
             {
                 selected.Add(reportFile);
@@ -106,6 +113,28 @@ internal static class CurrentReportSetValidator
                 report,
                 "{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],"
                     + "\"physicalTransitions\":[{\"transitionId\":\"physical-only\"}]}");
+            IReadOnlyList<string> selected = Select(new[] { report }, 4, "0.2.8");
+            return selected.Count == 1 && selected[0] == report;
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    internal static bool SelectsCampaignOnlySchemaFourReport()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "BallisticsLab.CampaignReportSet." + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string report = Path.Combine(directory, "BallisticsLab-campaign.json");
+            File.WriteAllText(
+                report,
+                "{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],"
+                    + "\"physicalTransitions\":[],\"campaign\":{\"attempts\":[{}]}}");
             IReadOnlyList<string> selected = Select(new[] { report }, 4, "0.2.8");
             return selected.Count == 1 && selected[0] == report;
         }

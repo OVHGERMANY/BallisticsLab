@@ -71,6 +71,8 @@ namespace BallisticsLab.Core
                 .Append(",\"certificationClaim\":false")
                 .Append(",\"campaignId\":")
                 .Append(LabPolicies.Json(definition.CampaignId))
+                .Append(",\"runInstanceId\":")
+                .Append(LabPolicies.Json(snapshot.RunInstanceId))
                 .Append(",\"campaignState\":")
                 .Append(LabPolicies.Json(snapshot.State.ToString()))
                 .Append(",\"runSeed\":")

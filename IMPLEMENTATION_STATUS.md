@@ -11,7 +11,7 @@ Snapshot date: 2026-08-13
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
 - Currently deployed and playtested DLL SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
-- Current strict-build candidate SHA-256: `8BFB73712C72D950AB7D4EB9CE9F38445CF1239939AD0F8B6154A41117CB78EA`
+- Current strict-build candidate SHA-256: `391382638040A43769B0CF24CB058E794994B8BEAFC01D074A7A9FC586743548`
 - Default configuration: disabled
 
 The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
@@ -36,6 +36,7 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Stable case-identification seeds derived from a configurable Lab seed. These seeds label repeatable cases; they do not replace EFT's observed shot seed.
 - Schema-4 campaign definitions, detached attempt evidence, and result matrices whose case seeds, statuses, counts, means, maxima, and completion state are independently recomputed by the offline validator.
 - A completed or stopped campaign cannot be silently replaced. Evidence revisions remain monotonic across replacements, unsaved attempts are checkpointed first, and a failed checkpoint blocks the new campaign start.
+- Every campaign start receives a canonical unique run-instance ID. Progressive automatic reports retain it, allowing cross-report tooling to deduplicate one run without merging separate executions that reused the same Lab seed.
 - Per-attempt protocol evidence records absolute target-impact speed, projectile mass and diameter, actual incidence, fixture-local hit coordinates, face dimensions, fixture distance, and witness-backstop state without retaining a pooled shot or Unity object.
 - A nominal GOST 34286-2017 catalog represents all eight Br1-through-Br6 threat rows, including the two Br4 and two Br5 threats. The supported item and English/Russian locale snapshots establish five exact designation mappings, the `57-N-181S-01` Br1 variant, and the absence of both Br5 designations.
 - Mapping metadata keeps installed simulation mass and diameter, locale-described mass, initial speed, internal name, display name, caliber, and exact designation evidence separate. The evaluator admits only exact designations whose recorded projectile mass and diameter match the installed simulation state, while preserving flags for nominal-mass and locale-mass differences. Variants and unavailable threats fail closed.
@@ -45,15 +46,16 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Schema-4 campaign evidence records the shot-sequence policy, threat and ammunition mapping, sample ordinal, per-shot protocol qualification reason, protocol rejection count, and invalidated-sequence count. Offline replay recomputes the final statuses and cursor.
 - Each protocol campaign report now carries a derived `protocolScreeningResult` document inside the same atomic schema-4 JSON file. It records the standards and sources, exact mapping, fixture construction, observed velocity aggregates, qualifying and through-penetration counts, every sample outcome, invalidated history, and an explicit non-certifying result. The validator rebuilds the complete object from campaign evidence and rejects forged certification, status, count, or sample claims.
 - Protocol completion is deferred while another physical hit remains queued. The campaign header, matrix, result document, runtime drain path, and replay validator share that state, so the fifth accepted hit cannot complete a screen until extra evidence is resolved. Stopping with unresolved protocol evidence invalidates the current sample rather than publishing a result from a damaged fixture.
+- The validation console can produce a standalone schema-1 cross-report comparison document from admitted schema-4 reports. It validates every source, deduplicates progressive snapshots by run ID, rejects divergent histories, and aggregates material rows only when a complete run used one exact ammunition template and identical fixture definitions. Incomplete and mixed-ammunition runs remain visible but ineligible. Protocol groups remain explicitly simulation-only and non-certifying.
 - Screening results are explicitly non-certifying. Runtime sampling reads cached EFT trajectory nodes without advancing the trajectory, measures cumulative path length, and interpolates velocity at 3 metres. A shot whose cached path is shorter remains `TargetImpactProxy` and cannot satisfy the protocol basis.
 
-This development layer has not been deployed or tested in-game. Cross-report material comparison and the final offline UI/source/schema review remain before the deferred integrated runtime campaign.
+This development layer has not been deployed or tested in-game. The final offline UI, source, schema, accessibility, and invariant review remains before the deferred integrated runtime campaign.
 
 ## Automated and startup verification
 
 - Clean Debug and deterministic Release solution builds at the `latest-all` analyzer tier: 0 warnings, 0 errors.
-- Pure and installed-database validation: 136 checks passed.
-- Validation with all installed-runtime reports: 143 checks passed.
+- Pure and installed-database validation: 145 checks passed.
+- Validation with all installed-runtime reports: 152 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -65,7 +67,7 @@ This development layer has not been deployed or tested in-game. Cross-report mat
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 - Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `8BFB7371...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `39138263...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
 ## Installed runtime evidence
 
@@ -142,7 +144,6 @@ Historical evidence does not satisfy a missing `0.2.8` gate.
 
 ## Remaining development sequence
 
-- Add cross-report and material-comparison summaries that consume the validated protocol result without weakening its simulation-only classification.
 - Complete the final offline UI, source, report-schema, and accessibility review; in-game interaction remains deferred to the final integrated campaign.
 - Run the final integrated in-game campaign only after every offline development layer is complete.
 

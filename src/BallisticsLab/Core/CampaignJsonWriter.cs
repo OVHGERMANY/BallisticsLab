@@ -34,6 +34,7 @@ namespace BallisticsLab.Core
             bool first = true;
             String(builder, ref first, "campaignId", definition.CampaignId);
             String(builder, ref first, "name", definition.Name);
+            String(builder, ref first, "runInstanceId", snapshot.RunInstanceId);
             Number(builder, ref first, "runSeed", snapshot.RunSeed);
             String(builder, ref first, "state", snapshot.State.ToString());
             Number(builder, ref first, "currentCaseIndex", snapshot.CurrentCaseIndex);

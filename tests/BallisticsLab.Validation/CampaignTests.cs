@@ -749,6 +749,19 @@ internal static class CampaignTests
         return certificationRejected && resultRejected && sampleRejected;
     }
 
+    internal static bool CampaignReportRejectsProtocolResultWithoutCampaign()
+    {
+        const string json = "{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],"
+            + "\"physicalTransitions\":[],\"campaign\":null,"
+            + "\"protocolScreeningResult\":{\"certificationClaim\":false}}";
+        using JsonDocument document = JsonDocument.Parse(json);
+        return !CampaignReportInvariantValidator.Validate(
+            document.RootElement,
+            out _,
+            out string failure)
+            && failure.Contains("without campaign", StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static bool PhysicalEvidenceUsesExactHostIdentityAndChecksClosure()
     {
         FakePhysicalEvent fake = FakePhysicalEvent.Resolved("campaign-physical");
@@ -828,6 +841,7 @@ internal static class CampaignTests
             && attemptCount == 1
             && campaign.GetProperty("campaignId").GetString() == "json-campaign"
             && campaign.GetProperty("runSeed").GetUInt64() == 42UL
+            && CampaignRunIdentity.IsValid(campaign.GetProperty("runInstanceId").GetString())
             && !campaign.GetProperty("gameShotSeedOverridden").GetBoolean()
             && campaign.GetProperty("state").GetString() == "Completed"
             && document.RootElement.GetProperty("protocolScreeningResult").ValueKind

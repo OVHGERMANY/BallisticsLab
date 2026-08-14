@@ -14,6 +14,14 @@ internal static class CampaignReportInvariantValidator
         if (!root.TryGetProperty("campaign", out JsonElement campaign)
             || campaign.ValueKind == JsonValueKind.Null)
         {
+            if (root.TryGetProperty(
+                    "protocolScreeningResult",
+                    out JsonElement detachedProtocolResult)
+                && detachedProtocolResult.ValueKind != JsonValueKind.Null)
+            {
+                failure = "protocol screening result exists without campaign evidence";
+                return false;
+            }
             return true;
         }
         if (campaign.ValueKind != JsonValueKind.Object)
@@ -23,6 +31,8 @@ internal static class CampaignReportInvariantValidator
         }
         if (!TryText(campaign, "campaignId", out string campaignId)
             || !TryText(campaign, "name", out string campaignName)
+            || !TryText(campaign, "runInstanceId", out string runInstanceId)
+            || !CampaignRunIdentity.IsValid(runInstanceId)
             || !TryUInt64(campaign, "runSeed", out ulong runSeed)
             || !TryEnum(campaign, "state", out CampaignRunState state)
             || !TryInt32(campaign, "currentCaseIndex", out int currentCaseIndex)
@@ -78,6 +88,7 @@ internal static class CampaignReportInvariantValidator
         if (!ReplayMatchesHeader(
                 definition,
                 runSeed,
+                runInstanceId,
                 attempts,
                 state,
                 currentCaseIndex,
@@ -93,6 +104,7 @@ internal static class CampaignReportInvariantValidator
         var snapshot = new CampaignRunSnapshot(
             campaignId,
             campaignName,
+            runInstanceId,
             runSeed,
             state,
             currentCaseIndex,
@@ -172,6 +184,7 @@ internal static class CampaignReportInvariantValidator
     private static bool ReplayMatchesHeader(
         CampaignDefinition definition,
         ulong runSeed,
+        string runInstanceId,
         List<CampaignAttemptRecord> attempts,
         CampaignRunState expectedState,
         int expectedCaseIndex,
@@ -182,7 +195,7 @@ internal static class CampaignReportInvariantValidator
         out string failure)
     {
         failure = string.Empty;
-        var tracker = new CampaignRunTracker(definition, runSeed);
+        var tracker = new CampaignRunTracker(definition, runSeed, runInstanceId);
         if (!tracker.Start())
         {
             failure = "campaign replay could not start";

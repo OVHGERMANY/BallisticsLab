@@ -20,6 +20,9 @@ string itemsPath = positionalArguments.Length > 0
 string reportsPath = positionalArguments.Length > 1
     ? Path.GetFullPath(positionalArguments[1])
     : string.Empty;
+string comparisonOutputPath = positionalArguments.Length > 2
+    ? Path.GetFullPath(positionalArguments[2])
+    : string.Empty;
 
 List<string> failures = new();
 int passed = 0;
@@ -70,6 +73,9 @@ Check(CurrentReportSetValidator.IgnoresCorruptHistoricalReport(), "current-repor
 Check(
     CurrentReportSetValidator.SelectsPhysicalOnlySchemaFourReport(),
     "current-report selection includes schema-4 physical-only evidence");
+Check(
+    CurrentReportSetValidator.SelectsCampaignOnlySchemaFourReport(),
+    "current-report selection includes schema-4 campaign-only evidence");
 Check(AcceptanceCoverageEvaluator.CompleteSyntheticCoveragePasses(), "report coverage accepts a complete controlled fixture matrix");
 Check(AcceptanceCoverageEvaluator.CasualBotTrafficCannotSatisfyFixtureCoverage(), "casual bot traffic cannot satisfy controlled fixture gates");
 Check(AcceptanceCoverageEvaluator.DuplicateBatchesDoNotInflateCoverage(), "duplicate automatic batches do not inflate acceptance coverage");
@@ -192,6 +198,30 @@ Check(
 Check(
     CampaignTests.CampaignReportRejectsCorruptedProtocolResult(),
     "campaign report validation rejects forged protocol result claims and sample counts");
+Check(
+    CampaignTests.CampaignReportRejectsProtocolResultWithoutCampaign(),
+    "campaign report validation rejects a protocol result detached from campaign evidence");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonDeduplicatesProgressiveReports(),
+    "cross-report comparison deduplicates progressive snapshots by exact campaign run identity");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonRejectsDivergentRunHistory(),
+    "cross-report comparison rejects divergent histories under one campaign run identity");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonRequiresExactAmmunitionCohort(),
+    "material comparison admits only complete runs with one exact ammunition template");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonPreservesProtocolClassification(),
+    "cross-report protocol summaries remain simulation evidence without certification claims");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonRejectsInvalidRunIdentity(),
+    "campaign report validation rejects malformed run instance identities");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonRejectsUnlikeFixtureCohort(),
+    "material comparison rejects unlike fixture definitions under one ammunition cohort");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonWriterCommitsOneCompleteDocument(),
+    "cross-report comparison writer atomically commits one complete document");
 Check(
     CampaignTests.PhysicalEvidenceUsesExactHostIdentityAndChecksClosure(),
     "campaign physical evidence uses exact host identity and measures mass and energy closure");
@@ -663,6 +693,49 @@ if (!string.IsNullOrEmpty(reportsPath))
                     ? "all controlled current-build report gates are complete"
                     : "controlled current-build report gates are incomplete: "
                         + string.Join(", ", coverage.Missing));
+        }
+        IReadOnlyList<string> comparisonReports = CurrentReportSetValidator.Select(
+            reportFiles,
+            LabBuild.ReportSchema,
+            LabBuild.PluginVersion);
+        if (comparisonReports.Count != 0)
+        {
+            bool comparisonBuilt = CrossReportCampaignComparison.TryBuild(
+                comparisonReports,
+                out string comparisonJson,
+                out string comparisonFailure);
+            Check(
+                comparisonBuilt,
+                comparisonBuilt
+                    ? "schema-4 campaign reports produce a validated cross-report comparison"
+                    : "schema-4 campaign comparison failed: " + comparisonFailure);
+            if (comparisonBuilt)
+            {
+                Console.WriteLine(CrossReportCampaignComparison.FormatSummary(comparisonJson));
+                if (!string.IsNullOrEmpty(comparisonOutputPath))
+                {
+                    bool aliasesInput = string.Equals(
+                            comparisonOutputPath,
+                            itemsPath,
+                            StringComparison.OrdinalIgnoreCase)
+                        || reportFiles.Any(reportFile => string.Equals(
+                            comparisonOutputPath,
+                            Path.GetFullPath(reportFile),
+                            StringComparison.OrdinalIgnoreCase));
+                    Check(
+                        !aliasesInput,
+                        aliasesInput
+                            ? "comparison output path aliases an input file"
+                            : "comparison output path does not alias an input file");
+                    if (!aliasesInput)
+                    {
+                        CrossReportCampaignComparison.WriteAtomically(
+                            comparisonOutputPath,
+                            comparisonJson);
+                        Console.WriteLine("Comparison document: " + comparisonOutputPath);
+                    }
+                }
+            }
         }
     }
 }
