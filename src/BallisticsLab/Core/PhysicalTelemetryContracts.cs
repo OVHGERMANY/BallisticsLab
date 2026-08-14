@@ -126,6 +126,7 @@ namespace BallisticsLab.Core
             double effectivePathLengthMetres,
             string targetProfileId,
             string targetMaterialClass,
+            string targetSurfaceIdentity,
             double targetDensityKilogramsPerCubicMetre,
             double targetResistancePressurePascals,
             double projectileDeformationCoupling,
@@ -138,6 +139,7 @@ namespace BallisticsLab.Core
             EffectivePathLengthMetres = effectivePathLengthMetres;
             TargetProfileId = targetProfileId;
             TargetMaterialClass = targetMaterialClass;
+            TargetSurfaceIdentity = targetSurfaceIdentity;
             TargetDensityKilogramsPerCubicMetre = targetDensityKilogramsPerCubicMetre;
             TargetResistancePressurePascals = targetResistancePressurePascals;
             ProjectileDeformationCoupling = projectileDeformationCoupling;
@@ -151,6 +153,7 @@ namespace BallisticsLab.Core
         internal double EffectivePathLengthMetres { get; }
         internal string TargetProfileId { get; }
         internal string TargetMaterialClass { get; }
+        internal string TargetSurfaceIdentity { get; }
         internal double TargetDensityKilogramsPerCubicMetre { get; }
         internal double TargetResistancePressurePascals { get; }
         internal double ProjectileDeformationCoupling { get; }

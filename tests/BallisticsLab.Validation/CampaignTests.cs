@@ -9,6 +9,8 @@ internal static class CampaignTests
     private static readonly int[] LayersZeroOne = { 0, 1 };
     private static readonly int[] LayersZeroOneTwo = { 0, 1, 2 };
     private static readonly int[] UnorderedDuplicateLayers = { 2, 0, 2, 1 };
+    private static readonly string[] PhysicalArmoredSteel = { "ArmoredSteel" };
+    private static readonly string[] PhysicalCeramic = { "Ceramic" };
     private static readonly string[] PhysicalMaterials =
     {
         "ArmoredSteel",
@@ -18,6 +20,16 @@ internal static class CampaignTests
         "Aluminium",
         "Aramid",
         "Combined"
+    };
+    private static readonly string[] PhysicalMaterialClasses =
+    {
+        "ArmoredSteel",
+        "Ceramic",
+        "Polymer",
+        "Titanium",
+        "Aluminum",
+        "Fabric",
+        "CompositeArmor"
     };
     private static readonly string[] RunnableProtocolThreatIds =
     {
@@ -144,6 +156,75 @@ internal static class CampaignTests
         }
     }
 
+    internal static bool PhysicalEvidenceRequiresAnExpectedMaterialClass()
+    {
+        bool missingExpected;
+        try
+        {
+            _ = new CampaignCaseDefinition(
+                "missing-physical-material",
+                "Missing physical material",
+                CampaignFixtureSelectorKind.MaterialAndArmorClass,
+                string.Empty,
+                "ArmoredSteel",
+                4,
+                1,
+                0.15d,
+                0.0127d,
+                8d,
+                0d,
+                true,
+                1,
+                CampaignResetPolicy.BeforeEachShot,
+                0.5d,
+                1.5d,
+                false,
+                true,
+                false,
+                0.000001d,
+                1d);
+            missingExpected = false;
+        }
+        catch (ArgumentException)
+        {
+            missingExpected = true;
+        }
+
+        bool unexpectedMaterial;
+        try
+        {
+            _ = new CampaignCaseDefinition(
+                "unexpected-physical-material",
+                "Unexpected physical material",
+                CampaignFixtureSelectorKind.MaterialAndArmorClass,
+                string.Empty,
+                "ArmoredSteel",
+                4,
+                1,
+                0.15d,
+                0.0127d,
+                8d,
+                0d,
+                true,
+                1,
+                CampaignResetPolicy.BeforeEachShot,
+                0.5d,
+                1.5d,
+                false,
+                false,
+                false,
+                0.000001d,
+                1d,
+                expectedPhysicalMaterialClass: "ArmoredSteel");
+            unexpectedMaterial = false;
+        }
+        catch (ArgumentException)
+        {
+            unexpectedMaterial = true;
+        }
+        return missingExpected && unexpectedMaterial;
+    }
+
     internal static bool TrackerEnforcesResetAndCompletesInOrder()
     {
         CampaignDefinition definition = Definition();
@@ -237,7 +318,8 @@ internal static class CampaignTests
             true,
             true,
             0.000001d,
-            0.01d);
+            0.01d,
+            expectedPhysicalMaterialClass: "ArmoredSteel");
         var tracker = new CampaignRunTracker(
             new CampaignDefinition(
                 "gates",
@@ -282,6 +364,16 @@ internal static class CampaignTests
                 physicalTransitionCount: 1,
                 conservationRecordCount: 0,
                 fixtureArmorClass: 4));
+        CampaignAttemptRecord? materialMismatch = tracker.RecordShot(
+            Evidence(
+                300L,
+                "material-mismatch",
+                1d,
+                LayerZero,
+                reachedBackstop: true,
+                physicalTransitionCount: 1,
+                fixtureArmorClass: 4,
+                physicalTargetMaterialClasses: PhysicalCeramic));
         CampaignAttemptRecord? accepted = tracker.RecordShot(
             Evidence(
                 300L,
@@ -297,6 +389,7 @@ internal static class CampaignTests
             && noPhysical?.Status == CampaignAttemptStatus.MissingPhysicalEvidence
             && brokenClosure?.Status == CampaignAttemptStatus.ConservationFailure
             && missingConservation?.Status == CampaignAttemptStatus.MissingConservationEvidence
+            && materialMismatch?.Status == CampaignAttemptStatus.PhysicalMaterialMismatch
             && accepted?.Status == CampaignAttemptStatus.Accepted
             && tracker.Snapshot().State == CampaignRunState.Completed;
     }
@@ -438,11 +531,23 @@ internal static class CampaignTests
             && physical.Cases.Select(campaignCase => campaignCase.Material).SequenceEqual(
                 PhysicalMaterials,
                 StringComparer.Ordinal)
+            && physical.Cases.Select(campaignCase =>
+                    campaignCase.ExpectedPhysicalMaterialClass).SequenceEqual(
+                PhysicalMaterialClasses,
+                StringComparer.Ordinal)
             && physical.Cases.Single(campaignCase => campaignCase.Material == "Aramid").ArmorClass == 2
             && physical.Cases.Where(campaignCase => campaignCase.Material != "Aramid")
                 .All(campaignCase => campaignCase.ArmorClass == 4)
             && physical.Cases.All(campaignCase => campaignCase.RequirePhysicalEvidence)
             && physical.Cases.All(campaignCase => campaignCase.RequireConservationEvidence)
+            && FixturePhysicalMaterialContract.TryMapArmorMaterial(
+                "Glass",
+                out string glassClass)
+            && glassClass == "Glass"
+            && !FixturePhysicalMaterialContract.TryMapArmorMaterial(
+                "UnknownMaterial",
+                out string unknownClass)
+            && unknownClass.Length == 0
             && protocolThreats.Count == 4
             && protocolThreats.Select(threat => threat.ThreatId).SequenceEqual(
                 RunnableProtocolThreatIds,
@@ -776,35 +881,60 @@ internal static class CampaignTests
         }
         var tracker = new PhysicalTransitionTracker(4);
         tracker.Add(resolved);
+        FakePhysicalEvent backstopFake = FakePhysicalEvent.Resolved(
+            "campaign-backstop",
+            "fixture/700/backstop");
+        if (!PhysicalTelemetryReflectionReader.TryCopy(
+                1,
+                backstopFake.Event,
+                out PhysicalTelemetryEventRecord? backstopResolved,
+                out _)
+            || backstopResolved == null)
+        {
+            return false;
+        }
+        tracker.Add(backstopResolved);
         CampaignPhysicalEvidenceSummary matching = CampaignPhysicalEvidenceCalculator.Calculate(
             tracker.Snapshot(),
             17,
             991,
             "ammo-template",
-            "profile");
+            "profile",
+            700L,
+            1);
         CampaignPhysicalEvidenceSummary mismatched = CampaignPhysicalEvidenceCalculator.Calculate(
             tracker.Snapshot(),
             18,
             991,
             "ammo-template",
-            "profile");
+            "profile",
+            700L,
+            1);
         CampaignPhysicalEvidenceSummary wrongProfile = CampaignPhysicalEvidenceCalculator.Calculate(
             tracker.Snapshot(),
             17,
             991,
             "ammo-template",
-            "other-profile");
+            "other-profile",
+            700L,
+            1);
         CampaignPhysicalEvidenceSummary missingProfile = CampaignPhysicalEvidenceCalculator.Calculate(
             tracker.Snapshot(),
             17,
             991,
             "ammo-template",
-            string.Empty);
+            string.Empty,
+            700L,
+            1);
         return matching.TransitionCount == 1
             && matching.ConservationRecordCount == 1
+            && matching.TargetMaterialClasses.SequenceEqual(
+                PhysicalArmoredSteel,
+                StringComparer.Ordinal)
             && Math.Abs(matching.MaximumMassClosureErrorKilograms) < 0.000000000001d
             && Math.Abs(matching.MaximumEnergyClosureErrorJoules - 10d) < 0.000000001d
             && mismatched.TransitionCount == 0
+            && mismatched.TargetMaterialClasses.Count == 0
             && mismatched.ConservationRecordCount == 0
             && wrongProfile.TransitionCount == 0
             && missingProfile.TransitionCount == 0;
@@ -850,6 +980,8 @@ internal static class CampaignTests
                 == "IndependentShots"
             && string.IsNullOrEmpty(
                 caseDefinition.GetProperty("protocolThreatId").GetString())
+            && string.IsNullOrEmpty(
+                caseDefinition.GetProperty("expectedPhysicalMaterialClass").GetString())
             && attempt.GetProperty("chainId").GetString() == "json-chain"
             && attempt.GetProperty("sampleOrdinal").GetInt32() == 0
             && string.IsNullOrEmpty(
@@ -861,6 +993,7 @@ internal static class CampaignTests
             && attempt.GetProperty("rootFireIndex").GetInt32() == 17
             && attempt.GetProperty("rootShooterProfileId").GetString() == "profile"
             && attempt.GetProperty("status").GetString() == "Accepted"
+            && attempt.GetProperty("physicalTargetMaterialClasses").GetArrayLength() == 0
             && protocol.GetProperty("velocityMeasurementBasis").GetString()
                 == "TargetImpactProxy"
             && Math.Abs(protocol.GetProperty("protocolVelocityMetresPerSecond").GetDouble() - 800d)
@@ -1197,8 +1330,16 @@ internal static class CampaignTests
         string fixtureTemplateId = "fixture-template",
         string fixtureArmorMaterial = "ArmoredSteel",
         int fixtureArmorClass = 6,
-        int fixtureLayerCount = 1)
+        int fixtureLayerCount = 1,
+        IReadOnlyList<string>? physicalTargetMaterialClasses = null)
     {
+        IReadOnlyList<string> materials = physicalTargetMaterialClasses
+            ?? (physicalTransitionCount > 0
+                && FixturePhysicalMaterialContract.TryMapArmorMaterial(
+                    fixtureArmorMaterial,
+                    out string physicalMaterialClass)
+                    ? new[] { physicalMaterialClass }
+                    : Array.Empty<string>());
         return new CampaignShotEvidence(
             fixtureId,
             chainId,
@@ -1216,6 +1357,7 @@ internal static class CampaignTests
             reachedBackstop,
             physicalTransitionCount,
             conservationRecordCount < 0 ? physicalTransitionCount : conservationRecordCount,
+            materials,
             massClosureError,
             energyClosureError,
             new ProtocolShotEvidence(
@@ -1293,6 +1435,7 @@ internal static class CampaignTests
             false,
             1,
             1,
+            PhysicalArmoredSteel,
             0d,
             0d,
             protocol);

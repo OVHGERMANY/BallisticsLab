@@ -45,6 +45,8 @@ internal static class PhysicalTransitionReportTests
             && Nearly(
                 resolved.GetProperty("impact").GetProperty("physicalThicknessMetres").GetDouble(),
                 0.0127d)
+            && resolved.GetProperty("impact").GetProperty("targetSurfaceIdentity").GetString()
+                == "fixture/700/plate/0"
             && parent.GetProperty("projectileId").GetString() == "projectile-parent"
             && Nearly(parent.GetProperty("originalMassKilograms").GetDouble(), 0.004d)
             && Nearly(parent.GetProperty("retainedMassKilograms").GetDouble(), 0.004d)

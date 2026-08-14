@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 
@@ -103,6 +104,11 @@ namespace BallisticsLab.Core
                 Number(builder, ref first, "maximumVelocityFraction", campaignCase.MaximumVelocityFraction);
                 Boolean(builder, ref first, "requireBackstopEvidence", campaignCase.RequireBackstopEvidence);
                 Boolean(builder, ref first, "requirePhysicalEvidence", campaignCase.RequirePhysicalEvidence);
+                String(
+                    builder,
+                    ref first,
+                    "expectedPhysicalMaterialClass",
+                    campaignCase.ExpectedPhysicalMaterialClass);
                 Boolean(
                     builder,
                     ref first,
@@ -168,6 +174,8 @@ namespace BallisticsLab.Core
                 Boolean(builder, ref first, "reachedBackstop", evidence.ReachedBackstop);
                 Number(builder, ref first, "physicalTransitionCount", evidence.PhysicalTransitionCount);
                 Number(builder, ref first, "conservationRecordCount", evidence.ConservationRecordCount);
+                Property(builder, ref first, "physicalTargetMaterialClasses");
+                AppendStrings(builder, evidence.PhysicalTargetMaterialClasses);
                 Number(
                     builder,
                     ref first,
@@ -273,6 +281,22 @@ namespace BallisticsLab.Core
                     builder.Append(',');
                 }
                 builder.Append(evidence.HitLayers[index].ToString(CultureInfo.InvariantCulture));
+            }
+            builder.Append(']');
+        }
+
+        private static void AppendStrings(
+            StringBuilder builder,
+            IReadOnlyList<string> values)
+        {
+            builder.Append('[');
+            for (int index = 0; index < values.Count; index++)
+            {
+                if (index != 0)
+                {
+                    builder.Append(',');
+                }
+                builder.Append(LabPolicies.Json(values[index]));
             }
             builder.Append(']');
         }

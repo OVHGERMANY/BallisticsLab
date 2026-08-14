@@ -11,7 +11,7 @@ Snapshot date: 2026-08-13
 - Target: SPT `4.1.2`, EFT `0.16.9.40743`, `EscapeFromTarkov.exe`
 - Release target: `netstandard2.1`
 - Currently deployed and playtested DLL SHA-256: `31CEF59F837919A1E334E977544E8A7FD45725AA59B738613C67333DD68542E3`
-- Current strict-build candidate: 262,656 bytes, SHA-256 `7130A353664A84D2E485E9E84024425ADE7AEA96C59E760046B068268D6DDD38`
+- Current strict-build candidate: 267,776 bytes, SHA-256 `9BD5DE0E9655ED4C19BF8ED7E2101F8426C30B90393B8ACF2D739E132823DBC1`
 - Default configuration: disabled
 
 The current source enables nullable analysis, checked arithmetic, recommended analyzers, code-style enforcement, and warnings-as-errors. Lifecycle contracts and locale-sensitive display formatting were corrected without changing lab ballistics or patch targets. The final offline UI, source, schema, accessibility, and invariant review is complete. The strict-build candidate has not been deployed or runtime-accepted. Tagging remains gated on the controlled current-build report matrix and the direct observations that telemetry cannot prove.
@@ -25,12 +25,15 @@ The `development/physical-projectile-telemetry` branch now has an offline-valida
 - Subscription only during an active Lab session, one-second late-discovery retries, and deterministic unsubscription during session teardown.
 - Immediate detached copies into immutable BallisticsLab-owned host, impact, component, collision-history, output, loss-budget, and conservation records.
 - Complete copied component geometry, mass, motion, energy, attitude, lineage, material provenance, damage and penetration capability, terminal state, and render state.
+- Optional target-surface identity is copied without retaining the collider. Lab fixture layers expose
+  a generic schema-1 material/identity contract; the seven armor families map to seven distinct
+  canonical physical classes, including a separate titanium class.
 - Safe absence, unsupported-schema, malformed-event, and bounded-buffer behavior.
 - Exact ordinal transition-ID pairing with first-seen ordering, pending prepared evidence, orphaned resolved evidence, and deterministic duplicate counters that preserve the first accepted stage.
 - Schema-4 JSON `physicalTransitions` export with complete parent/output state, material origin, prior collisions, loss budget, and conservation ledger.
 - Physical-transition-only manual and automatic reports with independent revision tracking; the flat shot-record CSV columns remain unchanged.
 - Offline mass and energy closure validation across parent allocation, target spall, output counts, modeled losses, residual energy, output energy, and closure error.
-- Built-in controlled-fixture and seven-material campaigns with exact installed material/class selectors plus explicit velocity, layer, backstop, physical-transition, and conservation gates.
+- Built-in controlled-fixture and seven-material campaigns with exact installed material/class selectors plus explicit velocity, layer, backstop, fixture-bound physical-transition, material-provenance, and conservation gates. Backstop transitions cannot satisfy plate evidence.
 - One accepted complete chain per attempt, exact fixture and lineage correlation, deterministic duplicate rejection, and a 350 ms evidence-settle window before evaluation.
 - Automatic durability reset between ordinary repeated shots, automatic fixture advancement between cases, and an accessible guided-campaign panel that does not fire the weapon.
 - Stable case-identification seeds derived from a configurable Lab seed. These seeds label repeatable cases; they do not replace EFT's observed shot seed.
@@ -57,11 +60,11 @@ This development layer has not been deployed or tested in-game. Its offline impl
 
 ## Automated and startup verification
 
-- Forced Release solution rebuild at the `latest-all` analyzer tier: 0 warnings, 0 errors in 7:08.20.
-- Forced Debug solution rebuild at the `latest-all` analyzer tier: 0 warnings, 0 errors in 7:08.16.
+- Forced Release solution rebuild at the `latest-all` analyzer tier: 0 warnings, 0 errors in 7:45.03.
+- Forced Debug solution rebuild at the `latest-all` analyzer tier: 0 warnings, 0 errors in 7:41.76.
 - Whitespace, style, analyzer-format, and diff verification: passed without changes.
-- Pure and installed-database validation: 155 checks passed.
-- Validation with all installed-runtime reports: 162 checks passed.
+- Pure and installed-database validation: 156 checks passed.
+- Validation with all installed-runtime reports: 163 checks passed.
 - Installed plate catalog: 39 usable templates across seven supported materials.
 - Disabled startup: `0.2.8` reports disabled and installs zero game patches.
 - Enabled startup: all four intended patches install exactly once.
@@ -73,7 +76,7 @@ This development layer has not been deployed or tested in-game. Its offline impl
 - .NET SDK `10.0.303` is pinned with roll-forward disabled. Deterministic source paths are enabled and Git-SHA injection into the assembly informational version is disabled.
 - Explicit deployment performs an SHA-256 parity check and fails if the compiled and installed assemblies differ.
 
-The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `7130A353...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
+The installed `31CEF59F...` DLL remains the runtime-tested baseline. A guarded restart produced one responsive Tarkov process, loaded `0.2.8` disabled, installed zero Lab patches, and emitted zero Lab startup errors. The current `9BD5DE0E...` strict-build candidate was validated in isolation and deliberately not copied over that installed baseline. Existing reports remain evidence for the installed build; the current candidate requires its own deployment and runtime gate before it can replace that baseline.
 
 ## Installed runtime evidence
 

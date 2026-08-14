@@ -244,6 +244,7 @@ internal static class PhysicalTransitionInvariantValidator
             && NonNegative(impact, "physicalThicknessMetres")
             && NonNegative(impact, "effectivePathLengthMetres")
             && !string.IsNullOrEmpty(RequiredString(impact, "targetMaterialClass"))
+            && HasString(impact, "targetSurfaceIdentity")
             && NonNegative(impact, "targetDensityKilogramsPerCubicMetre")
             && NonNegative(impact, "targetResistancePressurePascals")
             && Probability(impact, "projectileDeformationCoupling")
@@ -597,6 +598,12 @@ internal static class PhysicalTransitionInvariantValidator
             && value.ValueKind == JsonValueKind.String
                 ? value.GetString() ?? string.Empty
                 : string.Empty;
+    }
+
+    private static bool HasString(JsonElement source, string name)
+    {
+        return source.TryGetProperty(name, out JsonElement value)
+            && value.ValueKind == JsonValueKind.String;
     }
 
     private static bool TryInt32(JsonElement source, string name, out int value)

@@ -188,6 +188,9 @@ Check(
     CampaignTests.ConservationRequirementCannotExistWithoutPhysicalEvidence(),
     "campaign definitions reject conservation gates without physical-transition evidence");
 Check(
+    CampaignTests.PhysicalEvidenceRequiresAnExpectedMaterialClass(),
+    "campaign physical-evidence gates require one expected material class");
+Check(
     CampaignTests.TrackerEnforcesResetAndCompletesInOrder(),
     "campaign tracker enforces fixture and reset order without counting duplicate chains");
 Check(

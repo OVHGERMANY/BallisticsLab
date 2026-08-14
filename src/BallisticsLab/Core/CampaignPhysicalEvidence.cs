@@ -10,18 +10,21 @@ namespace BallisticsLab.Core
             int transitionCount,
             int conservationRecordCount,
             double maximumMassClosureErrorKilograms,
-            double maximumEnergyClosureErrorJoules)
+            double maximumEnergyClosureErrorJoules,
+            IReadOnlyList<string> targetMaterialClasses)
         {
             TransitionCount = transitionCount;
             ConservationRecordCount = conservationRecordCount;
             MaximumMassClosureErrorKilograms = maximumMassClosureErrorKilograms;
             MaximumEnergyClosureErrorJoules = maximumEnergyClosureErrorJoules;
+            TargetMaterialClasses = targetMaterialClasses;
         }
 
         internal int TransitionCount { get; }
         internal int ConservationRecordCount { get; }
         internal double MaximumMassClosureErrorKilograms { get; }
         internal double MaximumEnergyClosureErrorJoules { get; }
+        internal IReadOnlyList<string> TargetMaterialClasses { get; }
     }
 
     internal static class CampaignPhysicalEvidenceCalculator
@@ -31,7 +34,9 @@ namespace BallisticsLab.Core
             int rootFireIndex,
             int rootRandomSeed,
             string ammunitionTemplateId,
-            string rootShooterProfileId)
+            string rootShooterProfileId,
+            long fixtureId,
+            int fixtureLayerCount)
         {
             if (transitions == null)
             {
@@ -41,11 +46,33 @@ namespace BallisticsLab.Core
             {
                 ThrowMissingIdentity(nameof(ammunitionTemplateId));
             }
+            if (fixtureId <= 0L)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(fixtureId),
+                    "Fixture identity must be positive.");
+            }
+            if (fixtureLayerCount <= 0 || fixtureLayerCount > LabPolicies.MaximumLayers)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(fixtureLayerCount),
+                    "Fixture layer count is outside the supported range.");
+            }
+
+            var plateSurfaceIdentities = new HashSet<string>(StringComparer.Ordinal);
+            for (int layerIndex = 0; layerIndex < fixtureLayerCount; layerIndex++)
+            {
+                plateSurfaceIdentities.Add(
+                    FixturePhysicalMaterialContract.CreatePlateSurfaceIdentity(
+                        fixtureId,
+                        layerIndex));
+            }
 
             int transitionCount = 0;
             int conservationRecordCount = 0;
             double maximumMassError = 0d;
             double maximumEnergyError = 0d;
+            var targetMaterialClasses = new SortedSet<string>(StringComparer.Ordinal);
             for (int index = 0; index < transitions.Count; index++)
             {
                 PhysicalTelemetryEventRecord? resolved = transitions[index].Resolved;
@@ -54,12 +81,15 @@ namespace BallisticsLab.Core
                         rootFireIndex,
                         rootRandomSeed,
                         ammunitionTemplateId,
-                        rootShooterProfileId))
+                        rootShooterProfileId)
+                    || !plateSurfaceIdentities.Contains(
+                        resolved.Impact.TargetSurfaceIdentity))
                 {
                     continue;
                 }
 
                 transitionCount++;
+                targetMaterialClasses.Add(resolved.Impact.TargetMaterialClass);
                 PhysicalConservationRecord? conservation = resolved.Conservation;
                 if (conservation == null)
                 {
@@ -79,7 +109,8 @@ namespace BallisticsLab.Core
                 transitionCount,
                 conservationRecordCount,
                 maximumMassError,
-                maximumEnergyError);
+                maximumEnergyError,
+                new List<string>(targetMaterialClasses).AsReadOnly());
         }
 
         private static bool Matches(

@@ -515,7 +515,9 @@ namespace BallisticsLab.Runtime
                 identity.RootFireIndex,
                 identity.RootRandomSeed,
                 identity.AmmoTemplateId,
-                identity.RootShooterProfileId);
+                identity.RootShooterProfileId,
+                identity.FixtureId,
+                identity.FixtureLayerCount);
             ProtocolVelocityMeasurementBasis velocityBasis = identity.HasThreeMetreVelocity
                 ? ProtocolVelocityMeasurementBasis.EftTrajectoryThreeMetres
                 : ProtocolVelocityMeasurementBasis.TargetImpactProxy;
@@ -555,6 +557,7 @@ namespace BallisticsLab.Runtime
                 reachedBackstop,
                 physical.TransitionCount,
                 physical.ConservationRecordCount,
+                physical.TargetMaterialClasses,
                 physical.MaximumMassClosureErrorKilograms,
                 physical.MaximumEnergyClosureErrorJoules,
                 protocolEvidence);

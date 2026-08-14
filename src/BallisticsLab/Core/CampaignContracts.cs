@@ -46,7 +46,8 @@ namespace BallisticsLab.Core
         ConservationFailure = 6,
         MissingConservationEvidence = 7,
         ProtocolRejected = 8,
-        SequenceInvalidated = 9
+        SequenceInvalidated = 9,
+        PhysicalMaterialMismatch = 10
     }
 
     internal sealed class CampaignCaseDefinition
@@ -76,7 +77,8 @@ namespace BallisticsLab.Core
             CampaignShotSequencePolicy shotSequencePolicy =
                 CampaignShotSequencePolicy.IndependentShots,
             string protocolThreatId = "",
-            string protocolAmmunitionTemplateId = "")
+            string protocolAmmunitionTemplateId = "",
+            string expectedPhysicalMaterialClass = "")
         {
             CaseId = Required(caseId, nameof(caseId));
             Label = Required(label, nameof(label));
@@ -96,6 +98,16 @@ namespace BallisticsLab.Core
             if (requireConservationEvidence && !requirePhysicalEvidence)
             {
                 ThrowConservationRequiresPhysical(nameof(requireConservationEvidence));
+            }
+            if (requirePhysicalEvidence
+                && !FixturePhysicalMaterialContract.IsCanonicalPhysicalMaterialClass(
+                    expectedPhysicalMaterialClass))
+            {
+                ThrowPhysicalMaterialRequired(nameof(expectedPhysicalMaterialClass));
+            }
+            if (!requirePhysicalEvidence && !string.IsNullOrEmpty(expectedPhysicalMaterialClass))
+            {
+                ThrowPhysicalMaterialWithoutEvidence(nameof(expectedPhysicalMaterialClass));
             }
             ValidateNonNegative(
                 maximumMassClosureErrorKilograms,
@@ -135,6 +147,7 @@ namespace BallisticsLab.Core
             ShotSequencePolicy = shotSequencePolicy;
             ProtocolThreatId = protocolThreatId ?? string.Empty;
             ProtocolAmmunitionTemplateId = protocolAmmunitionTemplateId ?? string.Empty;
+            ExpectedPhysicalMaterialClass = expectedPhysicalMaterialClass ?? string.Empty;
         }
 
         internal string CaseId { get; }
@@ -161,6 +174,7 @@ namespace BallisticsLab.Core
         internal CampaignShotSequencePolicy ShotSequencePolicy { get; }
         internal string ProtocolThreatId { get; }
         internal string ProtocolAmmunitionTemplateId { get; }
+        internal string ExpectedPhysicalMaterialClass { get; }
         internal bool IsProtocolSequence => ShotSequencePolicy
             == CampaignShotSequencePolicy.SameFixtureProtocolPattern;
 
@@ -201,6 +215,22 @@ namespace BallisticsLab.Core
                 return;
             }
             ThrowUnsupportedSelector(selectorKind);
+        }
+
+        [DoesNotReturn]
+        private static void ThrowPhysicalMaterialRequired(string parameterName)
+        {
+            throw new ArgumentException(
+                "Physical-evidence cases must declare an expected physical material class.",
+                parameterName);
+        }
+
+        [DoesNotReturn]
+        private static void ThrowPhysicalMaterialWithoutEvidence(string parameterName)
+        {
+            throw new ArgumentException(
+                "A physical material class cannot be required when physical evidence is disabled.",
+                parameterName);
         }
 
         private static void ValidateShotSequence(
@@ -493,6 +523,7 @@ namespace BallisticsLab.Core
             bool reachedBackstop,
             int physicalTransitionCount,
             int conservationRecordCount,
+            IReadOnlyList<string> physicalTargetMaterialClasses,
             double maximumMassClosureErrorKilograms,
             double maximumEnergyClosureErrorJoules,
             ProtocolShotEvidence? protocolEvidence = null)
@@ -532,6 +563,10 @@ namespace BallisticsLab.Core
             {
                 ThrowInvalidConservationCount(nameof(conservationRecordCount));
             }
+            if (physicalTargetMaterialClasses == null)
+            {
+                ThrowNullPhysicalMaterials(nameof(physicalTargetMaterialClasses));
+            }
             if (hitLayers == null)
             {
                 ThrowNullLayers(nameof(hitLayers));
@@ -546,6 +581,15 @@ namespace BallisticsLab.Core
             {
                 ThrowLayerOutsideFixture(nameof(hitLayers));
             }
+            string[] targetMaterialClasses = physicalTargetMaterialClasses
+                .Select(materialClass => Required(materialClass, nameof(physicalTargetMaterialClasses)))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(materialClass => materialClass, StringComparer.Ordinal)
+                .ToArray();
+            if (targetMaterialClasses.Length > physicalTransitionCount)
+            {
+                ThrowTooManyPhysicalMaterials(nameof(physicalTargetMaterialClasses));
+            }
 
             FixtureId = fixtureId;
             FixtureArmorClass = fixtureArmorClass;
@@ -558,6 +602,7 @@ namespace BallisticsLab.Core
             ReachedBackstop = reachedBackstop;
             PhysicalTransitionCount = physicalTransitionCount;
             ConservationRecordCount = conservationRecordCount;
+            PhysicalTargetMaterialClasses = Array.AsReadOnly(targetMaterialClasses);
             MaximumMassClosureErrorKilograms = maximumMassClosureErrorKilograms;
             MaximumEnergyClosureErrorJoules = maximumEnergyClosureErrorJoules;
             ProtocolEvidence = protocolEvidence;
@@ -579,6 +624,7 @@ namespace BallisticsLab.Core
         internal bool ReachedBackstop { get; }
         internal int PhysicalTransitionCount { get; }
         internal int ConservationRecordCount { get; }
+        internal IReadOnlyList<string> PhysicalTargetMaterialClasses { get; }
         internal double MaximumMassClosureErrorKilograms { get; }
         internal double MaximumEnergyClosureErrorJoules { get; }
         internal ProtocolShotEvidence? ProtocolEvidence { get; }
@@ -640,6 +686,20 @@ namespace BallisticsLab.Core
             throw new ArgumentOutOfRangeException(
                 parameterName,
                 "Conservation count must be non-negative and no greater than the physical transition count.");
+        }
+
+        [DoesNotReturn]
+        private static void ThrowNullPhysicalMaterials(string parameterName)
+        {
+            throw new ArgumentNullException(parameterName);
+        }
+
+        [DoesNotReturn]
+        private static void ThrowTooManyPhysicalMaterials(string parameterName)
+        {
+            throw new ArgumentException(
+                "Unique physical material classes cannot exceed the transition count.",
+                parameterName);
         }
 
         [DoesNotReturn]
@@ -1185,6 +1245,13 @@ namespace BallisticsLab.Core
             {
                 return CampaignAttemptStatus.MissingPhysicalEvidence;
             }
+            if (campaignCase.RequirePhysicalEvidence
+                && !evidence.PhysicalTargetMaterialClasses.Contains(
+                    campaignCase.ExpectedPhysicalMaterialClass,
+                    StringComparer.Ordinal))
+            {
+                return CampaignAttemptStatus.PhysicalMaterialMismatch;
+            }
             if (campaignCase.RequireConservationEvidence
                 && evidence.ConservationRecordCount != evidence.PhysicalTransitionCount)
             {
@@ -1429,7 +1496,8 @@ namespace BallisticsLab.Core
                     Count(attempts, CampaignAttemptStatus.VelocityOutOfRange),
                     Count(attempts, CampaignAttemptStatus.IncompleteLayerChain),
                     Count(attempts, CampaignAttemptStatus.MissingBackstop),
-                    Count(attempts, CampaignAttemptStatus.MissingPhysicalEvidence),
+                    Count(attempts, CampaignAttemptStatus.MissingPhysicalEvidence)
+                        + Count(attempts, CampaignAttemptStatus.PhysicalMaterialMismatch),
                     Count(attempts, CampaignAttemptStatus.ConservationFailure),
                     Count(attempts, CampaignAttemptStatus.MissingConservationEvidence),
                     Count(attempts, CampaignAttemptStatus.ProtocolRejected),

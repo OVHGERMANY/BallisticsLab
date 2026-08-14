@@ -354,6 +354,10 @@ internal static class CampaignReportInvariantValidator
                 || !TryDouble(element, "maximumVelocityFraction", out double maximumVelocity)
                 || !TryBoolean(element, "requireBackstopEvidence", out bool requireBackstop)
                 || !TryBoolean(element, "requirePhysicalEvidence", out bool requirePhysical)
+                || !TryTextAllowEmpty(
+                    element,
+                    "expectedPhysicalMaterialClass",
+                    out string expectedPhysicalMaterialClass)
                 || !TryBoolean(
                     element,
                     "requireConservationEvidence",
@@ -394,7 +398,8 @@ internal static class CampaignReportInvariantValidator
                 maximumEnergyError,
                 shotSequencePolicy,
                 protocolThreatId,
-                protocolAmmunitionTemplateId));
+                protocolAmmunitionTemplateId,
+                expectedPhysicalMaterialClass));
             expectedIndex++;
         }
         if (cases.Count == 0)
@@ -477,6 +482,10 @@ internal static class CampaignReportInvariantValidator
                     out ProtocolShotEvidence? protocolEvidence)
                 || !TryInt32(element, "physicalTransitionCount", out int physicalCount)
                 || !TryInt32(element, "conservationRecordCount", out int conservationCount)
+                || !TrySortedTextArray(
+                    element,
+                    "physicalTargetMaterialClasses",
+                    out List<string> physicalTargetMaterialClasses)
                 || !TryDouble(
                     element,
                     "maximumMassClosureErrorKilograms",
@@ -507,6 +516,7 @@ internal static class CampaignReportInvariantValidator
                 reachedBackstop,
                 physicalCount,
                 conservationCount,
+                physicalTargetMaterialClasses,
                 maximumMassError,
                 maximumEnergyError,
                 protocolEvidence);
@@ -702,6 +712,37 @@ internal static class CampaignReportInvariantValidator
             }
             layers.Add(layer);
             previous = layer;
+        }
+        return true;
+    }
+
+    private static bool TrySortedTextArray(
+        JsonElement owner,
+        string name,
+        out List<string> values)
+    {
+        values = new List<string>();
+        if (!owner.TryGetProperty(name, out JsonElement array)
+            || array.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+        string? previous = null;
+        foreach (JsonElement item in array.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String)
+            {
+                return false;
+            }
+            string value = item.GetString() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(value)
+                || (previous != null
+                    && string.CompareOrdinal(previous, value) >= 0))
+            {
+                return false;
+            }
+            values.Add(value);
+            previous = value;
         }
         return true;
     }

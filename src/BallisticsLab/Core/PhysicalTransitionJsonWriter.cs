@@ -96,6 +96,7 @@ namespace BallisticsLab.Core
             Number(builder, ref first, "effectivePathLengthMetres", impact.EffectivePathLengthMetres);
             String(builder, ref first, "targetProfileId", impact.TargetProfileId);
             String(builder, ref first, "targetMaterialClass", impact.TargetMaterialClass);
+            String(builder, ref first, "targetSurfaceIdentity", impact.TargetSurfaceIdentity);
             Number(
                 builder,
                 ref first,

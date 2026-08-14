@@ -157,6 +157,7 @@ namespace BallisticsLab.Core
                 FiniteDouble(source, "EffectivePathLengthMetres"),
                 OptionalString(source, "TargetProfileId"),
                 EnumName(source, "TargetMaterialClass"),
+                OptionalStringIfPresent(source, "TargetSurfaceIdentity"),
                 FiniteDouble(source, "TargetDensityKilogramsPerCubicMetre"),
                 FiniteDouble(source, "TargetResistancePressurePascals"),
                 FiniteDouble(source, "ProjectileDeformationCoupling"),
@@ -350,6 +351,27 @@ namespace BallisticsLab.Core
         private static string OptionalString(object source, string propertyName)
         {
             object? value = OptionalObject(source, propertyName);
+            string text = value == null
+                ? string.Empty
+                : Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+            return DetachedString(text);
+        }
+
+        private static string OptionalStringIfPresent(object source, string propertyName)
+        {
+            PropertyInfo? property = source.GetType().GetProperty(
+                propertyName,
+                BindingFlags.Instance | BindingFlags.Public);
+            if (property == null)
+            {
+                return string.Empty;
+            }
+            if (!property.CanRead || property.GetIndexParameters().Length != 0)
+            {
+                throw new InvalidDataException(
+                    "Physical telemetry property " + propertyName + " was not readable.");
+            }
+            object? value = property.GetValue(source, null);
             string text = value == null
                 ? string.Empty
                 : Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;

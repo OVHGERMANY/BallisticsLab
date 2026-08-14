@@ -92,6 +92,7 @@ internal static class PhysicalTelemetryFoundationTests
             && captured.Host.AmmunitionTemplateId == "ammo-template"
             && captured.Impact.TargetProfileId == "target-profile"
             && captured.Impact.TargetMaterialClass == "ArmoredSteel"
+            && captured.Impact.TargetSurfaceIdentity == "fixture/700/plate/0"
             && Nearly(captured.Impact.PhysicalThicknessMetres, 0.0127d)
             && Nearly(captured.Impact.PositionMetres.X, 1.25d)
             && captured.Parent.Kind == "IntactProjectile"
@@ -309,7 +310,9 @@ internal sealed class FakePhysicalEvent
         return new FakePhysicalEvent(value, parent, parentHistory, outputs, new List<object>());
     }
 
-    internal static FakePhysicalEvent Resolved(string transitionId = "transition-resolved")
+    internal static FakePhysicalEvent Resolved(
+        string transitionId = "transition-resolved",
+        string targetSurfaceIdentity = "fixture/700/plate/0")
     {
         List<object> parentHistory = new() { Collision("collision-prior", FakeOutcome.Penetrated) };
         List<object> outputHistory = new() { Collision("collision-current", FakeOutcome.Fragmented) };
@@ -325,7 +328,7 @@ internal sealed class FakePhysicalEvent
             TransitionId = transitionId,
             Outcome = FakeOutcome.Fragmented,
             Host = Host(),
-            Impact = Impact(),
+            Impact = Impact(targetSurfaceIdentity),
             Parent = parent,
             Outputs = outputs,
             Conservation = new FakeConservation
@@ -371,7 +374,7 @@ internal sealed class FakePhysicalEvent
         };
     }
 
-    private static FakeImpact Impact()
+    private static FakeImpact Impact(string targetSurfaceIdentity = "fixture/700/plate/0")
     {
         return new FakeImpact
         {
@@ -381,6 +384,7 @@ internal sealed class FakePhysicalEvent
             EffectivePathLengthMetres = 0.018d,
             TargetProfileId = "target-profile",
             TargetMaterialClass = FakeMaterial.ArmoredSteel,
+            TargetSurfaceIdentity = targetSurfaceIdentity,
             TargetDensityKilogramsPerCubicMetre = 7850d,
             TargetResistancePressurePascals = 900000000d,
             ProjectileDeformationCoupling = 0.4d,
@@ -544,6 +548,7 @@ internal sealed class FakeImpact
     public double EffectivePathLengthMetres { get; init; }
     public string TargetProfileId { get; init; } = string.Empty;
     public FakeMaterial TargetMaterialClass { get; init; }
+    public string TargetSurfaceIdentity { get; init; } = string.Empty;
     public double TargetDensityKilogramsPerCubicMetre { get; init; }
     public double TargetResistancePressurePascals { get; init; }
     public double ProjectileDeformationCoupling { get; init; }

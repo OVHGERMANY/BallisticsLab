@@ -941,9 +941,12 @@ internal static class CrossReportCampaignComparison
             reachedBackstop: campaignCase.RequireBackstopEvidence,
             physicalTransitionCount: campaignCase.RequirePhysicalEvidence ? 1 : 0,
             conservationRecordCount: campaignCase.RequireConservationEvidence ? 1 : 0,
+            physicalTargetMaterialClasses: campaignCase.RequirePhysicalEvidence
+                ? new[] { campaignCase.ExpectedPhysicalMaterialClass }
+                : Array.Empty<string>(),
             maximumMassClosureErrorKilograms: 0d,
             maximumEnergyClosureErrorJoules: 0d,
-            protocolEvidence);
+            protocolEvidence: protocolEvidence);
     }
 
     private static double WeightedMean(

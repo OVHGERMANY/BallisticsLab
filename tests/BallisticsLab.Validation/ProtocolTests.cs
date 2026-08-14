@@ -462,6 +462,7 @@ internal static class ProtocolTests
             false,
             0,
             0,
+            Array.Empty<string>(),
             0d,
             0d,
             protocol));

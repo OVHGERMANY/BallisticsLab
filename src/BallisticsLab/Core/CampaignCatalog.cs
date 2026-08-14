@@ -109,7 +109,8 @@ namespace BallisticsLab.Core
                 MaximumUnallocatedEnergyJoules,
                 CampaignShotSequencePolicy.SameFixtureProtocolPattern,
                 threat.ThreatId,
-                mapping.TemplateId);
+                mapping.TemplateId,
+                "ArmoredSteel");
             return new CampaignDefinition(
                 "simulation-screening-" + threat.ThreatId,
                 threat.ProtectionClass + " simulation screening",
@@ -198,6 +199,15 @@ namespace BallisticsLab.Core
             string material,
             int armorClass = 4)
         {
+            if (!FixturePhysicalMaterialContract.TryMapArmorMaterial(
+                    material,
+                    out string expectedPhysicalMaterialClass))
+            {
+                throw new InvalidOperationException(
+                    "The physical material matrix contains an unmapped armor material: "
+                    + material);
+            }
+
             return new CampaignCaseDefinition(
                 caseId,
                 label,
@@ -219,7 +229,8 @@ namespace BallisticsLab.Core
                 true,
                 true,
                 0.000001d,
-                MaximumUnallocatedEnergyJoules);
+                MaximumUnallocatedEnergyJoules,
+                expectedPhysicalMaterialClass: expectedPhysicalMaterialClass);
         }
     }
 }
