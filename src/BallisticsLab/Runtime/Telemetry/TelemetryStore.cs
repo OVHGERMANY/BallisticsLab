@@ -16,6 +16,8 @@ namespace BallisticsLab.Runtime.Telemetry
         private static long _sequence;
         private static long _revision;
         private static long _savedRevision;
+        private static long _savedPhysicalRevision;
+        private static long _savedCampaignRevision;
         private static long _savedSequence;
         private static DateTime _lastRecordUtc;
         private static DateTime _nextAutomaticAttemptUtc;
@@ -95,34 +97,81 @@ namespace BallisticsLab.Runtime.Telemetry
                 Interlocked.Exchange(ref _sequence, 0L);
                 _revision = 0L;
                 _savedRevision = 0L;
+                _savedPhysicalRevision = 0L;
+                _savedCampaignRevision = 0L;
                 _savedSequence = 0L;
                 _lastRecordUtc = DateTime.MinValue;
                 _nextAutomaticAttemptUtc = DateTime.MinValue;
             }
         }
 
+        internal static bool HasUnsavedCampaignEvidence()
+        {
+            bool hasCampaign = CampaignRuntimeController.TrySnapshot(
+                out _,
+                out CampaignRunSnapshot? campaignSnapshot,
+                out long campaignRevision,
+                out _);
+            if (!hasCampaign || campaignSnapshot?.Attempts.Count == 0)
+            {
+                return false;
+            }
+
+            lock (Sync)
+            {
+                return campaignRevision > _savedCampaignRevision;
+            }
+        }
+
         internal static string Export()
         {
-            IReadOnlyList<ShotRecord> records;
+            ShotRecord[] records;
+            IReadOnlyList<PhysicalTransitionRecord> transitions =
+                PhysicalTelemetrySessionBridge.SnapshotTransitions(
+                    out long physicalRevision,
+                    out _);
+            bool hasCampaign = CampaignRuntimeController.TrySnapshot(
+                out CampaignDefinition? campaignDefinition,
+                out CampaignRunSnapshot? campaignSnapshot,
+                out long campaignRevision,
+                out _);
+            bool hasCampaignEvidence = hasCampaign && campaignSnapshot?.Attempts.Count > 0;
             long revision;
             lock (Sync)
             {
-                if (Records.Count == 0)
+                if (Records.Count == 0 && transitions.Count == 0 && !hasCampaignEvidence)
                 {
-                    throw new InvalidOperationException("No shot records are available to export.");
+                    throw new InvalidOperationException(
+                        "No shot records, physical transitions, or campaign results are available to export.");
                 }
                 records = Records.ToArray();
                 revision = _revision;
             }
             int ordinal = Interlocked.Increment(ref _manualExportOrdinal);
             string stem = LabPolicies.ReportStem(DateTime.UtcNow, ordinal);
-            string result = WriteReportPair(records, stem);
+            string result = WriteReportPair(
+                records,
+                transitions,
+                campaignDefinition,
+                campaignSnapshot,
+                stem);
             lock (Sync)
             {
                 if (revision > _savedRevision)
                 {
                     _savedRevision = revision;
-                    _savedSequence = records.Max(record => record.Sequence);
+                    if (records.Length != 0)
+                    {
+                        _savedSequence = records.Max(record => record.Sequence);
+                    }
+                }
+                if (physicalRevision > _savedPhysicalRevision)
+                {
+                    _savedPhysicalRevision = physicalRevision;
+                }
+                if (campaignRevision > _savedCampaignRevision)
+                {
+                    _savedCampaignRevision = campaignRevision;
                 }
             }
             return result;
@@ -131,24 +180,66 @@ namespace BallisticsLab.Runtime.Telemetry
         internal static string? ExportAutomatic(bool force)
         {
             IReadOnlyList<ShotRecord> records;
+            PhysicalTransitionRecord[] transitionsToWrite;
+            IReadOnlyList<PhysicalTransitionRecord> transitions =
+                PhysicalTelemetrySessionBridge.SnapshotTransitions(
+                    out long physicalRevision,
+                    out DateTime lastPhysicalRecordUtc);
+            bool hasCampaign = CampaignRuntimeController.TrySnapshot(
+                out CampaignDefinition? campaignDefinition,
+                out CampaignRunSnapshot? campaignSnapshot,
+                out long campaignRevision,
+                out DateTime lastCampaignEvidenceUtc);
             string stem;
             long revision;
             DateTime now = DateTime.UtcNow;
             lock (Sync)
             {
-                if (!LabPolicies.ShouldSaveReport(Records.Count, _revision, _savedRevision)
-                    || (!force && now < _lastRecordUtc.AddSeconds(1.25))
+                bool shotChanged = LabPolicies.ShouldSaveReport(
+                    Records.Count,
+                    _revision,
+                    _savedRevision);
+                bool physicalChanged = LabPolicies.ShouldSaveReport(
+                    transitions.Count,
+                    physicalRevision,
+                    _savedPhysicalRevision);
+                bool campaignChanged = hasCampaign
+                    && campaignSnapshot?.Attempts.Count > 0
+                    && campaignRevision > _savedCampaignRevision;
+                DateTime lastEvidenceUtc = _lastRecordUtc > lastPhysicalRecordUtc
+                    ? _lastRecordUtc
+                    : lastPhysicalRecordUtc;
+                if (lastCampaignEvidenceUtc > lastEvidenceUtc)
+                {
+                    lastEvidenceUtc = lastCampaignEvidenceUtc;
+                }
+                if ((!LabPolicies.ShouldSaveCombinedReport(
+                        Records.Count,
+                        _revision,
+                        _savedRevision,
+                        transitions.Count,
+                        physicalRevision,
+                        _savedPhysicalRevision)
+                        && !campaignChanged)
+                    || (!force && now < lastEvidenceUtc.AddSeconds(1.25))
                     || (!force && now < _nextAutomaticAttemptUtc))
                 {
                     return null;
                 }
 
-                records = LabPolicies.SelectChangedChains(
-                    Records,
-                    _savedSequence,
-                    record => record.Sequence,
-                    record => record.ChainId);
-                if (records.Count == 0)
+                records = shotChanged
+                    ? LabPolicies.SelectChangedChains(
+                        Records,
+                        _savedSequence,
+                        record => record.Sequence,
+                        record => record.ChainId)
+                    : Array.Empty<ShotRecord>();
+                transitionsToWrite = physicalChanged
+                    ? transitions
+                        .Where(transition => transition.LastUpdatedRevision > _savedPhysicalRevision)
+                        .ToArray()
+                    : Array.Empty<PhysicalTransitionRecord>();
+                if (records.Count == 0 && transitionsToWrite.Length == 0 && !campaignChanged)
                 {
                     return null;
                 }
@@ -158,23 +249,44 @@ namespace BallisticsLab.Runtime.Telemetry
                 _nextAutomaticAttemptUtc = now.AddSeconds(5.0);
             }
 
-            string result = WriteReportPair(records, stem);
+            string result = WriteReportPair(
+                records,
+                transitionsToWrite,
+                campaignDefinition,
+                campaignSnapshot,
+                stem);
             lock (Sync)
             {
                 if (revision > _savedRevision)
                 {
                     _savedRevision = revision;
-                    long savedSequence = records.Max(record => record.Sequence);
-                    if (savedSequence > _savedSequence)
+                    if (records.Count != 0)
                     {
-                        _savedSequence = savedSequence;
+                        long savedSequence = records.Max(record => record.Sequence);
+                        if (savedSequence > _savedSequence)
+                        {
+                            _savedSequence = savedSequence;
+                        }
                     }
+                }
+                if (physicalRevision > _savedPhysicalRevision)
+                {
+                    _savedPhysicalRevision = physicalRevision;
+                }
+                if (campaignRevision > _savedCampaignRevision)
+                {
+                    _savedCampaignRevision = campaignRevision;
                 }
             }
             return result;
         }
 
-        private static string WriteReportPair(IReadOnlyList<ShotRecord> records, string stem)
+        private static string WriteReportPair(
+            IReadOnlyList<ShotRecord> records,
+            IReadOnlyList<PhysicalTransitionRecord> transitions,
+            CampaignDefinition? campaignDefinition,
+            CampaignRunSnapshot? campaignSnapshot,
+            string stem)
         {
             string pluginDirectory = Path.GetDirectoryName(typeof(Plugin).Assembly.Location);
             string reports = Path.Combine(pluginDirectory ?? string.Empty, "Reports");
@@ -183,7 +295,7 @@ namespace BallisticsLab.Runtime.Telemetry
                 reports,
                 stem,
                 BuildCsv(records),
-                BuildJson(records)).ToString();
+                BuildJson(records, transitions, campaignDefinition, campaignSnapshot)).ToString();
         }
 
         private static string BuildCsv(IReadOnlyList<ShotRecord> records)
@@ -265,14 +377,14 @@ namespace BallisticsLab.Runtime.Telemetry
             return builder.ToString();
         }
 
-        private static string BuildJson(IReadOnlyList<ShotRecord> records)
+        private static string BuildJson(
+            IReadOnlyList<ShotRecord> records,
+            IReadOnlyList<PhysicalTransitionRecord> transitions,
+            CampaignDefinition? campaignDefinition,
+            CampaignRunSnapshot? campaignSnapshot)
         {
             StringBuilder builder = new StringBuilder();
-            builder.Append("{\"schema\":")
-                .Append(LabBuild.ReportSchema.ToString(CultureInfo.InvariantCulture))
-                .Append(",\"pluginVersion\":")
-                .Append(LabPolicies.Json(LabBuild.PluginVersion))
-                .Append(",\"records\":[");
+            builder.Append('[');
             for (int index = 0; index < records.Count; index++)
             {
                 if (index > 0)
@@ -354,8 +466,12 @@ namespace BallisticsLab.Runtime.Telemetry
                 }
                 builder.Append("]}");
             }
-            builder.Append("]}");
-            return builder.ToString();
+            builder.Append(']');
+            return PhysicalReportDocumentWriter.Build(
+                builder.ToString(),
+                transitions,
+                campaignDefinition,
+                campaignSnapshot);
         }
 
         private static void AppendJson(StringBuilder builder, string name, string value)

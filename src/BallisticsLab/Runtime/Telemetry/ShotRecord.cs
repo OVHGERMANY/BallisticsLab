@@ -75,7 +75,9 @@ namespace BallisticsLab.Runtime.Telemetry
                 FireIndex = state.FireIndex,
                 FragmentIndex = state.FragmentIndex,
                 ParentDepth = state.ParentDepth,
+                RootFireIndex = state.RootFireIndex,
                 RootRandomSeed = state.RootRandomSeed,
+                RootShooterProfileId = state.RootShooterProfileId,
                 IsForwardHit = state.IsForwardHit,
                 AmmoTemplateId = LabPolicies.AuthoritativeAmmoValue(
                     ammoTemplate?.StringId,
@@ -106,8 +108,20 @@ namespace BallisticsLab.Runtime.Telemetry
                 Outcome = LabPolicies.OutcomeName((int)shot.BulletState, shot.BlockedBy.HasValue, shot.DeflectedBy.HasValue),
                 ImpactAngle = angle,
                 ImpactSpeed = state.ImpactSpeed,
+                HasThreeMetreVelocity = state.HasThreeMetreVelocity,
+                ThreeMetreVelocity = state.ThreeMetreVelocity,
                 TemplateSpeed = templateSpeed,
                 Fraction = templateSpeed > 0f ? state.ImpactSpeed / templateSpeed : 0f,
+                ProjectileMassKilograms = (ammoTemplate?.BulletMassGram ?? 0f) * 0.001f,
+                ProjectileDiameterMetres = (ammoTemplate?.BulletDiameterMilimeters ?? 0f) * 0.001f,
+                HasFixtureFacePoint = state.HasFixtureFacePoint,
+                FixtureLocalHitX = state.FixtureLocalHitX,
+                FixtureLocalHitY = state.FixtureLocalHitY,
+                FixtureFaceWidth = state.FixtureFaceWidth,
+                FixtureFaceHeight = state.FixtureFaceHeight,
+                ImpactDistanceMetres = IsFinite(shot.StartPosition) && IsFinite(shot.HitPoint)
+                    ? Vector3.Distance(shot.StartPosition, shot.HitPoint)
+                    : 0f,
                 IncomingDamage = state.Collision?.Damage ?? state.DecisionDamage,
                 IncomingPenetration = state.Collision?.PenetrationPower ?? state.DecisionPenetration,
                 DecisionDamage = state.DecisionDamage,
@@ -144,7 +158,9 @@ namespace BallisticsLab.Runtime.Telemetry
         internal int FireIndex { get; private set; }
         internal int FragmentIndex { get; private set; }
         internal int ParentDepth { get; private set; }
+        internal int RootFireIndex { get; private set; }
         internal int RootRandomSeed { get; private set; }
+        internal string RootShooterProfileId { get; private set; } = string.Empty;
         internal bool IsForwardHit { get; private set; }
         internal string AmmoTemplateId { get; private set; } = string.Empty;
         internal string AmmoName { get; private set; } = string.Empty;
@@ -171,8 +187,18 @@ namespace BallisticsLab.Runtime.Telemetry
         internal string Outcome { get; private set; } = string.Empty;
         internal float ImpactAngle { get; private set; }
         internal float ImpactSpeed { get; private set; }
+        internal bool HasThreeMetreVelocity { get; private set; }
+        internal float ThreeMetreVelocity { get; private set; }
         internal float TemplateSpeed { get; private set; }
         internal float Fraction { get; private set; }
+        internal float ProjectileMassKilograms { get; private set; }
+        internal float ProjectileDiameterMetres { get; private set; }
+        internal bool HasFixtureFacePoint { get; private set; }
+        internal float FixtureLocalHitX { get; private set; }
+        internal float FixtureLocalHitY { get; private set; }
+        internal float FixtureFaceWidth { get; private set; }
+        internal float FixtureFaceHeight { get; private set; }
+        internal float ImpactDistanceMetres { get; private set; }
         internal float IncomingDamage { get; private set; }
         internal float IncomingPenetration { get; private set; }
         internal float DecisionDamage { get; private set; }

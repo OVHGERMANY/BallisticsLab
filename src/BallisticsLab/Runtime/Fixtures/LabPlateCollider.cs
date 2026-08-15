@@ -8,7 +8,30 @@ namespace BallisticsLab.Runtime.Fixtures
 {
     public sealed class LabPlateCollider : BallisticCollider
     {
+        private readonly int _physicalBallisticsSurfaceSchema =
+            FixturePhysicalMaterialContract.SurfaceSchema;
+
         internal LabPlateRuntime? Runtime { get; private set; }
+
+        public int PhysicalBallisticsSurfaceSchema => _physicalBallisticsSurfaceSchema;
+
+        public string PhysicalBallisticsMaterialClass
+        {
+            get
+            {
+                return FixturePhysicalMaterialContract.TryMapArmorMaterial(
+                    Runtime?.Preset.Material.ToString(),
+                    out string materialClass)
+                    ? materialClass
+                    : string.Empty;
+            }
+        }
+
+        public string PhysicalBallisticsSurfaceIdentity => Runtime == null
+            ? string.Empty
+            : FixturePhysicalMaterialContract.CreatePlateSurfaceIdentity(
+                Runtime.FixtureId,
+                Runtime.LayerIndex);
 
         internal void Configure(LabPlateRuntime runtime)
         {

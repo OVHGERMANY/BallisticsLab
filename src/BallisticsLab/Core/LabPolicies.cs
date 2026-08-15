@@ -87,6 +87,18 @@ namespace BallisticsLab.Core
             return recordCount > 0 && revision > savedRevision;
         }
 
+        public static bool ShouldSaveCombinedReport(
+            int shotRecordCount,
+            long shotRevision,
+            long savedShotRevision,
+            int transitionCount,
+            long transitionRevision,
+            long savedTransitionRevision)
+        {
+            return ShouldSaveReport(shotRecordCount, shotRevision, savedShotRevision)
+                || ShouldSaveReport(transitionCount, transitionRevision, savedTransitionRevision);
+        }
+
         public static IReadOnlyList<T> SelectChangedChains<T>(
             IReadOnlyList<T>? records,
             long savedSequence,

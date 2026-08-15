@@ -1,10 +1,12 @@
 using System.Globalization;
 using System.Text.Json;
 using BallisticsLab.Core;
+using BallisticsLab.Validation;
 
 const string plateParent = "644120aa86ffbe10ee032b6f";
 const string granitBr4 = "65573fa5655447403702a816";
 const string granitBr5 = "64afc71497cf3a403c01ff38";
+const int installedRuntimeEvidenceSchema = 3;
 
 string[] positionalArguments = args
     .Where(argument => !argument.StartsWith("--", StringComparison.Ordinal))
@@ -12,11 +14,33 @@ string[] positionalArguments = args
 bool requireReportCoverage = args.Contains(
     "--require-report-coverage",
     StringComparer.OrdinalIgnoreCase);
-string itemsPath = positionalArguments.Length > 0
-    ? Path.GetFullPath(positionalArguments[0])
-    : @"E:\Games\SPT\SPT_Runtime\SPT_Data\database\templates\items.json";
+string itemsPath;
+if (positionalArguments.Length > 0)
+{
+    itemsPath = Path.GetFullPath(positionalArguments[0]);
+}
+else
+{
+    string? sptRoot = Environment.GetEnvironmentVariable("SPT_ROOT");
+    if (string.IsNullOrWhiteSpace(sptRoot))
+    {
+        Console.Error.WriteLine(
+            "Pass items.json as the first positional argument or set the SPT_ROOT environment variable.");
+        return 2;
+    }
+    itemsPath = Path.GetFullPath(Path.Combine(
+        sptRoot,
+        "SPT_Runtime",
+        "SPT_Data",
+        "database",
+        "templates",
+        "items.json"));
+}
 string reportsPath = positionalArguments.Length > 1
     ? Path.GetFullPath(positionalArguments[1])
+    : string.Empty;
+string comparisonOutputPath = positionalArguments.Length > 2
+    ? Path.GetFullPath(positionalArguments[2])
     : string.Empty;
 
 List<string> failures = new();
@@ -26,8 +50,20 @@ Dictionary<string, AmmoRow> ammunition = new(StringComparer.Ordinal);
 Check(
     ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginGuid), "com.janky.ballisticslab")
     && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginName), "Janky-BallisticsLab")
-    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginVersion), "0.2.8")
-    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 3),
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginVersion), "0.3.0")
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 5)
+    && ConstantMatches(
+        typeof(PhysicalTelemetryContract),
+        nameof(PhysicalTelemetryContract.SupportedPublisherSchema),
+        2)
+    && ConstantMatches(
+        typeof(PhysicalTelemetryContract),
+        nameof(PhysicalTelemetryContract.SnapshotSchema),
+        2)
+    && ConstantMatches(
+        typeof(PhysicalTelemetryContract),
+        nameof(PhysicalTelemetryContract.PublisherTypeName),
+        "BallisticPenetration.Core.Physics.PhysicalProjectileTelemetry"),
     "report provenance constants match the current plugin build");
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
 Check(LabPolicies.OutcomeName(1, false, false) == "PENETRATED / DEVIATED", "deviation taxonomy");
@@ -40,8 +76,11 @@ Check(Math.Abs(LabPolicies.ImpactAngleDegrees(-0.5f) - 60f) < 0.0001f, "back-fac
 Check(LabPolicies.Csv("a,b") == "\"a,b\"", "CSV escaping");
 Check(LabPolicies.Json("a\n\"b") == "\"a\\n\\\"b\"", "JSON escaping");
 Check(ReportPairValidator.ParserHandlesQuotedFields(), "CSV report parser handles commas, quotes, and embedded newlines");
-Check(ReportPairValidator.ValidatorMatchesSyntheticPair(), "CSV and JSON report validator accepts a matching schema-3 pair");
+Check(ReportPairValidator.ValidatorMatchesSyntheticPair(), "CSV and JSON report validator accepts a matching schema-4 pair");
 Check(ReportPairValidator.ValidatorRejectsSyntheticMismatch(), "CSV and JSON report validator rejects a field mismatch");
+Check(
+    ReportPairValidator.ValidatorAcceptsPhysicalOnlySchemaFivePair(),
+    "CSV and JSON validator accepts a schema-5 physical-only report with the flat CSV header");
 Check(ReportInvariantValidator.AcceptsSyntheticReport(), "report invariants accept a valid collision record");
 Check(ReportInvariantValidator.RejectsIncorrectFalloff(), "report invariants reject incorrect penetration falloff");
 Check(ReportInvariantValidator.RejectsDetachedTrajectoryEndpoint(), "report invariants reject a detached trajectory endpoint");
@@ -50,9 +89,317 @@ Check(ReportInvariantValidator.RejectsMismatchedContinuationSource(), "report in
 Check(ReportInvariantValidator.RejectsChangedRootIdentity(), "report invariants reject a changed root identity inside one chain");
 Check(CurrentReportSetValidator.RejectsCorruptEarlierCurrentReport(), "current-report gate rejects corruption in an earlier contributing export");
 Check(CurrentReportSetValidator.IgnoresCorruptHistoricalReport(), "current-report gate excludes historical versions from current acceptance");
+Check(
+    CurrentReportSetValidator.SelectsPhysicalOnlySchemaFiveReport(),
+    "current-report selection includes schema-5 physical-only evidence");
+Check(
+    CurrentReportSetValidator.SelectsCampaignOnlySchemaFiveReport(),
+    "current-report selection includes schema-5 campaign-only evidence");
 Check(AcceptanceCoverageEvaluator.CompleteSyntheticCoveragePasses(), "report coverage accepts a complete controlled fixture matrix");
 Check(AcceptanceCoverageEvaluator.CasualBotTrafficCannotSatisfyFixtureCoverage(), "casual bot traffic cannot satisfy controlled fixture gates");
 Check(AcceptanceCoverageEvaluator.DuplicateBatchesDoNotInflateCoverage(), "duplicate automatic batches do not inflate acceptance coverage");
+Check(PhysicalTelemetryFoundationTests.AbsentPublisherIsSafe(), "absent physical telemetry publisher is a safe no-op");
+Check(PhysicalTelemetryFoundationTests.UnsupportedSchemaIsRejected(), "unsupported physical telemetry schema is rejected before subscription");
+Check(
+    PhysicalTelemetryFoundationTests.LateDiscoveryAttachesAndSessionDetachReleasesDelegate(),
+    "late physical telemetry discovery attaches and session teardown releases the delegate");
+Check(
+    PhysicalTelemetryFoundationTests.PreparedEventIsCopiedCompletelyAndDetached(),
+    "prepared physical telemetry is copied completely without retaining foreign collections");
+Check(
+    PhysicalTelemetryFoundationTests.ResolvedEventCopiesOutputsProvenanceAndConservation(),
+    "resolved physical telemetry preserves output provenance and conservation data");
+Check(
+    PhysicalTelemetryFoundationTests.CaptureBufferIsBoundedAndReturnsDetachedSnapshots(),
+    "physical telemetry capture buffer is bounded and snapshots are detached");
+Check(
+    PhysicalTelemetryFoundationTests.RejectsInvalidOrNonFiniteForeignEvents(),
+    "invalid physical telemetry is rejected without partial capture");
+Check(
+    PhysicalTransitionTrackerTests.PreparedAndResolvedPairByExactTransitionId(),
+    "prepared and resolved events pair by exact transition ID");
+Check(
+    PhysicalTransitionTrackerTests.PreparedOnlyRemainsPendingEvidence(),
+    "prepared-only physical transitions remain pending evidence");
+Check(
+    PhysicalTransitionTrackerTests.ResolvedOnlyIsMarkedOrphaned(),
+    "resolved-only physical transitions are marked orphaned");
+Check(
+    PhysicalTransitionTrackerTests.OutOfOrderArrivalConvergesToCompleted(),
+    "out-of-order transition events converge to one completed pair");
+Check(
+    PhysicalTransitionTrackerTests.DuplicateStagesAreCountedAndFirstEventWins(),
+    "duplicate physical stages are counted without duplicating transitions");
+Check(
+    PhysicalTransitionTrackerTests.TransitionIdsUseOrdinalCaseSensitiveIdentity(),
+    "physical transition IDs use exact ordinal identity");
+Check(
+    PhysicalTransitionTrackerTests.CapacityEvictsOldestTransitionDeterministically(),
+    "physical transition capacity evicts the oldest evidence deterministically");
+Check(
+    PhysicalTransitionReportTests.SchemaFiveWriterPreservesCompletePhysicalEvidence(),
+    "schema-5 physical transition JSON preserves complete paired evidence");
+Check(
+    PhysicalTransitionReportTests.PhysicalOnlyChangesTriggerCombinedReportPolicy(),
+    "physical-only revisions trigger report capture without a shot record");
+Check(
+    PhysicalTransitionReportTests.PhysicalOnlyDocumentUsesSchemaFiveAndEmptyShotArray(),
+    "physical-only document uses schema 5 with an unchanged empty shot-record array");
+Check(
+    PhysicalTransitionReportTests.UpdatedRevisionIdentifiesOnlyChangedTransitions(),
+    "automatic physical evidence selection includes only transitions changed since save");
+Check(
+    PhysicalTransitionInvariantTests.AcceptsBalancedSchemaFiveEvidence(),
+    "physical transition invariants accept balanced mass and energy evidence");
+Check(
+    PhysicalTransitionInvariantTests.RejectsBrokenMassClosure(),
+    "physical transition invariants reject broken mass closure");
+Check(
+    PhysicalTransitionInvariantTests.RejectsBrokenEnergyClosure(),
+    "physical transition invariants reject broken energy closure");
+Check(
+    PhysicalTransitionInvariantTests.RejectsUnsupportedTelemetrySchema(),
+    "physical transition invariants reject altered publisher or snapshot schemas");
+Check(
+    PhysicalTransitionInvariantTests.RejectsInconsistentComponentKinematics(),
+    "physical transition invariants recompute component speed, momentum, and energy");
+Check(
+    PhysicalTransitionInvariantTests.RejectsLostPriorCollisionHistory(),
+    "physical transition invariants reject lost or rewritten prior collision history");
+Check(
+    PhysicalTransitionInvariantTests.RejectsPreparedResolvedContextMismatch(),
+    "physical transition invariants reject mismatched prepared and resolved contexts");
+Check(
+    PhysicalTransitionInvariantTests.RejectsOutputKindProvenanceMismatch(),
+    "physical transition invariants reject component kind and provenance mismatches");
+Check(
+    PhysicalTransitionInvariantTests.AcceptsTargetMaterialFragmentDerivedFromImmediateParent(),
+    "schema 5 preserves target origin while closing immediate-parent mass and energy ledgers");
+Check(
+    PhysicalTransitionInvariantTests.AcceptsSignedClosureRemaindersInsidePublisherTolerance(),
+    "physical transition invariants accept signed rounding remainders inside publisher tolerance");
+Check(
+    PhysicalTransitionInvariantTests.RejectsNegativeClosureBeyondPublisherTolerance(),
+    "physical transition invariants reject output energy beyond publisher tolerance");
+Check(
+    PhysicalTransitionInvariantTests.RejectsInvalidImpactCoupling(),
+    "physical transition invariants reject impact couplings outside zero to one");
+Check(
+    CampaignTests.SeedDerivationIsStableAndCaseSpecific(),
+    "campaign case seeds are stable and distinct across cases and repetitions");
+Check(
+    CampaignTests.EvidenceRevisionRemainsMonotonicAcrossCampaignResets(),
+    "campaign evidence revisions remain monotonic across campaign replacements");
+Check(
+    CampaignTests.DefinitionRejectsDuplicateCaseIdentity(),
+    "campaign definitions reject duplicate case identities");
+Check(
+    CampaignTests.EvidenceCanonicalizesHitLayers(),
+    "campaign evidence canonicalizes layer indices deterministically");
+Check(
+    CampaignTests.EvidenceRejectsLayersOutsideRecordedFixture(),
+    "campaign evidence rejects layer indices outside the recorded fixture");
+Check(
+    CampaignTests.ConservationRequirementCannotExistWithoutPhysicalEvidence(),
+    "campaign definitions reject conservation gates without physical-transition evidence");
+Check(
+    CampaignTests.PhysicalEvidenceRequiresAnExpectedMaterialClass(),
+    "campaign physical-evidence gates require one expected material class");
+Check(
+    CampaignTests.TrackerEnforcesResetAndCompletesInOrder(),
+    "campaign tracker enforces fixture and reset order without counting duplicate chains");
+Check(
+    CampaignTests.TrackerAppliesBackstopPhysicalAndConservationGates(),
+    "campaign tracker applies backstop, physical-evidence, and conservation gates");
+Check(
+    CampaignTests.SnapshotDoesNotChangeAfterLaterAttempts(),
+    "campaign snapshots remain detached from later attempts");
+Check(
+    CampaignTests.MatrixSummarizesAcceptedAndRejectedAttempts(),
+    "campaign result matrix summarizes accepted and rejected attempts");
+Check(
+    CampaignTests.TrackerRejectsWrongFixtureSelectorBeforeOtherGates(),
+    "campaign tracker rejects wrong physical fixtures before accepting shot evidence");
+Check(
+    CampaignTests.BuiltInCatalogsDeclareExpectedCasesAndEvidenceRules(),
+    "built-in campaigns declare the controlled stacks and physical material evidence rules");
+Check(
+    CampaignTests.ProtocolTrackerPreservesOneSampleAcrossFiveAcceptedShots(),
+    "protocol campaign preserves one fixture and accumulated damage across five accepted shots");
+Check(
+    CampaignTests.ProtocolRejectionInvalidatesPartialSampleAndRoundTripsEvidence(),
+    "a rejected protocol hit preserves evidence and restarts on a fresh physical sample");
+Check(
+    CampaignTests.QueuedSixthProtocolShotCannotCompleteAContaminatedSample(),
+    "a queued sixth hit cannot complete a contaminated five-shot sample");
+Check(
+    CampaignTests.InvalidProtocolEvidenceCanDiscardDamagedSampleWithoutResettingIt(),
+    "invalid protocol evidence discards the damaged sample instead of silently reusing it");
+Check(
+    CampaignTests.ProtocolResultSummarizesCompletedSampleAndStandards(),
+    "protocol result block summarizes the verified standard, mapping, and completed sample");
+Check(
+    CampaignTests.ProtocolResultPreservesInvalidatedSampleHistory(),
+    "protocol result block preserves invalidated samples before a recovered completion");
+Check(
+    CampaignTests.ProtocolResultCannotCompleteWhileExtraEvidenceIsPending(),
+    "protocol result block cannot claim completion while queued evidence is unresolved");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedProtocolResult(),
+    "campaign report validation rejects forged protocol result claims and sample counts");
+Check(
+    CampaignTests.CampaignReportRejectsProtocolResultWithoutCampaign(),
+    "campaign report validation rejects a protocol result detached from campaign evidence");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonDeduplicatesProgressiveReports(),
+    "cross-report comparison deduplicates progressive snapshots by exact campaign run identity");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonRejectsDivergentRunHistory(),
+    "cross-report comparison rejects divergent histories under one campaign run identity");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonRequiresExactAmmunitionCohort(),
+    "material comparison admits only complete runs with one exact ammunition template");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonPreservesProtocolClassification(),
+    "cross-report protocol summaries remain simulation evidence without certification claims");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonRejectsInvalidRunIdentity(),
+    "campaign report validation rejects malformed run instance identities");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonRejectsUnlikeFixtureCohort(),
+    "material comparison rejects unlike fixture definitions under one ammunition cohort");
+Check(
+    CrossReportCampaignComparison.SyntheticComparisonWriterCommitsOneCompleteDocument(),
+    "cross-report comparison writer atomically commits one complete document");
+Check(
+    PresentationPolicyTests.PanelRemainsFullyVisibleAtSmallResolutions(),
+    "lab panel remains fully visible after resolution changes and off-screen dragging");
+Check(
+    PresentationPolicyTests.PanelRestoresPreferredSizeWhenResolutionGrows(),
+    "lab panel restores its preferred size when screen space becomes available");
+Check(
+    PresentationPolicyTests.PanelRejectsInvalidCoordinates(),
+    "lab panel replaces invalid saved coordinates with a visible origin");
+Check(
+    PresentationPolicyTests.CompactControlsFollowVisiblePanelWidth(),
+    "advanced controls switch layout from the fitted visible panel width");
+Check(
+    PresentationPolicyTests.VisibleEnabledPanelOwnsGameInput(),
+    "visible enabled lab panel owns game input until its explicit close action");
+Check(
+    PresentationPolicyTests.AimMarkerRequiresSafeFrontFaceView(),
+    "plate marker hides behind, inside, or behind-camera instead of becoming a floating streak");
+Check(
+    CampaignTests.PhysicalEvidenceUsesExactHostIdentityAndChecksClosure(),
+    "campaign physical evidence uses exact host identity and measures mass and energy closure");
+Check(
+    CampaignTests.PhysicalEvidenceSeparatesMaterialOriginFromImmediateMassSource(),
+    "campaign closure separates inherited target material from fresh target-spall mass");
+Check(
+    CampaignTests.CampaignJsonContainsDefinitionAttemptsAndMatrix(),
+    "schema 5 campaign JSON contains definitions, attempts, seed semantics, and result matrix");
+Check(
+    CampaignTests.CampaignJsonRejectsPartialDefinitionAndSnapshot(),
+    "campaign JSON refuses a partial definition/snapshot pair");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedSeedAndMatrix(),
+    "campaign report validation rejects corrupted case seeds and summary matrices");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedFixtureIdentity(),
+    "campaign report validation rejects fixture identity inconsistent with attempt status");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedProtocolEvidence(),
+    "campaign report validation rejects impossible protocol geometry and outcome evidence");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedProtocolSequenceState(),
+    "campaign report validation rejects forged protocol samples, reasons, and final statuses");
+Check(
+    CampaignTests.CampaignReportRejectsCorruptedAttemptAndHeaderCursors(),
+    "campaign report validation rejects impossible attempt order and header cursors");
+Check(
+    CampaignTests.ReportInvariantAcceptsCampaignOnlyEvidence(),
+    "campaign-only schema 5 evidence passes the report invariant gate");
+Check(
+    CampaignTests.ReportInvariantRejectsEmptyCampaignShell(),
+    "an empty campaign shell is not accepted as report evidence");
+Check(
+    CampaignTests.StoppedCampaignPreservesAttemptsAndRejectsFurtherShots(),
+    "stopping a campaign preserves evidence and rejects later shot chains");
+Check(
+    ProtocolTests.CatalogMatchesPublishedNominalThreatTable(),
+    "GOST-oriented catalog preserves the published nominal Br1 through Br6 threat table");
+Check(
+    ProtocolTests.ShotEvidenceRejectsInvalidFaceGeometry(),
+    "protocol shot evidence validates projectile geometry and fixture-local impact bounds");
+Check(
+    ProtocolTests.MappingCollectionsAreDetachedAndRejectDuplicates(),
+    "protocol ammunition mappings are detached from caller mutation and reject duplicate templates");
+Check(
+    ProtocolTests.TargetImpactProxyCannotCompleteScreening(),
+    "target-impact velocity remains an explicit proxy and cannot complete protocol screening");
+Check(
+    ProtocolTests.UnverifiedCatalogAmmunitionCannotCompleteScreening(),
+    "nominal catalog threats cannot complete screening without a verified game-ammunition mapping");
+Check(
+    ProtocolTests.VariantDesignationCannotCompleteScreening(),
+    "a related cartridge variant cannot stand in for the exact protocol designation");
+Check(
+    ProtocolTests.ExactCatalogMappingCanCompleteSimulationScreening(),
+    "an exact installed designation can complete only a non-certifying simulation screen");
+Check(
+    ProtocolTests.ExactIdentityReportsKnownGameRepresentationMismatches(),
+    "simulation screening reports known nominal and locale mass mismatches");
+Check(
+    ProtocolTests.RecordedPhysicalStateMustMatchMappedGameRepresentation(),
+    "protocol evidence must match the mapped installed projectile mass and diameter");
+Check(
+    ProtocolTests.DeterministicImpactPatternPreservesFiveDiameterClearance(),
+    "deterministic protocol markers preserve five-diameter edge and neighbour clearance");
+Check(
+    ProtocolTests.DeterministicImpactPatternRejectsUndersizedFaces(),
+    "protocol marker planning fails closed when the sample face is too small");
+Check(
+    ProtocolTests.ValidFiveShotPatternCompletesSimulationScreening(),
+    "five qualifying spaced V3 observations complete simulation screening without certification");
+Check(
+    ProtocolTests.ExtraIncompleteObservationDoesNotInvalidateCompleteScreening(),
+    "an extra incomplete observation cannot erase an otherwise complete screening set");
+Check(
+    ProtocolTests.VelocitySeverityExceptionsAreApplied(),
+    "lower-velocity penetration and higher-velocity stop observations retain severity exceptions");
+Check(
+    ProtocolTests.OppositeVelocityExceptionsRemainNonQualifying(),
+    "non-severe out-of-band velocity observations remain nonqualifying");
+Check(
+    ProtocolTests.EdgeSpacingAndFixtureIdentityAreEnforced(),
+    "protocol screening enforces edge spacing, neighbour spacing, and one physical sample");
+Check(
+    ProtocolTests.CampaignEvidenceRejectsMismatchedProtocolIdentity(),
+    "campaign evidence rejects protocol geometry attached to another fixture");
+Check(
+    GostAmmunitionMappingTests.SupportedDatabaseFilesMatchCatalogSnapshot(itemsPath),
+    "installed item and English/Russian locale databases match the verified mapping snapshot");
+Check(
+    GostAmmunitionMappingTests.InstalledMappingsMatchDatabaseAndLocales(itemsPath),
+    "every installed protocol mapping matches its exact database and locale evidence");
+Check(
+    GostAmmunitionMappingTests.UnavailableThreatDesignationsRemainAbsent(itemsPath),
+    "7N13 and 7-BZ-3 remain absent from installed 7.62x54R ammunition data");
+Check(
+    ProtocolTrajectorySamplerTests.ExactThreeMetreNodeReturnsNodeSpeed(),
+    "three-metre trajectory sampling returns an exact cached-node speed");
+Check(
+    ProtocolTrajectorySamplerTests.CurvedPathUsesCumulativeDistanceAndInterpolatesSpeed(),
+    "three-metre trajectory sampling uses cumulative path length and speed interpolation");
+Check(
+    ProtocolTrajectorySamplerTests.DuplicateNodesDoNotInflateDistance(),
+    "duplicate trajectory nodes do not inflate the three-metre path distance");
+Check(
+    ProtocolTrajectorySamplerTests.InsufficientPathDoesNotExtrapolate(),
+    "a trajectory shorter than three metres remains insufficient instead of extrapolated");
+Check(
+    ProtocolTrajectorySamplerTests.InvalidInputsAreRejected(),
+    "three-metre trajectory sampling rejects invalid samples and distances");
 Check(!LabPolicies.IsFiniteNonNegative(float.NaN) && LabPolicies.IsFiniteNonNegative(0f), "finite guard");
 Check(
     !LabPolicies.ShouldSaveReport(0, 1, 0)
@@ -241,6 +588,22 @@ else
     Check(plates.Any(plate => plate.Id == granitBr5 && plate.ArmorClass == 6 && plate.Material == "Ceramic"), "Granit Br5 regression");
     Check(Enumerable.Range(3, 4).All(armorClass => plates.Any(plate => plate.Material == "ArmoredSteel" && plate.ArmorClass == armorClass)), "steel classes 3 through 6");
     Check(plates.All(plate => plate.Durability > 0 && plate.ArmorClass is >= 2 and <= 6), "plate class and durability bounds");
+    Check(
+        CampaignCatalog.PhysicalMaterialMatrix().Cases.All(
+            campaignCase => plates.Any(
+                plate => plate.Material == campaignCase.Material
+                    && plate.ArmorClass == campaignCase.ArmorClass)),
+        "every physical material campaign case resolves an exact installed material and armor class");
+    Check(
+        CampaignCatalog.ProtocolScreeningThreats.All(threat =>
+        {
+            CampaignCaseDefinition campaignCase = CampaignCatalog
+                .GostSimulationScreening(threat.ThreatId)
+                .Cases[0];
+            return plates.Any(plate => plate.Material == campaignCase.Material
+                && plate.ArmorClass == campaignCase.ArmorClass);
+        }),
+        "every available protocol screening resolves an installed armored-steel sample class");
 
     Console.WriteLine("Catalog: " + plates.Count.ToString(CultureInfo.InvariantCulture) + " usable plates");
     foreach (IGrouping<string, PlateRow> group in plates.GroupBy(plate => plate.Material).OrderBy(group => group.Key, StringComparer.Ordinal))
@@ -265,8 +628,8 @@ if (!string.IsNullOrEmpty(reportsPath))
         using JsonDocument report = JsonDocument.Parse(File.ReadAllText(latestReport));
         bool currentSchema = report.RootElement.TryGetProperty("schema", out JsonElement schemaElement)
             && schemaElement.TryGetInt32(out int schema)
-            && schema == LabBuild.ReportSchema;
-        Check(currentSchema, "latest BallisticsLab report uses the current schema");
+            && schema == installedRuntimeEvidenceSchema;
+        Check(currentSchema, "latest installed-runtime report uses the accepted baseline schema");
         string reportVersion = report.RootElement.TryGetProperty(
                 "pluginVersion",
                 out JsonElement versionElement)
@@ -274,25 +637,25 @@ if (!string.IsNullOrEmpty(reportsPath))
             : string.Empty;
         Check(
             string.Equals(reportVersion, LabBuild.PluginVersion, StringComparison.Ordinal),
-            "latest BallisticsLab report identifies the current plugin version");
+            "latest installed-runtime report identifies the accepted plugin version");
 
         JsonElement recordsElement = report.RootElement.TryGetProperty("records", out JsonElement records)
             ? records
             : default;
         bool hasRecords = recordsElement.ValueKind == JsonValueKind.Array
             && recordsElement.GetArrayLength() > 0;
-        Check(hasRecords, "latest BallisticsLab report contains shot records");
+        Check(hasRecords, "latest installed-runtime report contains shot records");
 
         IReadOnlyList<string> currentReports = CurrentReportSetValidator.Select(
             reportFiles,
-            LabBuild.ReportSchema,
+            installedRuntimeEvidenceSchema,
             LabBuild.PluginVersion);
 
         string identityFailure = string.Empty;
         string pairFailure = string.Empty;
         bool invariantsValid = CurrentReportSetValidator.ValidateInvariants(
             reportFiles,
-            LabBuild.ReportSchema,
+            installedRuntimeEvidenceSchema,
             LabBuild.PluginVersion,
             out int invariantReportCount,
             out string invariantFailure);
@@ -352,24 +715,24 @@ if (!string.IsNullOrEmpty(reportsPath))
         Check(
             currentReports.Count > 0 && string.IsNullOrEmpty(identityFailure),
             string.IsNullOrEmpty(identityFailure)
-                ? "all current-build report ammunition identities and speeds match the installed templates"
-                : "current-build report ammunition identity mismatch: " + identityFailure);
+                ? "all installed-runtime report ammunition identities and speeds match the installed templates"
+                : "installed-runtime report ammunition identity mismatch: " + identityFailure);
         Check(
             currentReports.Count > 0 && string.IsNullOrEmpty(pairFailure),
             string.IsNullOrEmpty(pairFailure)
-                ? "all current-build CSV and JSON exports match field for field"
-                : "current-build CSV and JSON export mismatch: " + pairFailure);
+                ? "all installed-runtime CSV and JSON exports match field for field"
+                : "installed-runtime CSV and JSON export mismatch: " + pairFailure);
         Check(
             invariantsValid && invariantReportCount == currentReports.Count,
             invariantsValid && invariantReportCount == currentReports.Count
-                ? "all current-build reports satisfy ballistic, durability, trajectory, and lineage invariants"
-                : "current-build report invariant failure: " + invariantFailure);
+                ? "all installed-runtime reports satisfy ballistic, durability, trajectory, and lineage invariants"
+                : "installed-runtime report invariant failure: " + invariantFailure);
         AcceptanceReportCoverage coverage = AcceptanceCoverageEvaluator.Evaluate(
             reportFiles,
-            LabBuild.ReportSchema,
+            installedRuntimeEvidenceSchema,
             LabBuild.PluginVersion);
         Console.WriteLine(
-            "Current reports validated: "
+            "Installed-runtime reports validated: "
             + currentReports.Count.ToString(CultureInfo.InvariantCulture)
             + "; latest: "
             + Path.GetFileName(latestReport));
@@ -400,6 +763,49 @@ if (!string.IsNullOrEmpty(reportsPath))
                     ? "all controlled current-build report gates are complete"
                     : "controlled current-build report gates are incomplete: "
                         + string.Join(", ", coverage.Missing));
+        }
+        IReadOnlyList<string> comparisonReports = CurrentReportSetValidator.Select(
+            reportFiles,
+            LabBuild.ReportSchema,
+            LabBuild.PluginVersion);
+        if (comparisonReports.Count != 0)
+        {
+            bool comparisonBuilt = CrossReportCampaignComparison.TryBuild(
+                comparisonReports,
+                out string comparisonJson,
+                out string comparisonFailure);
+            Check(
+                comparisonBuilt,
+                comparisonBuilt
+            ? "schema-5 campaign reports produce a validated cross-report comparison"
+            : "schema-5 campaign comparison failed: " + comparisonFailure);
+            if (comparisonBuilt)
+            {
+                Console.WriteLine(CrossReportCampaignComparison.FormatSummary(comparisonJson));
+                if (!string.IsNullOrEmpty(comparisonOutputPath))
+                {
+                    bool aliasesInput = string.Equals(
+                            comparisonOutputPath,
+                            itemsPath,
+                            StringComparison.OrdinalIgnoreCase)
+                        || reportFiles.Any(reportFile => string.Equals(
+                            comparisonOutputPath,
+                            Path.GetFullPath(reportFile),
+                            StringComparison.OrdinalIgnoreCase));
+                    Check(
+                        !aliasesInput,
+                        aliasesInput
+                            ? "comparison output path aliases an input file"
+                            : "comparison output path does not alias an input file");
+                    if (!aliasesInput)
+                    {
+                        CrossReportCampaignComparison.WriteAtomically(
+                            comparisonOutputPath,
+                            comparisonJson);
+                        Console.WriteLine("Comparison document: " + comparisonOutputPath);
+                    }
+                }
+            }
         }
     }
 }

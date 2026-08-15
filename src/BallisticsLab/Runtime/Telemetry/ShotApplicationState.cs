@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using BallisticsLab.Core;
 using EFT;
 using EFT.Ballistics;
 using EFT.InventoryLogic;
 using BallisticsLab.Runtime.Fixtures;
+using UnityEngine;
 
 namespace BallisticsLab.Runtime.Telemetry
 {
@@ -46,14 +48,19 @@ namespace BallisticsLab.Runtime.Telemetry
             DecisionDamage = shot.Damage;
             DecisionPenetration = shot.PenetrationPower;
             ImpactSpeed = shot.CurrentVelocity.magnitude;
+            HasThreeMetreVelocity = TryCaptureThreeMetreVelocity(
+                shot,
+                out float threeMetreVelocity);
+            ThreeMetreVelocity = threeMetreVelocity;
             IsForwardHit = shot.IsForwardHit;
             FireIndex = shot.FireIndex;
             FragmentIndex = shot.FragmentIndex;
             Shot root = FindRoot(shot, out int parentDepth);
             ParentDepth = parentDepth;
+            RootFireIndex = root.FireIndex;
             RootRandomSeed = root.RandomSeed;
-            string rootShooter = root.Player?.iPlayer?.ProfileId ?? root.PlayerProfileID ?? string.Empty;
-            ChainId = LabPolicies.ShotChainId(rootShooter, root.FireIndex, root.RandomSeed);
+            RootShooterProfileId = root.Player?.iPlayer?.ProfileId ?? root.PlayerProfileID ?? string.Empty;
+            ChainId = LabPolicies.ShotChainId(RootShooterProfileId, RootFireIndex, RootRandomSeed);
             TargetKind = "WORLD";
             TargetName = shot.HittedBallisticCollider != null
                 ? shot.HittedBallisticCollider.name
@@ -76,6 +83,7 @@ namespace BallisticsLab.Runtime.Telemetry
                 FixtureMaximumDurability = LabPlate.MaximumDurability;
                 FixtureLayerSpacing = LabPlate.LayerSpacing;
                 FixtureColliderThickness = LabPlate.ColliderThickness;
+                CaptureFixtureFacePoint(labPlate, shot.HitPoint);
                 TargetKind = "FIXTURE PLATE";
                 TargetName = "Fixture " + FixtureId + " layer " + (LayerIndex + 1)
                     + "/" + FixtureLayerCount + " | " + FixtureName;
@@ -119,11 +127,15 @@ namespace BallisticsLab.Runtime.Telemetry
         internal int FireIndex { get; }
         internal int FragmentIndex { get; }
         internal int ParentDepth { get; }
+        internal int RootFireIndex { get; }
         internal int RootRandomSeed { get; }
+        internal string RootShooterProfileId { get; }
         internal bool IsForwardHit { get; }
         internal float DecisionDamage { get; }
         internal float DecisionPenetration { get; }
         internal float ImpactSpeed { get; }
+        internal bool HasThreeMetreVelocity { get; }
+        internal float ThreeMetreVelocity { get; }
         internal string TargetName { get; }
         internal string TargetKind { get; }
         internal string Material { get; }
@@ -138,6 +150,11 @@ namespace BallisticsLab.Runtime.Telemetry
         internal float FixtureMaximumDurability { get; }
         internal float FixtureLayerSpacing { get; }
         internal float FixtureColliderThickness { get; }
+        internal bool HasFixtureFacePoint { get; private set; }
+        internal float FixtureLocalHitX { get; private set; }
+        internal float FixtureLocalHitY { get; private set; }
+        internal float FixtureFaceWidth { get; private set; }
+        internal float FixtureFaceHeight { get; private set; }
         internal bool HasArmorAnalysis { get; }
         internal float ArmorRealResistance { get; }
         internal float ArmorClassResistance { get; }
@@ -195,6 +212,100 @@ namespace BallisticsLab.Runtime.Telemetry
             }
 
             return root;
+        }
+
+        private void CaptureFixtureFacePoint(LabPlateCollider plate, Vector3 hitPoint)
+        {
+            if (plate == null || !IsFinite(hitPoint))
+            {
+                return;
+            }
+
+            Vector3 local = plate.transform.InverseTransformPoint(hitPoint);
+            Vector3 scale = plate.transform.lossyScale;
+            float width = Mathf.Abs(scale.x);
+            float height = Mathf.Abs(scale.y);
+            float localX = local.x * width;
+            float localY = local.y * height;
+            if (!IsFinite(localX)
+                || !IsFinite(localY)
+                || !IsFinite(width)
+                || !IsFinite(height)
+                || width <= 0f
+                || height <= 0f)
+            {
+                return;
+            }
+
+            HasFixtureFacePoint = true;
+            FixtureLocalHitX = localX;
+            FixtureLocalHitY = localY;
+            FixtureFaceWidth = width;
+            FixtureFaceHeight = height;
+        }
+
+        private static bool TryCaptureThreeMetreVelocity(Shot shot, out float speed)
+        {
+            speed = 0f;
+            if (shot == null
+                || !IsFinite(shot.StartPosition)
+                || !IsFinite(shot.HitPoint)
+                || Vector3.Distance(shot.StartPosition, shot.HitPoint)
+                    < ProtocolTrajectorySampler.StandardMeasurementDistanceMetres)
+            {
+                return false;
+            }
+            TrajectoryCalculator? trajectory = shot.TrajectoryInfo;
+            if (trajectory == null)
+            {
+                return false;
+            }
+            TrajectoryInfo[]? history = trajectory.history;
+            if (history == null || history.Length == 0)
+            {
+                return false;
+            }
+
+            int finalIndex = Math.Min(trajectory.cursorIndex, history.Length - 1);
+            if (finalIndex < 1)
+            {
+                return false;
+            }
+            var samples = new List<ProtocolTrajectorySample>(finalIndex + 1);
+            for (int index = 0; index <= finalIndex; index++)
+            {
+                TrajectoryInfo entry = history[index];
+                if (!IsFinite(entry.position) || !IsFinite(entry.velocity))
+                {
+                    return false;
+                }
+                samples.Add(new ProtocolTrajectorySample(
+                    entry.position.x,
+                    entry.position.y,
+                    entry.position.z,
+                    entry.velocity.magnitude));
+            }
+
+            if (!ProtocolTrajectorySampler.TryInterpolateSpeedAtPathDistance(
+                    samples,
+                    ProtocolTrajectorySampler.StandardMeasurementDistanceMetres,
+                    out double sampledSpeed)
+                || sampledSpeed > float.MaxValue)
+            {
+                return false;
+            }
+            speed = (float)sampledSpeed;
+            return IsFinite(speed) && speed >= 0f;
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 }

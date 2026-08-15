@@ -24,9 +24,9 @@ namespace BallisticsLab.Runtime.Patches
 
         [PatchPrefix]
         [HarmonyPriority(Priority.First)]
-        private static bool Prefix(ECommand command, ref ETranslateResult __result)
+        private static bool Prefix(ref ETranslateResult __result)
         {
-            if (!LabRuntime.ShouldBlockShootingCommand(command))
+            if (!LabRuntime.ShouldBlockGameInput())
             {
                 return true;
             }

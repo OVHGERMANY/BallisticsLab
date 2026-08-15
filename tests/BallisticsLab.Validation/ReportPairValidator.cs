@@ -29,6 +29,28 @@ internal static class ReportPairValidator
         return ValidateSyntheticPair(true);
     }
 
+    internal static bool ValidatorAcceptsPhysicalOnlySchemaFivePair()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "BallisticsLab.PhysicalPair." + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            string jsonPath = Path.Combine(directory, "BallisticsLab-physical.json");
+            File.WriteAllText(
+                jsonPath,
+                "{\"schema\":5,\"pluginVersion\":\"0.3.0\",\"records\":[],"
+                    + "\"physicalTransitions\":[{\"transitionId\":\"physical-only\"}]}");
+            File.WriteAllText(Path.ChangeExtension(jsonPath, ".csv"), Header + "\r\n");
+            return Validate(jsonPath, out _);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     private static bool ValidateSyntheticPair(bool corruptCsv)
     {
         string directory = Path.Combine(
@@ -58,7 +80,7 @@ internal static class ReportPairValidator
                 string column = header[index];
                 if (column == "schema")
                 {
-                    csvValues[index] = "3";
+                    csvValues[index] = "4";
                 }
                 else if (column == "pluginVersion")
                 {
@@ -106,9 +128,10 @@ internal static class ReportPairValidator
             record["path"] = new[] { new[] { 1, 2, 3 }, new[] { 10, 20, 30 } };
             Dictionary<string, object> root = new(StringComparer.Ordinal)
             {
-                ["schema"] = 3,
+                ["schema"] = 4,
                 ["pluginVersion"] = "0.2.6",
-                ["records"] = new[] { record }
+                ["records"] = new[] { record },
+                ["physicalTransitions"] = Array.Empty<object>()
             };
 
             if (corruptCsv)
@@ -157,6 +180,18 @@ internal static class ReportPairValidator
                 failure = "JSON root is missing schema, pluginVersion, or records";
                 return false;
             }
+            if (!schema.TryGetInt32(out int schemaNumber))
+            {
+                failure = "JSON schema is not an integer";
+                return false;
+            }
+            if (schemaNumber >= 4
+                && (!root.TryGetProperty("physicalTransitions", out JsonElement physicalTransitions)
+                    || physicalTransitions.ValueKind != JsonValueKind.Array))
+            {
+                failure = "schema 4 or newer JSON is missing physicalTransitions";
+                return false;
+            }
 
             List<IReadOnlyList<string>> rows = ParseCsv(File.ReadAllText(csvPath));
             if (rows.Count == 0)
@@ -168,7 +203,7 @@ internal static class ReportPairValidator
             string[] expectedHeader = Header.Split(',');
             if (!rows[0].SequenceEqual(expectedHeader, StringComparer.Ordinal))
             {
-                failure = "CSV header differs from schema 3";
+                failure = "CSV header differs from the flat shot-record contract";
                 return false;
             }
 

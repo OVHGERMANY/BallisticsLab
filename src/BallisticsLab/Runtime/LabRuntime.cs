@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -13,7 +14,7 @@ using BallisticsLab.Runtime.Fixtures;
 using BallisticsLab.Runtime.Telemetry;
 using EFT;
 using EFT.Ballistics;
-using EFT.InputSystem;
+using EFT.InventoryLogic;
 using UnityEngine;
 
 namespace BallisticsLab.Runtime
@@ -33,10 +34,15 @@ namespace BallisticsLab.Runtime
         private static bool _enteredShootingRange;
         private static PlateCatalog? _catalog;
         private static FixtureRig? _rig;
-        private static Rect _window = new Rect(40f, 60f, 840f, 900f);
+        private static Rect _window = new Rect(
+            40f,
+            60f,
+            LabPresentationPolicies.PreferredPanelWidth,
+            LabPresentationPolicies.PreferredPanelHeight);
         private static Vector2 _scroll;
         private static int _layerCount = 1;
         private static int _selectedLayer;
+        private static int _protocolThreatIndex;
         private static float _distance = 8f;
         private static float _spacing = 0.15f;
         private static float _thickness = 0.0127f;
@@ -56,6 +62,7 @@ namespace BallisticsLab.Runtime
         private static GUIStyle? _sectionStyle;
         private static GUIStyle? _statusStyle;
         private static GUIStyle? _buttonStyle;
+        private static GUIStyle? _textFieldStyle;
 
         internal static bool IsSessionActive => _sessionActive;
 
@@ -67,18 +74,11 @@ namespace BallisticsLab.Runtime
             _catalog
             ?? throw new InvalidOperationException("The armor catalog is not initialized.");
 
-        internal static bool ShouldBlockShootingCommand(ECommand command)
+        internal static bool ShouldBlockGameInput()
         {
-            if (command != ECommand.ToggleShooting
-                || !_panelVisible
-                || Plugin.Configuration?.Enabled.Value != true)
-            {
-                return false;
-            }
-
-            Vector3 mouse = Input.mousePosition;
-            Vector2 guiPoint = new Vector2(mouse.x, Screen.height - mouse.y);
-            return _window.Contains(guiPoint);
+            return LabPresentationPolicies.ShouldCaptureGameInput(
+                _panelVisible,
+                Plugin.Configuration?.Enabled.Value == true);
         }
 
         internal static void Initialize()
@@ -136,8 +136,11 @@ namespace BallisticsLab.Runtime
 
             if (_sessionActive)
             {
+                PhysicalTelemetrySessionBridge.Update();
+                UpdateCampaign();
                 BotController.Update();
                 RefreshHideoutShootingModeStatus();
+                _rig?.UpdateAimMarkerVisibility(Camera.main);
                 UpdateTrace();
                 SaveAutomaticReport(false);
             }
@@ -151,9 +154,7 @@ namespace BallisticsLab.Runtime
             }
 
             KeepPanelCursorAvailable();
-
-            _window.width = Mathf.Min(_window.width, Screen.width - 20f);
-            _window.height = Mathf.Min(_window.height, Screen.height - 20f);
+            FitPanelToScreen();
             _window = GUI.Window(WindowId, _window, DrawWindow, "Ballistics Lab " + Plugin.PluginVersion);
         }
 
@@ -195,6 +196,7 @@ namespace BallisticsLab.Runtime
 
         internal static void NotifyRecord(ShotRecord record)
         {
+            CampaignRuntimeController.Observe(record);
             _latestRecord = record;
             _traceUntil = Time.time + (Plugin.Configuration?.TraceLifetime.Value ?? 8f);
             _status = "Recorded shot #" + record.Sequence + ": " + record.Outcome + ".";
@@ -222,7 +224,8 @@ namespace BallisticsLab.Runtime
                 };
                 _sectionStyle = new GUIStyle(GUI.skin.label)
                 {
-                    fontSize = 16
+                    fontSize = 16,
+                    wordWrap = true
                 };
                 _statusStyle = new GUIStyle(GUI.skin.box)
                 {
@@ -236,12 +239,19 @@ namespace BallisticsLab.Runtime
                     wordWrap = true,
                     padding = new RectOffset(10, 10, 8, 8)
                 };
+                _textFieldStyle = new GUIStyle(GUI.skin.textField)
+                {
+                    fontSize = 15,
+                    padding = new RectOffset(8, 8, 7, 7)
+                };
             }
 
             GUIStyle sectionStyle = _sectionStyle
                 ?? throw new InvalidOperationException("The section style was not initialized.");
             GUIStyle buttonStyle = _buttonStyle
                 ?? throw new InvalidOperationException("The button style was not initialized.");
+            GUIStyle textFieldStyle = _textFieldStyle
+                ?? throw new InvalidOperationException("The text-field style was not initialized.");
 
             GUILayout.BeginVertical(GUILayout.ExpandHeight(true));
             GUILayout.Label("BALLISTICS LAB", _titleStyle);
@@ -262,7 +272,10 @@ namespace BallisticsLab.Runtime
             }
 
             _scroll = GUILayout.BeginScrollView(_scroll);
-            GUILayout.Label("SESSION ACTIVE | " + TelemetryStore.Count + " recorded shots", _sectionStyle);
+            GUILayout.Label(
+                "SESSION ACTIVE | " + TelemetryStore.Count + " recorded shots | "
+                    + PhysicalTelemetrySessionBridge.TransitionCount + " physical transitions",
+                _sectionStyle);
             GUILayout.Box(_status, _statusStyle, GUILayout.ExpandWidth(true));
             if (_world is HideoutGameWorld)
             {
@@ -273,8 +286,14 @@ namespace BallisticsLab.Runtime
             {
                 SetPanelVisible(false);
             }
+            GUILayout.Label(
+                "Game controls are paused while this panel is open. Close it or press the panel shortcut to resume.");
 
-            DrawFixtureControls(sectionStyle, buttonStyle);
+            DrawCampaignControls(sectionStyle, buttonStyle);
+            if (!CampaignRuntimeController.IsRunning)
+            {
+                DrawFixtureControls(sectionStyle, buttonStyle, textFieldStyle);
+            }
             DrawBotControls(sectionStyle, buttonStyle);
             DrawLatestShot();
 
@@ -282,7 +301,7 @@ namespace BallisticsLab.Runtime
             GUILayout.Label("REPORTS", _sectionStyle);
             GUILayout.Label(
                 ActiveConfiguration.AutomaticReportSaving.Value
-                    ? "Automatic saving is ON. Each changed shot-chain batch is saved after a burst and when the session ends."
+                    ? "Automatic saving is ON. Changed shot chains and physical transitions save after a burst and when the session ends."
                     : "Automatic saving is OFF. Use the manual export button before ending the session.");
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("SAVE REPORT NOW", _buttonStyle, GUILayout.Height(42f)))
@@ -296,13 +315,20 @@ namespace BallisticsLab.Runtime
                     _status = "Export failed: " + exception.Message;
                 }
             }
-            if (GUILayout.Button("CLEAR RECORDS", _buttonStyle, GUILayout.Height(42f)))
+            if (!CampaignRuntimeController.IsRunning
+                && GUILayout.Button("CLEAR RECORDS", _buttonStyle, GUILayout.Height(42f)))
             {
                 SaveAutomaticReport(true);
+                CampaignRuntimeController.Clear();
                 TelemetryStore.Clear();
+                PhysicalTelemetrySessionBridge.ClearCaptured();
                 _latestRecord = null;
                 HideTrace();
-                _status = "Shot records cleared.";
+                _status = "Shot and physical-transition records cleared.";
+            }
+            else if (CampaignRuntimeController.IsRunning)
+            {
+                GUILayout.Label("Stop the guided campaign before clearing its evidence.");
             }
             GUILayout.EndHorizontal();
 
@@ -315,7 +341,10 @@ namespace BallisticsLab.Runtime
             GUI.DragWindow(new Rect(0f, 0f, 10000f, 28f));
         }
 
-        private static void DrawFixtureControls(GUIStyle sectionStyle, GUIStyle buttonStyle)
+        private static void DrawFixtureControls(
+            GUIStyle sectionStyle,
+            GUIStyle buttonStyle,
+            GUIStyle textFieldStyle)
         {
             GUILayout.Space(12f);
             GUILayout.Label("QUICK FIXTURES - ONE CLICK BUILDS, PLACES, AND CLOSES", sectionStyle);
@@ -356,8 +385,8 @@ namespace BallisticsLab.Runtime
             }
             GUILayout.EndHorizontal();
 
+            GUILayout.Label("SAME PLATE, CHOOSE LAYERS:");
             GUILayout.BeginHorizontal();
-            GUILayout.Label("SAME PLATE, CHOOSE LAYERS:", GUILayout.Width(220f));
             for (int layers = 1; layers <= LabPolicies.MaximumLayers; layers++)
             {
                 int requestedLayers = layers;
@@ -411,79 +440,93 @@ namespace BallisticsLab.Runtime
 
             GUILayout.Space(8f);
             GUILayout.Label("ADVANCED FIXTURE CONTROLS", sectionStyle);
+            bool compactControls = LabPresentationPolicies.UseCompactControls(_window.width);
             GUILayout.BeginHorizontal();
             GUILayout.Label("Layers: " + _layerCount, GUILayout.Width(120f));
-            if (GUILayout.Button("-", GUILayout.Width(40f)))
+            if (GUILayout.Button("-", buttonStyle, GUILayout.Height(42f), GUILayout.Width(56f)))
             {
                 _layerCount = Math.Max(1, _layerCount - 1);
                 _selectedLayer = Math.Min(_selectedLayer, _layerCount - 1);
             }
-            if (GUILayout.Button("+", GUILayout.Width(40f)))
+            if (GUILayout.Button("+", buttonStyle, GUILayout.Height(42f), GUILayout.Width(56f)))
             {
                 _layerCount = Math.Min(LabPolicies.MaximumLayers, _layerCount + 1);
             }
-            GUILayout.Label("Edit layer " + (_selectedLayer + 1), GUILayout.Width(110f));
-            if (GUILayout.Button("Prev", GUILayout.Width(55f)))
+            if (!compactControls)
             {
-                _selectedLayer = (_selectedLayer + _layerCount - 1) % _layerCount;
-            }
-            if (GUILayout.Button("Next", GUILayout.Width(55f)))
-            {
-                _selectedLayer = (_selectedLayer + 1) % _layerCount;
+                GUILayout.Space(20f);
+                DrawLayerSelectionButtons(buttonStyle);
             }
             GUILayout.EndHorizontal();
+            if (compactControls)
+            {
+                GUILayout.BeginHorizontal();
+                DrawLayerSelectionButtons(buttonStyle);
+                GUILayout.EndHorizontal();
+            }
 
-            _search = GUILayout.TextField(_search ?? string.Empty);
+            GUILayout.Label("FILTER ARMOR PRESETS");
+            _search = GUILayout.TextField(
+                _search ?? string.Empty,
+                textFieldStyle,
+                GUILayout.Height(38f));
             List<int> matches = ActiveCatalog.Search(_search);
             int currentIndex = ClampPresetIndex(PresetIndices[_selectedLayer]);
             PlateCatalogEntry current = ActiveCatalog.Entries[currentIndex];
             GUILayout.Label("Preset: " + current.DisplayName);
             GUILayout.Label("Template: " + current.TemplateId + " | blunt throughput " + Invariant(current.BluntThroughput, "F3"));
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("< matching preset"))
+            if (GUILayout.Button("< MATCHING PRESET", buttonStyle, GUILayout.Height(42f)))
             {
                 PresetIndices[_selectedLayer] = CycleMatch(matches, currentIndex, -1);
             }
-            if (GUILayout.Button("matching preset >"))
+            if (GUILayout.Button("MATCHING PRESET >", buttonStyle, GUILayout.Height(42f)))
             {
                 PresetIndices[_selectedLayer] = CycleMatch(matches, currentIndex, 1);
             }
             GUILayout.EndHorizontal();
 
+            GUILayout.Label("SELECTED LAYER MATERIAL");
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Selected layer material:", GUILayout.Width(145f));
-            if (GUILayout.Button("Steel")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.ArmoredSteel);
-            if (GUILayout.Button("Ceramic")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Ceramic);
-            if (GUILayout.Button("UHMWPE")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.UHMWPE);
-            if (GUILayout.Button("Titan")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Titan);
+            if (GUILayout.Button("Steel", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.ArmoredSteel);
+            if (GUILayout.Button("Ceramic", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Ceramic);
+            if (GUILayout.Button("UHMWPE", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.UHMWPE);
+            if (GUILayout.Button("Titan", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Titan);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            GUILayout.Space(145f);
-            if (GUILayout.Button("Aluminium")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Aluminium);
-            if (GUILayout.Button("Aramid")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Aramid);
-            if (GUILayout.Button("Combined")) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Combined);
+            if (GUILayout.Button("Aluminium", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Aluminium);
+            if (GUILayout.Button("Aramid", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Aramid);
+            if (GUILayout.Button("Combined", buttonStyle, GUILayout.Height(42f))) SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial.Combined);
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Distance " + Invariant(_distance, "F1") + " m", GUILayout.Width(135f));
-            if (GUILayout.Button("-1m", GUILayout.Width(55f))) _distance = Mathf.Max(3f, _distance - 1f);
-            if (GUILayout.Button("+1m", GUILayout.Width(55f))) _distance = Mathf.Min(50f, _distance + 1f);
-            GUILayout.Label("Angle " + Invariant(_angle, "F0") + " deg", GUILayout.Width(120f));
-            if (GUILayout.Button("-5", GUILayout.Width(45f))) _angle = Mathf.Max(-75f, _angle - 5f);
-            if (GUILayout.Button("+5", GUILayout.Width(45f))) _angle = Mathf.Min(75f, _angle + 5f);
+            GUILayout.Label("Distance " + Invariant(_distance, "F1") + " m", GUILayout.Width(180f));
+            if (GUILayout.Button("-1 m", buttonStyle, GUILayout.Height(42f))) _distance = Mathf.Max(3f, _distance - 1f);
+            if (GUILayout.Button("+1 m", buttonStyle, GUILayout.Height(42f))) _distance = Mathf.Min(50f, _distance + 1f);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Angle " + Invariant(_angle, "F0") + " degrees", GUILayout.Width(180f));
+            if (GUILayout.Button("-5 deg", buttonStyle, GUILayout.Height(42f))) _angle = Mathf.Max(-75f, _angle - 5f);
+            if (GUILayout.Button("+5 deg", buttonStyle, GUILayout.Height(42f))) _angle = Mathf.Min(75f, _angle + 5f);
             GUILayout.EndHorizontal();
             GUILayout.Label("Thickness controls collider geometry; resistance and durability come from the selected EFT armor template.");
 
             GUILayout.BeginHorizontal();
             bool backstopEnabled = ActiveConfiguration.CatcherEnabled.Value;
-            if (GUILayout.Button("Backstop: " + (backstopEnabled ? "ON" : "OFF")))
+            if (GUILayout.Button(
+                    "Backstop: " + (backstopEnabled ? "ON" : "OFF"),
+                    buttonStyle,
+                    GUILayout.Height(42f)))
             {
                 ActiveConfiguration.CatcherEnabled.Value = !backstopEnabled;
                 _status = "Backstop " + (!backstopEnabled ? "enabled" : "disabled")
                     + "; rebuild the fixture to apply.";
             }
             bool traceEnabled = ActiveConfiguration.TraceEnabled.Value;
-            if (GUILayout.Button("Last-shot trace: " + (traceEnabled ? "ON" : "OFF")))
+            if (GUILayout.Button(
+                    "Last-shot trace: " + (traceEnabled ? "ON" : "OFF"),
+                    buttonStyle,
+                    GUILayout.Height(42f)))
             {
                 ActiveConfiguration.TraceEnabled.Value = !traceEnabled;
                 if (traceEnabled)
@@ -494,20 +537,22 @@ namespace BallisticsLab.Runtime
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Gap " + Invariant(_spacing, "F2") + " m", GUILayout.Width(135f));
-            if (GUILayout.Button("-0.05", GUILayout.Width(60f))) _spacing = Mathf.Max(0.02f, _spacing - 0.05f);
-            if (GUILayout.Button("+0.05", GUILayout.Width(60f))) _spacing = Mathf.Min(1f, _spacing + 0.05f);
-            GUILayout.Label("Thickness " + Invariant(_thickness * 1000f, "F1") + " mm", GUILayout.Width(145f));
-            if (GUILayout.Button("-1mm", GUILayout.Width(60f))) _thickness = Mathf.Max(0.003f, _thickness - 0.001f);
-            if (GUILayout.Button("+1mm", GUILayout.Width(60f))) _thickness = Mathf.Min(0.1f, _thickness + 0.001f);
+            GUILayout.Label("Layer gap " + Invariant(_spacing, "F2") + " m", GUILayout.Width(180f));
+            if (GUILayout.Button("-0.05 m", buttonStyle, GUILayout.Height(42f))) _spacing = Mathf.Max(0.02f, _spacing - 0.05f);
+            if (GUILayout.Button("+0.05 m", buttonStyle, GUILayout.Height(42f))) _spacing = Mathf.Min(1f, _spacing + 0.05f);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Thickness " + Invariant(_thickness * 1000f, "F1") + " mm", GUILayout.Width(180f));
+            if (GUILayout.Button("-1 mm", buttonStyle, GUILayout.Height(42f))) _thickness = Mathf.Max(0.003f, _thickness - 0.001f);
+            if (GUILayout.Button("+1 mm", buttonStyle, GUILayout.Height(42f))) _thickness = Mathf.Min(0.1f, _thickness + 0.001f);
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Place / Rebuild Fixture", GUILayout.Height(32f)))
+            if (GUILayout.Button("PLACE / REBUILD FIXTURE", buttonStyle, GUILayout.Height(46f)))
             {
                 PlaceFixture();
             }
-            if (GUILayout.Button("Reset Plate Durability", GUILayout.Height(32f)))
+            if (GUILayout.Button("RESET PLATE DURABILITY", buttonStyle, GUILayout.Height(46f)))
             {
                 if (_rig == null)
                 {
@@ -518,7 +563,11 @@ namespace BallisticsLab.Runtime
                     ResetFixtureDurability(false);
                 }
             }
-            if (GUILayout.Button("Reset Durability + Clear Records", GUILayout.Height(32f)))
+            GUILayout.EndHorizontal();
+            if (GUILayout.Button(
+                    "RESET DURABILITY + CLEAR RECORDS",
+                    buttonStyle,
+                    GUILayout.Height(46f)))
             {
                 if (_rig == null)
                 {
@@ -529,8 +578,131 @@ namespace BallisticsLab.Runtime
                     ResetFixtureDurability(true);
                 }
             }
-            GUILayout.EndHorizontal();
+        }
 
+        private static void DrawLayerSelectionButtons(GUIStyle buttonStyle)
+        {
+            GUILayout.Label("Edit layer " + (_selectedLayer + 1), GUILayout.Width(120f));
+            if (GUILayout.Button("PREVIOUS", buttonStyle, GUILayout.Height(42f)))
+            {
+                _selectedLayer = (_selectedLayer + _layerCount - 1) % _layerCount;
+            }
+            if (GUILayout.Button("NEXT", buttonStyle, GUILayout.Height(42f)))
+            {
+                _selectedLayer = (_selectedLayer + 1) % _layerCount;
+            }
+        }
+
+        private static void DrawCampaignControls(GUIStyle sectionStyle, GUIStyle buttonStyle)
+        {
+            GUILayout.Space(12f);
+            GUILayout.Label("GUIDED CAMPAIGNS", sectionStyle);
+            GUILayout.Box(CampaignRuntimeController.Describe(), GUILayout.ExpandWidth(true));
+            if (CampaignRuntimeController.IsRunning)
+            {
+                if (CampaignRuntimeController.TryGetCurrentCase(
+                        out CampaignCaseDefinition? activeCase)
+                    && activeCase?.IsProtocolSequence == true
+                    && activeCase.TryGetProtocolDefinition(
+                        out ProtocolThreatDefinition? activeThreat,
+                        out ProtocolAmmunitionMapping? activeMapping)
+                    && activeThreat != null
+                    && activeMapping != null)
+                {
+                    GUILayout.Label(
+                        "Use " + activeMapping.InstalledDisplayName + " ("
+                        + activeThreat.CartridgeDesignation
+                        + "). Shoot only the current red marker. Qualifying hits keep accumulated damage; any rejected hit starts a fresh sample.");
+                }
+                else
+                {
+                    GUILayout.Label(
+                        "Shoot one round at the center marker. The Lab waits for the full shot chain, records the result, restores durability, and advances the fixture.");
+                }
+                if (GUILayout.Button("STOP GUIDED CAMPAIGN", buttonStyle, GUILayout.Height(52f)))
+                {
+                    StopCampaign("Guided campaign stopped. Captured attempts remain in reports.");
+                }
+                return;
+            }
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(
+                "Lab case seed: " + ActiveConfiguration.CampaignSeed.Value.ToString(CultureInfo.InvariantCulture),
+                GUILayout.Width(230f));
+            if (GUILayout.Button("-1", buttonStyle, GUILayout.Height(42f), GUILayout.Width(80f)))
+            {
+                if (ActiveConfiguration.CampaignSeed.Value > 1)
+                {
+                    ActiveConfiguration.CampaignSeed.Value--;
+                }
+            }
+            if (GUILayout.Button("+1", buttonStyle, GUILayout.Height(42f), GUILayout.Width(80f)))
+            {
+                if (ActiveConfiguration.CampaignSeed.Value < int.MaxValue)
+                {
+                    ActiveConfiguration.CampaignSeed.Value++;
+                }
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Label(
+                "This seed identifies repeatable Lab cases. The game shot seed is observed and recorded; it is not overridden.");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(
+                    "START CONTROLLED FIXTURE BASELINE\n10 plate-stack cases",
+                    buttonStyle,
+                    GUILayout.Height(66f)))
+            {
+                StartCampaign(CampaignCatalog.ControlledFixtureBaseline());
+            }
+            if (GUILayout.Button(
+                    "START PHYSICAL MATERIAL MATRIX\n7 materials x 3 accepted shots",
+                    buttonStyle,
+                    GUILayout.Height(66f)))
+            {
+                StartCampaign(CampaignCatalog.PhysicalMaterialMatrix());
+            }
+            GUILayout.EndHorizontal();
+            IReadOnlyList<ProtocolThreatDefinition> threats = CampaignCatalog.ProtocolScreeningThreats;
+            if (threats.Count != 0)
+            {
+                _protocolThreatIndex = Math.Max(
+                    0,
+                    Math.Min(_protocolThreatIndex, threats.Count - 1));
+                ProtocolThreatDefinition threat = threats[_protocolThreatIndex];
+                ProtocolAmmunitionMapping mapping = threat.AmmunitionMappings.Single(candidate =>
+                    candidate.CanQualifySimulationScreening);
+                GUILayout.Space(8f);
+                GUILayout.Label("GOST-ORIENTED SIMULATION SCREENING", sectionStyle);
+                GUILayout.Box(
+                    threat.ProtectionClass + " | " + threat.CartridgeDesignation + "\n"
+                    + mapping.InstalledDisplayName + " | five shots on one sample | "
+                    + threat.TestDistanceMetres.ToString("0.#", CultureInfo.InvariantCulture) + " m",
+                    GUILayout.ExpandWidth(true));
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("PREVIOUS", buttonStyle, GUILayout.Height(46f)))
+                {
+                    _protocolThreatIndex = (_protocolThreatIndex + threats.Count - 1) % threats.Count;
+                }
+                if (GUILayout.Button("NEXT", buttonStyle, GUILayout.Height(46f)))
+                {
+                    _protocolThreatIndex = (_protocolThreatIndex + 1) % threats.Count;
+                }
+                GUILayout.EndHorizontal();
+                if (GUILayout.Button(
+                        "START " + threat.ProtectionClass + " SCREENING\n"
+                        + mapping.InstalledDisplayName,
+                        buttonStyle,
+                        GUILayout.Height(66f)))
+                {
+                    StartCampaign(CampaignCatalog.GostSimulationScreening(threat.ThreatId));
+                }
+                GUILayout.Label(
+                    "This is a non-certifying simulation screen. The Lab guides placement and records evidence; it never fires the weapon.");
+            }
+            GUILayout.Label(
+                "The campaign automates fixture selection, repeat counts, evidence gates, resets, and result matrices. It does not fire the weapon.");
         }
 
         private static void DrawBotControls(GUIStyle sectionStyle, GUIStyle buttonStyle)
@@ -706,8 +878,10 @@ namespace BallisticsLab.Runtime
                 {
                     PresetIndices[index] = defaultIndex;
                 }
+                CampaignRuntimeController.Clear();
                 TelemetryStore.Clear();
                 _sessionActive = true;
+                PhysicalTelemetrySessionBridge.Start();
                 EnterHideoutShootingRangeIfNeeded();
                 if (!PlaceFixture())
                 {
@@ -726,6 +900,9 @@ namespace BallisticsLab.Runtime
 
         private static void EndSession(string status)
         {
+            FinalizePendingCampaignEvidence();
+            CampaignRuntimeController.Stop();
+            PhysicalTelemetrySessionBridge.Stop();
             SaveAutomaticReport(true);
             BotController.ClearSelection();
             _rig?.Dispose();
@@ -734,6 +911,7 @@ namespace BallisticsLab.Runtime
             HideTrace(true);
             _sessionActive = false;
             _latestRecord = null;
+            CampaignRuntimeController.Clear();
             _status = status;
         }
 
@@ -753,7 +931,7 @@ namespace BallisticsLab.Runtime
                 string? result = TelemetryStore.ExportAutomatic(force);
                 if (!string.IsNullOrEmpty(result) && !force)
                 {
-                    _status = "Changed shot chains saved. Keep shooting or choose the next fixture.";
+                    _status = "Changed ballistic evidence saved. Keep shooting or choose the next fixture.";
                 }
             }
             catch (Exception exception)
@@ -918,7 +1096,286 @@ namespace BallisticsLab.Runtime
             return property != null && property.GetValue(owner, null) is bool value && value;
         }
 
-        private static bool PlaceFixture()
+        private static void StartCampaign(CampaignDefinition definition)
+        {
+            if (!_sessionActive)
+            {
+                _status = "Start a lab session first.";
+                return;
+            }
+            if (!PrepareCampaignReplacement())
+            {
+                return;
+            }
+            ulong runSeed = (uint)ActiveConfiguration.CampaignSeed.Value;
+            if (!CampaignRuntimeController.Start(definition, runSeed))
+            {
+                _status = "Another guided campaign is still active.";
+                return;
+            }
+            if (!PlaceCampaignFixture())
+            {
+                CampaignRuntimeController.Stop();
+                return;
+            }
+            if (string.IsNullOrEmpty(_status))
+            {
+                _status = "Campaign ready. Shoot the current marker.";
+            }
+            SetPanelVisible(false);
+        }
+
+        private static bool PrepareCampaignReplacement()
+        {
+            if (!CampaignRuntimeController.HasCampaign)
+            {
+                return true;
+            }
+
+            if (TelemetryStore.HasUnsavedCampaignEvidence())
+            {
+                try
+                {
+                    string checkpoint = TelemetryStore.Export();
+                    Plugin.Log?.LogInfo("Previous guided campaign checkpointed before replacement: " + checkpoint);
+                }
+                catch (IOException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (UnauthorizedAccessException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (InvalidOperationException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (ArgumentException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (NotSupportedException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+                catch (System.Security.SecurityException exception)
+                {
+                    return ReportCampaignCheckpointFailure(exception);
+                }
+            }
+
+            CampaignRuntimeController.Clear();
+            return true;
+        }
+
+        private static bool ReportCampaignCheckpointFailure(Exception exception)
+        {
+            _status = "Previous campaign checkpoint failed; new campaign was not started: "
+                + exception.Message;
+            Plugin.Log?.LogWarning(_status);
+            return false;
+        }
+
+        private static void StopCampaign(string status)
+        {
+            FinalizePendingCampaignEvidence();
+            CampaignRuntimeController.Stop();
+            SaveAutomaticReport(true);
+            _status = status;
+        }
+
+        private static void FinalizePendingCampaignEvidence()
+        {
+            while (CampaignRuntimeController.TryFinalizePending(DateTime.MaxValue, out _))
+            {
+            }
+        }
+
+        private static void UpdateCampaign()
+        {
+            if (!CampaignRuntimeController.TryFinalizePending(
+                    DateTime.UtcNow,
+                    out CampaignAttemptRecord? attempt)
+                || attempt == null)
+            {
+                if (CampaignRuntimeController.TryConsumeFixtureRestartRequest(
+                        out string restartReason))
+                {
+                    if (!PlaceCampaignFixture())
+                    {
+                        StopCampaign(restartReason + " A fresh protocol sample could not be placed.");
+                    }
+                    else
+                    {
+                        _status = restartReason
+                            + " The damaged sample was discarded; a fresh sample is ready at marker 1.";
+                    }
+                }
+                return;
+            }
+
+            string result = "Campaign attempt "
+                + attempt.AttemptOrdinal.ToString(CultureInfo.InvariantCulture)
+                + " was " + attempt.Status + ".";
+            if (!CampaignRuntimeController.TrySnapshot(
+                    out _,
+                    out CampaignRunSnapshot? snapshot,
+                    out _,
+                    out _)
+                || snapshot == null)
+            {
+                _status = result;
+                return;
+            }
+
+            if (snapshot.State == CampaignRunState.AwaitingReset)
+            {
+                if (_rig == null)
+                {
+                    StopCampaign(result + " Fixture vanished before reset; campaign stopped.");
+                    return;
+                }
+                _rig.ResetDurability();
+                if (!CampaignRuntimeController.ConfirmReset(_rig.FixtureId))
+                {
+                    StopCampaign(result + " Reset state did not match the active fixture; campaign stopped.");
+                    return;
+                }
+                _status = result + " Durability restored; shoot the same center marker again.";
+                return;
+            }
+
+            if (snapshot.State == CampaignRunState.AwaitingFixture)
+            {
+                bool restartedProtocolSample = attempt.Status != CampaignAttemptStatus.Accepted
+                    && CampaignRuntimeController.TryGetCurrentCase(
+                        out CampaignCaseDefinition? retryCase)
+                    && retryCase?.IsProtocolSequence == true;
+                if (!PlaceCampaignFixture())
+                {
+                    StopCampaign(result + " The next fixture could not be placed; campaign stopped.");
+                    return;
+                }
+                _status = restartedProtocolSample
+                    ? result + " The partial sample was invalidated; a fresh sample is ready at marker 1."
+                    : result + " Next fixture placed; shoot its marker.";
+                return;
+            }
+
+            if (snapshot.State == CampaignRunState.AwaitingShot
+                && attempt.Status == CampaignAttemptStatus.Accepted
+                && CampaignRuntimeController.TryGetCurrentCase(
+                    out CampaignCaseDefinition? continuingCase)
+                && continuingCase?.IsProtocolSequence == true)
+            {
+                if (!ConfigureCampaignAimMarker(out string markerInstruction))
+                {
+                    StopCampaign(result + " The next protocol marker could not be configured; campaign stopped.");
+                    return;
+                }
+                _status = result + " Durability preserved; " + markerInstruction;
+                return;
+            }
+
+            _status = snapshot.State == CampaignRunState.Completed
+                ? result + " Campaign complete; the result matrix is ready in the JSON report."
+                : result;
+        }
+
+        private static bool PlaceCampaignFixture()
+        {
+            if (!CampaignRuntimeController.TryGetCurrentCase(
+                    out CampaignCaseDefinition? campaignCase)
+                || campaignCase == null)
+            {
+                _status = "The campaign has no current fixture case.";
+                return false;
+            }
+
+            int presetIndex;
+            if (campaignCase.SelectorKind == CampaignFixtureSelectorKind.ExactTemplate)
+            {
+                presetIndex = ActiveCatalog.FindByTemplateId(campaignCase.TemplateId);
+            }
+            else if (campaignCase.SelectorKind == CampaignFixtureSelectorKind.MaterialAndArmorClass
+                && Enum.TryParse(campaignCase.Material, ignoreCase: true, out EArmorMaterial material))
+            {
+                presetIndex = ActiveCatalog.FindExactMaterial(material, campaignCase.ArmorClass);
+            }
+            else
+            {
+                _status = "Unsupported campaign fixture selector for " + campaignCase.CaseId + ".";
+                return false;
+            }
+            if (presetIndex < 0)
+            {
+                _status = "No installed armor template satisfies campaign case "
+                    + campaignCase.CaseId + ".";
+                return false;
+            }
+
+            _distance = (float)campaignCase.DistanceMetres;
+            _spacing = (float)campaignCase.LayerSpacingMetres;
+            _thickness = (float)campaignCase.PlateThicknessMetres;
+            _angle = (float)campaignCase.AngleDegrees;
+            SetAllPresets(presetIndex, campaignCase.LayerCount);
+            if (!PlaceFixture(campaignCase.BackstopEnabled) || _rig == null)
+            {
+                return false;
+            }
+            if (!CampaignRuntimeController.AttachFixture(_rig.FixtureId))
+            {
+                _status = "Campaign fixture state rejected fixture #"
+                    + _rig.FixtureId.ToString(CultureInfo.InvariantCulture) + ".";
+                return false;
+            }
+            if (!ConfigureCampaignAimMarker(out string markerInstruction))
+            {
+                _status = "Campaign marker setup failed for fixture #"
+                    + _rig.FixtureId.ToString(CultureInfo.InvariantCulture) + ".";
+                return false;
+            }
+            _status = "Campaign case " + campaignCase.CaseId + " placed as fixture #"
+                + _rig.FixtureId.ToString(CultureInfo.InvariantCulture) + "; "
+                + markerInstruction;
+            return true;
+        }
+
+        private static bool ConfigureCampaignAimMarker(out string instruction)
+        {
+            instruction = "shoot the center marker";
+            if (_rig == null
+                || !CampaignRuntimeController.TryGetCurrentCase(
+                    out CampaignCaseDefinition? campaignCase)
+                || campaignCase == null)
+            {
+                return false;
+            }
+            if (!campaignCase.IsProtocolSequence)
+            {
+                return true;
+            }
+            if (!CampaignRuntimeController.TryGetExpectedImpactPoint(
+                    FixtureRig.PlateFaceWidthMetres,
+                    FixtureRig.PlateFaceHeightMetres,
+                    out ProtocolImpactPoint point,
+                    out double projectileDiameterMetres,
+                    out int shotNumber,
+                    out int requiredShots,
+                    out string failure))
+            {
+                instruction = failure;
+                return false;
+            }
+            _rig.SetAimPoint(point, projectileDiameterMetres);
+            instruction = "shoot red marker "
+                + shotNumber.ToString(CultureInfo.InvariantCulture) + "/"
+                + requiredShots.ToString(CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        private static bool PlaceFixture(bool? backstopOverride = null)
         {
             if (!_sessionActive || _catalog == null)
             {
@@ -952,7 +1409,7 @@ namespace BallisticsLab.Runtime
                 rotation,
                 _spacing,
                 _thickness,
-                ActiveConfiguration.CatcherEnabled.Value);
+                backstopOverride ?? ActiveConfiguration.CatcherEnabled.Value);
             _rig?.Dispose();
             _rig = replacement;
             _status = "Placed " + _layerCount + " layer(s) at " + Invariant(_distance, "F1")
@@ -1009,9 +1466,10 @@ namespace BallisticsLab.Runtime
 
             SaveAutomaticReport(true);
             TelemetryStore.Clear();
+            PhysicalTelemetrySessionBridge.ClearCaptured();
             _latestRecord = null;
             HideTrace();
-            _status = "Fixture durability restored and shot records cleared.";
+            _status = "Fixture durability restored and ballistic records cleared.";
         }
 
         private static void SetSelectedMaterial(EFT.InventoryLogic.EArmorMaterial material)
@@ -1071,8 +1529,7 @@ namespace BallisticsLab.Runtime
                 _previousCursorVisible = Cursor.visible;
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
-                _window.x = Mathf.Clamp(_window.x, 0f, Math.Max(0f, Screen.width - _window.width));
-                _window.y = Mathf.Clamp(_window.y, 0f, Math.Max(0f, Screen.height - _window.height));
+                FitPanelToScreen();
             }
             else
             {
@@ -1085,6 +1542,16 @@ namespace BallisticsLab.Runtime
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
+        }
+
+        private static void FitPanelToScreen()
+        {
+            LabPanelBounds bounds = LabPresentationPolicies.FitPanelToScreen(
+                _window.x,
+                _window.y,
+                Screen.width,
+                Screen.height);
+            _window = new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height);
         }
 
         private static string DescribeWorld()
@@ -1146,6 +1613,9 @@ namespace BallisticsLab.Runtime
             _trace = host.AddComponent<LineRenderer>();
             _trace.sharedMaterial = _traceMaterial;
             _trace.useWorldSpace = true;
+            _trace.alignment = LineAlignment.View;
+            _trace.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            _trace.receiveShadows = false;
             _trace.startWidth = 0.012f;
             _trace.endWidth = 0.006f;
             _trace.startColor = _traceMaterial.color;
