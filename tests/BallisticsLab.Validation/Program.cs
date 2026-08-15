@@ -50,16 +50,16 @@ Dictionary<string, AmmoRow> ammunition = new(StringComparer.Ordinal);
 Check(
     ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginGuid), "com.janky.ballisticslab")
     && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginName), "Janky-BallisticsLab")
-    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginVersion), "0.2.8")
-    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 4)
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginVersion), "0.3.0")
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 5)
     && ConstantMatches(
         typeof(PhysicalTelemetryContract),
         nameof(PhysicalTelemetryContract.SupportedPublisherSchema),
-        1)
+        2)
     && ConstantMatches(
         typeof(PhysicalTelemetryContract),
         nameof(PhysicalTelemetryContract.SnapshotSchema),
-        1)
+        2)
     && ConstantMatches(
         typeof(PhysicalTelemetryContract),
         nameof(PhysicalTelemetryContract.PublisherTypeName),
@@ -79,8 +79,8 @@ Check(ReportPairValidator.ParserHandlesQuotedFields(), "CSV report parser handle
 Check(ReportPairValidator.ValidatorMatchesSyntheticPair(), "CSV and JSON report validator accepts a matching schema-4 pair");
 Check(ReportPairValidator.ValidatorRejectsSyntheticMismatch(), "CSV and JSON report validator rejects a field mismatch");
 Check(
-    ReportPairValidator.ValidatorAcceptsPhysicalOnlySchemaFourPair(),
-    "CSV and JSON validator accepts a schema-4 physical-only report with the flat CSV header");
+    ReportPairValidator.ValidatorAcceptsPhysicalOnlySchemaFivePair(),
+    "CSV and JSON validator accepts a schema-5 physical-only report with the flat CSV header");
 Check(ReportInvariantValidator.AcceptsSyntheticReport(), "report invariants accept a valid collision record");
 Check(ReportInvariantValidator.RejectsIncorrectFalloff(), "report invariants reject incorrect penetration falloff");
 Check(ReportInvariantValidator.RejectsDetachedTrajectoryEndpoint(), "report invariants reject a detached trajectory endpoint");
@@ -90,11 +90,11 @@ Check(ReportInvariantValidator.RejectsChangedRootIdentity(), "report invariants 
 Check(CurrentReportSetValidator.RejectsCorruptEarlierCurrentReport(), "current-report gate rejects corruption in an earlier contributing export");
 Check(CurrentReportSetValidator.IgnoresCorruptHistoricalReport(), "current-report gate excludes historical versions from current acceptance");
 Check(
-    CurrentReportSetValidator.SelectsPhysicalOnlySchemaFourReport(),
-    "current-report selection includes schema-4 physical-only evidence");
+    CurrentReportSetValidator.SelectsPhysicalOnlySchemaFiveReport(),
+    "current-report selection includes schema-5 physical-only evidence");
 Check(
-    CurrentReportSetValidator.SelectsCampaignOnlySchemaFourReport(),
-    "current-report selection includes schema-4 campaign-only evidence");
+    CurrentReportSetValidator.SelectsCampaignOnlySchemaFiveReport(),
+    "current-report selection includes schema-5 campaign-only evidence");
 Check(AcceptanceCoverageEvaluator.CompleteSyntheticCoveragePasses(), "report coverage accepts a complete controlled fixture matrix");
 Check(AcceptanceCoverageEvaluator.CasualBotTrafficCannotSatisfyFixtureCoverage(), "casual bot traffic cannot satisfy controlled fixture gates");
 Check(AcceptanceCoverageEvaluator.DuplicateBatchesDoNotInflateCoverage(), "duplicate automatic batches do not inflate acceptance coverage");
@@ -137,19 +137,19 @@ Check(
     PhysicalTransitionTrackerTests.CapacityEvictsOldestTransitionDeterministically(),
     "physical transition capacity evicts the oldest evidence deterministically");
 Check(
-    PhysicalTransitionReportTests.SchemaFourWriterPreservesCompletePhysicalEvidence(),
-    "schema-4 physical transition JSON preserves complete paired evidence");
+    PhysicalTransitionReportTests.SchemaFiveWriterPreservesCompletePhysicalEvidence(),
+    "schema-5 physical transition JSON preserves complete paired evidence");
 Check(
     PhysicalTransitionReportTests.PhysicalOnlyChangesTriggerCombinedReportPolicy(),
     "physical-only revisions trigger report capture without a shot record");
 Check(
-    PhysicalTransitionReportTests.PhysicalOnlyDocumentUsesSchemaFourAndEmptyShotArray(),
-    "physical-only document uses schema 4 with an unchanged empty shot-record array");
+    PhysicalTransitionReportTests.PhysicalOnlyDocumentUsesSchemaFiveAndEmptyShotArray(),
+    "physical-only document uses schema 5 with an unchanged empty shot-record array");
 Check(
     PhysicalTransitionReportTests.UpdatedRevisionIdentifiesOnlyChangedTransitions(),
     "automatic physical evidence selection includes only transitions changed since save");
 Check(
-    PhysicalTransitionInvariantTests.AcceptsBalancedSchemaFourEvidence(),
+    PhysicalTransitionInvariantTests.AcceptsBalancedSchemaFiveEvidence(),
     "physical transition invariants accept balanced mass and energy evidence");
 Check(
     PhysicalTransitionInvariantTests.RejectsBrokenMassClosure(),
@@ -174,7 +174,7 @@ Check(
     "physical transition invariants reject component kind and provenance mismatches");
 Check(
     PhysicalTransitionInvariantTests.AcceptsTargetMaterialFragmentDerivedFromImmediateParent(),
-    "schema 4 preserves target origin while closing immediate-parent mass and energy ledgers");
+    "schema 5 preserves target origin while closing immediate-parent mass and energy ledgers");
 Check(
     PhysicalTransitionInvariantTests.AcceptsSignedClosureRemaindersInsidePublisherTolerance(),
     "physical transition invariants accept signed rounding remainders inside publisher tolerance");
@@ -297,7 +297,7 @@ Check(
     "campaign closure separates inherited target material from fresh target-spall mass");
 Check(
     CampaignTests.CampaignJsonContainsDefinitionAttemptsAndMatrix(),
-    "schema 4 campaign JSON contains definitions, attempts, seed semantics, and result matrix");
+    "schema 5 campaign JSON contains definitions, attempts, seed semantics, and result matrix");
 Check(
     CampaignTests.CampaignJsonRejectsPartialDefinitionAndSnapshot(),
     "campaign JSON refuses a partial definition/snapshot pair");
@@ -318,7 +318,7 @@ Check(
     "campaign report validation rejects impossible attempt order and header cursors");
 Check(
     CampaignTests.ReportInvariantAcceptsCampaignOnlyEvidence(),
-    "campaign-only schema 4 evidence passes the report invariant gate");
+    "campaign-only schema 5 evidence passes the report invariant gate");
 Check(
     CampaignTests.ReportInvariantRejectsEmptyCampaignShell(),
     "an empty campaign shell is not accepted as report evidence");
@@ -777,8 +777,8 @@ if (!string.IsNullOrEmpty(reportsPath))
             Check(
                 comparisonBuilt,
                 comparisonBuilt
-                    ? "schema-4 campaign reports produce a validated cross-report comparison"
-                    : "schema-4 campaign comparison failed: " + comparisonFailure);
+            ? "schema-5 campaign reports produce a validated cross-report comparison"
+            : "schema-5 campaign comparison failed: " + comparisonFailure);
             if (comparisonBuilt)
             {
                 Console.WriteLine(CrossReportCampaignComparison.FormatSummary(comparisonJson));

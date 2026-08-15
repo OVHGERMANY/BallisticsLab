@@ -153,6 +153,7 @@ namespace BallisticsLab.Core
             Number(builder, ref first, "fragmentGeneration", component.FragmentGeneration);
             Number(builder, ref first, "deterministicSeed", component.DeterministicSeed);
             String(builder, ref first, "construction", component.Construction);
+            String(builder, ref first, "designClass", component.DesignClass);
             String(builder, ref first, "shapeClass", component.ShapeClass);
             Number(builder, ref first, "originalMassKilograms", component.OriginalMassKilograms);
             Number(builder, ref first, "retainedMassKilograms", component.RetainedMassKilograms);

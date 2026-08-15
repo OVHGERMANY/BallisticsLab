@@ -234,6 +234,7 @@ namespace BallisticsLab.Core
                 Int32(source, "FragmentGeneration"),
                 UInt64(source, "DeterministicSeed"),
                 EnumName(source, "Construction"),
+                EnumName(source, "DesignClass"),
                 EnumName(source, "ShapeClass"),
                 FiniteDouble(source, "OriginalMassKilograms"),
                 FiniteDouble(source, "RetainedMassKilograms"),

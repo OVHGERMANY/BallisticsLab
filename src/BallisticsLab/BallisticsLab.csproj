@@ -3,7 +3,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>BallisticsLab</AssemblyName>
     <RootNamespace>BallisticsLab</RootNamespace>
-    <Version>0.2.8</Version>
+    <Version>0.3.0</Version>
     <SptRoot Condition="'$(SptRoot)' == '' and '$(SPT_ROOT)' != ''">$(SPT_ROOT)</SptRoot>
     <DeployRoot Condition="'$(DeployRoot)' == '' and '$(SptRoot)' != ''">$(SptRoot)</DeployRoot>
     <DeployDirectory>$(DeployRoot)\BepInEx\plugins\BallisticsLab</DeployDirectory>

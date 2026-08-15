@@ -393,6 +393,7 @@ internal static class PhysicalTransitionInvariantValidator
             || string.IsNullOrEmpty(RequiredString(component, "rootShotId"))
             || string.IsNullOrEmpty(kind)
             || string.IsNullOrEmpty(RequiredString(component, "construction"))
+            || string.IsNullOrEmpty(RequiredString(component, "designClass"))
             || string.IsNullOrEmpty(RequiredString(component, "shapeClass"))
             || string.IsNullOrEmpty(RequiredString(component, "sourceMaterialClass"))
             || string.IsNullOrEmpty(RequiredString(component, "tumbleState"))
@@ -872,7 +873,7 @@ internal static class PhysicalTransitionInvariantValidator
 
 internal static class PhysicalTransitionInvariantTests
 {
-    internal static bool AcceptsBalancedSchemaFourEvidence()
+    internal static bool AcceptsBalancedSchemaFiveEvidence()
     {
         using JsonDocument document = JsonDocument.Parse(CreateReport());
         return PhysicalTransitionInvariantValidator.Validate(
@@ -911,7 +912,7 @@ internal static class PhysicalTransitionInvariantTests
     internal static bool RejectsUnsupportedTelemetrySchema()
     {
         JsonNode root = JsonNode.Parse(CreateReport())!;
-        root["physicalTransitions"]![0]!["prepared"]!["snapshotSchema"] = 2;
+        root["physicalTransitions"]![0]!["prepared"]!["snapshotSchema"] = 3;
         using JsonDocument document = JsonDocument.Parse(root.ToJsonString());
         return !PhysicalTransitionInvariantValidator.Validate(
                 document.RootElement,
@@ -979,6 +980,7 @@ internal static class PhysicalTransitionInvariantTests
         fragment.Kind = FakeKind.TargetSpallFragment;
         fragment.ProjectileId = "target-spall-fragment";
         fragment.Construction = FakeConstruction.TargetMaterial;
+        fragment.DesignClass = FakeDesign.Fragment;
         fragment.ShapeClass = FakeShape.TargetSpallFlake;
         fragment.ParentProjectileId = "target-spall-parent";
         fragment.SourceProjectileId = "target-spall-parent";
@@ -995,7 +997,7 @@ internal static class PhysicalTransitionInvariantTests
         JsonElement resolvedSnapshot = transition.GetProperty("resolved");
         JsonElement output = resolvedSnapshot.GetProperty("outputs")[0];
         JsonElement conservation = resolvedSnapshot.GetProperty("conservation");
-        return document.RootElement.GetProperty("schema").GetInt32() == 4
+        return document.RootElement.GetProperty("schema").GetInt32() == 5
             && output.GetProperty("kind").GetString() == "TargetSpallFragment"
             && output.GetProperty("isTargetMaterialOrigin").GetBoolean()
             && output.GetProperty("isParentDerivedMass").GetBoolean()
@@ -1098,7 +1100,7 @@ internal static class PhysicalTransitionInvariantTests
         var tracker = new PhysicalTransitionTracker(2);
         tracker.Add(Copy(FakePhysicalEvent.Prepared(resolved.Event.TransitionId)));
         tracker.Add(Copy(resolved));
-        var builder = new StringBuilder("{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],\"physicalTransitions\":");
+        var builder = new StringBuilder("{\"schema\":5,\"pluginVersion\":\"0.3.0\",\"records\":[],\"physicalTransitions\":");
         PhysicalTransitionJsonWriter.AppendArray(builder, tracker.Snapshot());
         builder.Append('}');
         return builder.ToString();

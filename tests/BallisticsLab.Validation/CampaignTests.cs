@@ -856,7 +856,7 @@ internal static class CampaignTests
 
     internal static bool CampaignReportRejectsProtocolResultWithoutCampaign()
     {
-        const string json = "{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],"
+        const string json = "{\"schema\":5,\"pluginVersion\":\"0.3.0\",\"records\":[],"
             + "\"physicalTransitions\":[],\"campaign\":null,"
             + "\"protocolScreeningResult\":{\"certificationClaim\":false}}";
         using JsonDocument document = JsonDocument.Parse(json);
@@ -871,7 +871,7 @@ internal static class CampaignTests
     {
         FakePhysicalEvent fake = FakePhysicalEvent.Resolved("campaign-physical");
         if (!PhysicalTelemetryReflectionReader.TryCopy(
-                1,
+                PhysicalTelemetryContract.SupportedPublisherSchema,
                 fake.Event,
                 out PhysicalTelemetryEventRecord? resolved,
                 out _)
@@ -885,7 +885,7 @@ internal static class CampaignTests
             "campaign-backstop",
             "fixture/700/backstop");
         if (!PhysicalTelemetryReflectionReader.TryCopy(
-                1,
+                PhysicalTelemetryContract.SupportedPublisherSchema,
                 backstopFake.Event,
                 out PhysicalTelemetryEventRecord? backstopResolved,
                 out _)
@@ -947,6 +947,7 @@ internal static class CampaignTests
         fragment.Kind = FakeKind.TargetSpallFragment;
         fragment.ProjectileId = "target-spall-fragment";
         fragment.Construction = FakeConstruction.TargetMaterial;
+        fragment.DesignClass = FakeDesign.Fragment;
         fragment.ShapeClass = FakeShape.TargetSpallFlake;
         fragment.ParentProjectileId = "target-spall-parent";
         fragment.SourceProjectileId = "target-spall-parent";

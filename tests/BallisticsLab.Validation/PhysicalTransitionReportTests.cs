@@ -6,7 +6,7 @@ namespace BallisticsLab.Validation;
 
 internal static class PhysicalTransitionReportTests
 {
-    internal static bool SchemaFourWriterPreservesCompletePhysicalEvidence()
+    internal static bool SchemaFiveWriterPreservesCompletePhysicalEvidence()
     {
         var tracker = new PhysicalTransitionTracker(8);
         tracker.Add(Copy(FakePhysicalEvent.Prepared("complete")));
@@ -82,14 +82,14 @@ internal static class PhysicalTransitionReportTests
             && LabPolicies.ShouldSaveCombinedReport(1, 2L, 1L, 0, 0L, 0L);
     }
 
-    internal static bool PhysicalOnlyDocumentUsesSchemaFourAndEmptyShotArray()
+    internal static bool PhysicalOnlyDocumentUsesSchemaFiveAndEmptyShotArray()
     {
         var tracker = new PhysicalTransitionTracker(2);
         tracker.Add(Copy(FakePhysicalEvent.Prepared("physical-only")));
         string json = PhysicalReportDocumentWriter.Build("[]", tracker.Snapshot());
         using JsonDocument document = JsonDocument.Parse(json);
-        return document.RootElement.GetProperty("schema").GetInt32() == 4
-            && document.RootElement.GetProperty("pluginVersion").GetString() == "0.2.8"
+        return document.RootElement.GetProperty("schema").GetInt32() == 5
+            && document.RootElement.GetProperty("pluginVersion").GetString() == "0.3.0"
             && document.RootElement.GetProperty("records").GetArrayLength() == 0
             && document.RootElement.GetProperty("physicalTransitions").GetArrayLength() == 1;
     }

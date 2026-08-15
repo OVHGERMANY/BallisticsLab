@@ -7,8 +7,8 @@ namespace BallisticsLab.Core
 {
     internal static class PhysicalTelemetryContract
     {
-        internal const int SupportedPublisherSchema = 1;
-        internal const int SnapshotSchema = 1;
+        internal const int SupportedPublisherSchema = 2;
+        internal const int SnapshotSchema = 2;
         internal const string PublisherTypeName =
             "BallisticPenetration.Core.Physics.PhysicalProjectileTelemetry";
     }
@@ -292,6 +292,7 @@ namespace BallisticsLab.Core
             int fragmentGeneration,
             ulong deterministicSeed,
             string construction,
+            string designClass,
             string shapeClass,
             double originalMassKilograms,
             double retainedMassKilograms,
@@ -331,6 +332,7 @@ namespace BallisticsLab.Core
             FragmentGeneration = fragmentGeneration;
             DeterministicSeed = deterministicSeed;
             Construction = construction;
+            DesignClass = designClass;
             ShapeClass = shapeClass;
             OriginalMassKilograms = originalMassKilograms;
             RetainedMassKilograms = retainedMassKilograms;
@@ -377,6 +379,7 @@ namespace BallisticsLab.Core
         internal int FragmentGeneration { get; }
         internal ulong DeterministicSeed { get; }
         internal string Construction { get; }
+        internal string DesignClass { get; }
         internal string ShapeClass { get; }
         internal double OriginalMassKilograms { get; }
         internal double RetainedMassKilograms { get; }

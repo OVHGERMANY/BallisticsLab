@@ -100,7 +100,7 @@ internal static class CurrentReportSetValidator
             expectedFailure: string.Empty);
     }
 
-    internal static bool SelectsPhysicalOnlySchemaFourReport()
+    internal static bool SelectsPhysicalOnlySchemaFiveReport()
     {
         string directory = Path.Combine(
             Path.GetTempPath(),
@@ -111,9 +111,9 @@ internal static class CurrentReportSetValidator
             string report = Path.Combine(directory, "BallisticsLab-physical.json");
             File.WriteAllText(
                 report,
-                "{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],"
+                "{\"schema\":5,\"pluginVersion\":\"0.3.0\",\"records\":[],"
                     + "\"physicalTransitions\":[{\"transitionId\":\"physical-only\"}]}");
-            IReadOnlyList<string> selected = Select(new[] { report }, 4, "0.2.8");
+            IReadOnlyList<string> selected = Select(new[] { report }, 5, "0.3.0");
             return selected.Count == 1 && selected[0] == report;
         }
         finally
@@ -122,7 +122,7 @@ internal static class CurrentReportSetValidator
         }
     }
 
-    internal static bool SelectsCampaignOnlySchemaFourReport()
+    internal static bool SelectsCampaignOnlySchemaFiveReport()
     {
         string directory = Path.Combine(
             Path.GetTempPath(),
@@ -133,9 +133,9 @@ internal static class CurrentReportSetValidator
             string report = Path.Combine(directory, "BallisticsLab-campaign.json");
             File.WriteAllText(
                 report,
-                "{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],"
+                "{\"schema\":5,\"pluginVersion\":\"0.3.0\",\"records\":[],"
                     + "\"physicalTransitions\":[],\"campaign\":{\"attempts\":[{}]}}");
-            IReadOnlyList<string> selected = Select(new[] { report }, 4, "0.2.8");
+            IReadOnlyList<string> selected = Select(new[] { report }, 5, "0.3.0");
             return selected.Count == 1 && selected[0] == report;
         }
         finally

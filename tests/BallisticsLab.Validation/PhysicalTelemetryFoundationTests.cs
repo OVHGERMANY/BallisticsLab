@@ -9,7 +9,7 @@ internal static class PhysicalTelemetryFoundationTests
     {
         using var connection = new PhysicalTelemetryPublisherConnection(
             "BallisticsLab.Validation.MissingPublisher",
-            1);
+            PhysicalTelemetryContract.SupportedPublisherSchema);
         bool attached = connection.TryAttach(
             Array.Empty<Assembly>(),
             _ => throw new InvalidOperationException("Absent publisher delivered an event."));
@@ -23,7 +23,7 @@ internal static class PhysicalTelemetryFoundationTests
         UnsupportedPublisher.Reset();
         using var connection = new PhysicalTelemetryPublisherConnection(
             typeof(UnsupportedPublisher).FullName!,
-            1);
+            PhysicalTelemetryContract.SupportedPublisherSchema);
         bool attached = connection.TryAttach(
             new[] { typeof(UnsupportedPublisher).Assembly },
             _ => throw new InvalidOperationException("Unsupported publisher delivered an event."));
@@ -40,7 +40,7 @@ internal static class PhysicalTelemetryFoundationTests
         int delivered = 0;
         using var connection = new PhysicalTelemetryPublisherConnection(
             typeof(ValidPublisher).FullName!,
-            1);
+            PhysicalTelemetryContract.SupportedPublisherSchema);
         bool absent = !connection.TryAttach(Array.Empty<Assembly>(), _ => delivered++);
         bool attached = connection.TryAttach(
             new[] { typeof(ValidPublisher).Assembly },
@@ -64,7 +64,7 @@ internal static class PhysicalTelemetryFoundationTests
         PhysicalTelemetryEventRecord? captured = null;
         using var connection = new PhysicalTelemetryPublisherConnection(
             typeof(ValidPublisher).FullName!,
-            1);
+            PhysicalTelemetryContract.SupportedPublisherSchema);
         if (!connection.TryAttach(
                 new[] { typeof(ValidPublisher).Assembly },
                 record => captured = record))
@@ -80,8 +80,8 @@ internal static class PhysicalTelemetryFoundationTests
             return false;
         }
 
-        return captured.SnapshotSchema == 1
-            && captured.PublisherSchema == 1
+        return captured.SnapshotSchema == 2
+            && captured.PublisherSchema == 2
             && captured.Stage == PhysicalTelemetryStageRecord.CollisionPrepared
             && captured.TransitionId == "transition-prepared"
             && captured.Outcome == "Unknown"
@@ -100,6 +100,7 @@ internal static class PhysicalTelemetryFoundationTests
             && !ReferenceEquals(captured.Parent.ProjectileId, source.Parent.ProjectileId)
             && captured.Parent.RootShotId == "root-shot"
             && captured.Parent.Construction == "SteelCoreJacketed"
+            && captured.Parent.DesignClass == "FullMetalJacket"
             && captured.Parent.ShapeClass == "Spitzer"
             && Nearly(captured.Parent.RetainedMassKilograms, 0.004d)
             && Nearly(captured.Parent.EquivalentDiameterMetres, 0.0057d)
@@ -120,7 +121,7 @@ internal static class PhysicalTelemetryFoundationTests
         PhysicalTelemetryEventRecord? captured = null;
         using var connection = new PhysicalTelemetryPublisherConnection(
             typeof(ValidPublisher).FullName!,
-            1);
+            PhysicalTelemetryContract.SupportedPublisherSchema);
         if (!connection.TryAttach(
                 new[] { typeof(ValidPublisher).Assembly },
                 record => captured = record))
@@ -178,9 +179,9 @@ internal static class PhysicalTelemetryFoundationTests
         FakePhysicalEvent first = FakePhysicalEvent.Prepared("first");
         FakePhysicalEvent second = FakePhysicalEvent.Prepared("second");
         FakePhysicalEvent third = FakePhysicalEvent.Prepared("third");
-        if (!PhysicalTelemetryReflectionReader.TryCopy(1, first.Event, out PhysicalTelemetryEventRecord? firstRecord, out _)
-            || !PhysicalTelemetryReflectionReader.TryCopy(1, second.Event, out PhysicalTelemetryEventRecord? secondRecord, out _)
-            || !PhysicalTelemetryReflectionReader.TryCopy(1, third.Event, out PhysicalTelemetryEventRecord? thirdRecord, out _)
+        if (!PhysicalTelemetryReflectionReader.TryCopy(2, first.Event, out PhysicalTelemetryEventRecord? firstRecord, out _)
+            || !PhysicalTelemetryReflectionReader.TryCopy(2, second.Event, out PhysicalTelemetryEventRecord? secondRecord, out _)
+            || !PhysicalTelemetryReflectionReader.TryCopy(2, third.Event, out PhysicalTelemetryEventRecord? thirdRecord, out _)
             || firstRecord == null
             || secondRecord == null
             || thirdRecord == null)
@@ -205,7 +206,7 @@ internal static class PhysicalTelemetryFoundationTests
         FakePhysicalEvent source = FakePhysicalEvent.Prepared();
         source.Parent.SpeedMetresPerSecond = double.NaN;
         bool copied = PhysicalTelemetryReflectionReader.TryCopy(
-            1,
+            2,
             source.Event,
             out PhysicalTelemetryEventRecord? record,
             out string failure);
@@ -222,7 +223,7 @@ internal static class PhysicalTelemetryFoundationTests
 
 internal static class ValidPublisher
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
     private static Action<object>? _observers;
 
     internal static int SubscriberCount => _observers?.GetInvocationList().Length ?? 0;
@@ -411,6 +412,7 @@ internal sealed class FakePhysicalEvent
             FragmentGeneration = 0,
             DeterministicSeed = 123456789UL,
             Construction = FakeConstruction.SteelCoreJacketed,
+            DesignClass = FakeDesign.FullMetalJacket,
             ShapeClass = FakeShape.Spitzer,
             OriginalMassKilograms = 0.004d,
             RetainedMassKilograms = 0.004d,
@@ -453,6 +455,7 @@ internal sealed class FakePhysicalEvent
         component.FragmentIndex = 1;
         component.FragmentGeneration = 1;
         component.Construction = FakeConstruction.TargetMaterial;
+        component.DesignClass = FakeDesign.Fragment;
         component.ShapeClass = FakeShape.TargetSpallFlake;
         component.OriginalMassKilograms = 0.0002d;
         component.RetainedMassKilograms = 0.0002d;
@@ -530,6 +533,7 @@ internal enum FakeOutcome { Unknown, Penetrated, Stopped, Deviated, Ricocheted, 
 internal enum FakeKind { IntactProjectile, DeformedProjectile, ProjectileFragment, TargetSpall, TargetSpallFragment }
 internal enum FakeMaterial { Air, MildSteel, ArmoredSteel }
 internal enum FakeConstruction { SteelCoreJacketed, TargetMaterial }
+internal enum FakeDesign { FullMetalJacket, Fragment }
 internal enum FakeShape { Spitzer, TargetSpallFlake }
 internal enum FakeTumble { Stable, Yawing, Tumbling }
 internal enum FakeTerminal { Continuing, Exited, Embedded, Stopped }
@@ -619,6 +623,7 @@ internal sealed class FakeComponent
     public int FragmentGeneration { get; set; }
     public ulong DeterministicSeed { get; set; }
     public FakeConstruction Construction { get; set; }
+    public FakeDesign DesignClass { get; set; }
     public FakeShape ShapeClass { get; set; }
     public double OriginalMassKilograms { get; set; }
     public double RetainedMassKilograms { get; set; }

@@ -104,12 +104,12 @@ internal static class CrossReportCampaignComparison
         using JsonDocument document = JsonDocument.Parse(comparisonJson);
         JsonElement root = document.RootElement;
         var builder = new StringBuilder(512);
-        builder.Append("Schema-4 campaign comparison: ")
-            .Append(root.GetProperty("sourceReportCount").GetInt32().ToString(CultureInfo.InvariantCulture))
-            .Append(" reports, ")
-            .Append(root.GetProperty("uniqueCampaignRunCount").GetInt32().ToString(
-                CultureInfo.InvariantCulture))
-            .AppendLine(" unique runs.");
+        builder.Append("Schema-5 campaign comparison: ")
+        .Append(root.GetProperty("sourceReportCount").GetInt32().ToString(CultureInfo.InvariantCulture))
+        .Append(" reports, ")
+        .Append(root.GetProperty("uniqueCampaignRunCount").GetInt32().ToString(
+            CultureInfo.InvariantCulture))
+        .AppendLine(" unique runs.");
         JsonElement cohorts = root.GetProperty("materialCohorts");
         builder.Append("Comparable material cohorts: ")
             .Append(cohorts.GetArrayLength().ToString(CultureInfo.InvariantCulture))

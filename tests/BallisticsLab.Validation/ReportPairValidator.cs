@@ -29,7 +29,7 @@ internal static class ReportPairValidator
         return ValidateSyntheticPair(true);
     }
 
-    internal static bool ValidatorAcceptsPhysicalOnlySchemaFourPair()
+    internal static bool ValidatorAcceptsPhysicalOnlySchemaFivePair()
     {
         string directory = Path.Combine(
             Path.GetTempPath(),
@@ -40,7 +40,7 @@ internal static class ReportPairValidator
             string jsonPath = Path.Combine(directory, "BallisticsLab-physical.json");
             File.WriteAllText(
                 jsonPath,
-                "{\"schema\":4,\"pluginVersion\":\"0.2.8\",\"records\":[],"
+                "{\"schema\":5,\"pluginVersion\":\"0.3.0\",\"records\":[],"
                     + "\"physicalTransitions\":[{\"transitionId\":\"physical-only\"}]}");
             File.WriteAllText(Path.ChangeExtension(jsonPath, ".csv"), Header + "\r\n");
             return Validate(jsonPath, out _);
@@ -189,7 +189,7 @@ internal static class ReportPairValidator
                 && (!root.TryGetProperty("physicalTransitions", out JsonElement physicalTransitions)
                     || physicalTransitions.ValueKind != JsonValueKind.Array))
             {
-                failure = "schema 4 JSON is missing physicalTransitions";
+                failure = "schema 4 or newer JSON is missing physicalTransitions";
                 return false;
             }
 
