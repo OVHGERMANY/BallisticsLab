@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using BallisticsLab.Core;
+using BallisticsLab.Runtime;
 using BallisticsLab.Validation;
 
 const string plateParent = "644120aa86ffbe10ee032b6f";
@@ -65,6 +66,22 @@ Check(
         nameof(PhysicalTelemetryContract.PublisherTypeName),
         "BallisticPenetration.Core.Physics.PhysicalProjectileTelemetry"),
     "report provenance constants match the current plugin build");
+Check(
+    ConstantMatches(
+        typeof(SptVersionCompatibility),
+        nameof(SptVersionCompatibility.SupportedCoreVersionText),
+        "4.1.3")
+    && ConstantMatches(
+        typeof(SptVersionCompatibility),
+        nameof(SptVersionCompatibility.SupportedEftVersionText),
+        "0.16.9.40743")
+    && ConstantMatches(
+        typeof(SptVersionCompatibility),
+        nameof(SptVersionCompatibility.VerifiedAssemblyHash),
+        "3D1B0C637467B773EF64C31A321B6C7CDEFC05025B88DB4E482489FA6F59FEBA")
+    && SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 1, 3))
+    && !SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 1, 2)),
+    "exact SPT 4.1.3 and EFT 0.16.9.40743 compatibility gate");
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
 Check(LabPolicies.OutcomeName(1, false, false) == "PENETRATED / DEVIATED", "deviation taxonomy");
 Check(LabPolicies.OutcomeName(3, false, false) == "PENETRATED / FRAGMENTED", "fragment taxonomy");

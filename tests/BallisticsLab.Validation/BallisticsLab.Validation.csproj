@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\BallisticsLab\Core\**\*.cs" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\BallisticsLab\Runtime\SptVersionCompatibility.cs" Link="Runtime\SptVersionCompatibility.cs" />
   </ItemGroup>
 </Project>
 

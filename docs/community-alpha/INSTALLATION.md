@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- SPT 4.1.2 exactly.
+- SPT 4.1.3 exactly.
 - EFT 0.16.9.40743.
 - Windows client process `EscapeFromTarkov.exe`.
 
@@ -28,8 +28,8 @@ Set `Enabled = false` and restart when testing is finished.
 
 ## Update
 
-Back up the DLL, configuration, and any reports you want to keep. Replace only the Lab DLL, preserve the configuration unless the release notes say otherwise, and verify the installed hash against `SHA256SUMS.txt`.
+Back up the DLL, configuration, and any reports you want to keep. Replace only the Lab DLL, preserve the configuration unless the release notes say otherwise, and verify the installed hash against `BallisticsLab-Docs\SHA256SUMS.txt`.
 
 ## Uninstall
 
-Close SPT, then delete only `BepInEx\plugins\BallisticsLab`. Optionally delete `BepInEx\config\com.janky.ballisticslab.cfg` after saving settings and reports. Do not delete BepInEx, SPT, or EFT directories.
+Close SPT, save any reports you want to keep, then delete only `BepInEx\plugins\BallisticsLab`. Optionally delete `BepInEx\config\com.janky.ballisticslab.cfg` after saving its settings. Do not delete BepInEx, SPT, or EFT directories.

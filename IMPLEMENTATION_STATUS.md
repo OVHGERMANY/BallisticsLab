@@ -1,15 +1,15 @@
 # BallisticsLab implementation status
 
-Snapshot date: 2026-08-15
+Snapshot date: 2026-09-01
 
 ## Community alpha candidate
 
 - Plugin version: `0.3.0`
-- Planned prerelease tag: `v0.3.0-alpha.1`
+- Planned prerelease tag: `v0.3.0-alpha.2`
 - Development report schema: `5`
 - Supported physical publisher schema: `2`
 - Detached physical snapshot schema: `2`
-- Supported environment: SPT `4.1.2`, EFT `0.16.9.40743`
+- Supported environment: SPT `4.1.3`, EFT `0.16.9.40743`
 - Release target: `netstandard2.1`
 - Default configuration: disabled
 
@@ -59,7 +59,7 @@ the Lab prevents new sessions and report generation.
 
 - Release solution build: warnings as errors, checked arithmetic, recommended .NET analyzers,
   code-style enforcement, deterministic source paths; `0` warnings and `0` errors.
-- Validation: `162` checks passed, `0` failed against the installed SPT 4.1.2 item database.
+- Validation: `163` checks passed, `0` failed against the official SPT 4.1.3 item database.
 - Catalog: `39` usable plate templates across aluminum, aramid, armored steel, ceramic, combined,
   titanium, and UHMWPE.
 - Schema-5 report, schema-2 telemetry, exact projectile-design copy, provenance/mass-source

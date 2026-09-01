@@ -1,6 +1,6 @@
 # Rollback
 
-The integrated installer creates a timestamped backup before replacing any installed file. Keep that folder until testing is finished.
+Create a timestamped backup of the existing Lab folder and configuration before extracting the package. Keep that backup until testing is finished.
 
 To roll back manually:
 
@@ -10,4 +10,4 @@ To roll back manually:
 4. If no earlier Lab installation existed, remove only the newly installed Lab folder and configuration.
 5. Keep or remove `BepInEx\plugins\BallisticsLab\Reports` separately; rollback never deletes reports automatically.
 
-The package rollback script accepts an explicit SPT root and restores only files listed in its backup manifest.
+The `0.3.0-alpha.2` package contains no installer or rollback script. It changes only the packaged Lab DLL when extracted; restore only the paths you backed up.

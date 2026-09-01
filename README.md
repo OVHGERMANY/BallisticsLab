@@ -1,6 +1,6 @@
 # BallisticsLab
 
-BallisticsLab is an opt-in SPT 4.1.2 client-side range and telemetry plugin for repeatable terminal-ballistics testing.
+BallisticsLab is an opt-in SPT 4.1.3 client-side range and telemetry plugin for repeatable terminal-ballistics testing.
 
 The current development build is a public experimental alpha. Installation, testing,
 privacy, rollback, compatibility, and confirmed-issue guidance is under
@@ -24,7 +24,7 @@ Campaign attempts carry detached protocol-shot evidence: absolute target-impact 
 
 The runtime reads only trajectory nodes EFT has already computed, measures cumulative path from the shot start, and linearly interpolates speed at 3 metres without advancing or rewriting the game trajectory. Evidence is marked `EftTrajectoryThreeMetres` when the cached path reaches that distance; a shorter path remains `TargetImpactProxy` and cannot complete a protocol screen. This is a simulation value, not a physical chronograph measurement or certification result.
 
-The installed SPT 4.1.2 item database and its English/Russian locale records provide five exact designation mappings, one related variant, and two unavailable threats. Exact identity does not imply exact physical representation: the evaluator requires the shot mass and diameter to match the installed simulation values, then separately reports known differences from the nominal threat mass and the locale description. A variant or unavailable designation fails closed. Even an exact mapping can produce only a non-certifying simulation screen.
+The installed SPT 4.1.3 item database and its English/Russian locale records provide five exact designation mappings, one related variant, and two unavailable threats. Exact identity does not imply exact physical representation: the evaluator requires the shot mass and diameter to match the installed simulation values, then separately reports known differences from the nominal threat mass and the locale description. A variant or unavailable designation fails closed. Even an exact mapping can produce only a non-certifying simulation screen.
 
 | Threat | Installed EFT mapping | Identity | Mass evidence in grams: nominal / simulation / locale |
 |---|---|---|---:|
@@ -46,6 +46,14 @@ Normal `Build` does not alter the live installation. Explicit deployment:
 ```powershell
 dotnet msbuild .\src\BallisticsLab\BallisticsLab.csproj -t:Deploy -p:Configuration=Release -p:SptRoot="$env:SPT_ROOT"
 ```
+
+Create the `v0.3.0-alpha.2` release archive explicitly:
+
+```powershell
+dotnet msbuild .\src\BallisticsLab\BallisticsLab.csproj -t:Package -p:Configuration=Release -p:SptRoot="$env:SPT_ROOT"
+```
+
+The package is written to `dist/BallisticsLab-0.3.0-alpha.2-SPT-4.1.3.zip`. It contains the plugin DLL, its SHA-256 manifest, and community-alpha documentation; it contains no EFT, Unity, Harmony, BepInEx, or SPT runtime assembly.
 
 Set `SPT_ROOT` to the local SPT installation directory before building or validating. The project deliberately has no machine-specific fallback path.
 

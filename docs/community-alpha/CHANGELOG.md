@@ -1,5 +1,13 @@
 # Community Alpha Changelog
 
+## 0.3.0-alpha.2
+
+- Retargeted the exact client compatibility gate and release documentation to official SPT 4.1.3.
+- Kept the verified EFT target at 0.16.9.40743 and the verified `Assembly-CSharp.dll` SHA-256 unchanged.
+- Added a fail-closed package target that produces `BallisticsLab-0.3.0-alpha.2-SPT-4.1.3.zip` without bundling proprietary runtime assemblies.
+- Added an offline regression check for the exact SPT, EFT, and game-assembly compatibility constants.
+- Made no gameplay, telemetry-schema, campaign, or report-format change.
+
 ## 0.3.0-alpha.1
 
 - Advanced the optional physical-telemetry publisher contract and snapshot format to schema 2.

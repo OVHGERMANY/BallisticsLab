@@ -76,20 +76,20 @@ namespace BallisticsLab.Runtime
         {
             if (method == null || method.DeclaringType != declaringType || method.IsStatic || method.ReturnType != returnType)
             {
-                throw new MissingMethodException("Required SPT 4.1.2 method was not found: " + name);
+                throw new MissingMethodException("Required SPT 4.1.3 method was not found: " + name);
             }
 
             ParameterInfo[] actual = method.GetParameters();
             if (actual.Length != parameters.Length)
             {
-                throw new MissingMethodException("Required SPT 4.1.2 signature changed: " + name);
+                throw new MissingMethodException("Required SPT 4.1.3 signature changed: " + name);
             }
 
             for (int index = 0; index < actual.Length; index++)
             {
                 if (actual[index].ParameterType != parameters[index])
                 {
-                    throw new MissingMethodException("Required SPT 4.1.2 signature changed: " + name);
+                    throw new MissingMethodException("Required SPT 4.1.3 signature changed: " + name);
                 }
             }
 
