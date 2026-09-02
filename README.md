@@ -2,9 +2,8 @@
 
 BallisticsLab is an opt-in SPT 4.1.3 client-side range and telemetry plugin for repeatable terminal-ballistics testing.
 
-The current development build is a public experimental alpha. Installation, testing,
-privacy, rollback, compatibility, and confirmed-issue guidance is under
-[`docs/community-alpha`](docs/community-alpha/TESTING_GUIDE.md).
+Version `0.3.0` is the normal SPT 4.1.3 release. Installation, use, privacy, and
+compatibility guidance is under [`docs/release`](docs/release/INSTALL.md).
 
 The verified baseline, historical evidence, remaining acceptance gates, and deferred stages are tracked in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
@@ -47,13 +46,13 @@ Normal `Build` does not alter the live installation. Explicit deployment:
 dotnet msbuild .\src\BallisticsLab\BallisticsLab.csproj -t:Deploy -p:Configuration=Release -p:SptRoot="$env:SPT_ROOT"
 ```
 
-Create the `v0.3.0-alpha.2` release archive explicitly:
+Create the `v0.3.0` release archive explicitly:
 
 ```powershell
 dotnet msbuild .\src\BallisticsLab\BallisticsLab.csproj -t:Package -p:Configuration=Release -p:SptRoot="$env:SPT_ROOT"
 ```
 
-The package is written to `dist/BallisticsLab-0.3.0-alpha.2-SPT-4.1.3.zip`. It contains the plugin DLL, its SHA-256 manifest, and community-alpha documentation; it contains no EFT, Unity, Harmony, BepInEx, or SPT runtime assembly.
+The package is written to `dist/BallisticsLab-0.3.0-SPT-4.1.3.zip`. It contains the plugin DLL, its SHA-256 manifest, and concise end-user documentation; it contains no EFT, Unity, Harmony, BepInEx, or SPT runtime assembly.
 
 Set `SPT_ROOT` to the local SPT installation directory before building or validating. The project deliberately has no machine-specific fallback path.
 

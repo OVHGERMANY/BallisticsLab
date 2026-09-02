@@ -2,10 +2,10 @@
 
 Snapshot date: 2026-09-01
 
-## Community alpha candidate
+## Release candidate
 
 - Plugin version: `0.3.0`
-- Planned prerelease tag: `v0.3.0-alpha.2`
+- Release tag: `v0.3.0`
 - Development report schema: `5`
 - Supported physical publisher schema: `2`
 - Detached physical snapshot schema: `2`
@@ -66,7 +66,7 @@ the Lab prevents new sessions and report generation.
   independence, mass/energy closure, campaign replay, protocol replay, report pairing, comparison,
   UI policy, marker policy, and disabled-startup contracts pass offline.
 
-## Known alpha limitations
+## Known limitations
 
 - The `0.3.0` candidate has not yet completed its minimal startup/load smoke test.
 - Controlled campaigns require the exact installed fixture and ammunition identities they declare;
@@ -81,6 +81,6 @@ the Lab prevents new sessions and report generation.
 
 ## Release boundary
 
-No new campaign, automation, replay, standards, or laboratory feature category is required before
-the community alpha. Post-release work is limited to defects reproduced during local or community
-testing and to documentation needed to make those tests repeatable.
+No new campaign, automation, replay, standards, or laboratory feature category is required for
+version `0.3.0`. Post-release work is limited to reproduced defects and documentation needed to
+make normal use repeatable.
