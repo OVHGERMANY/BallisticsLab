@@ -1,5 +1,7 @@
 # BallisticsLab 0.3.1 — SPT 4.1.4 compatibility
 
+Release DLLs omit commit-specific debug provenance so an unchanged implementation rebuilds identically after Git merges. Fixture/runtime methods are unchanged by this packaging correction.
+
 For official SPT 4.1.4 / EFT 0.16.9.5.40743 only. The exact-version guard and verified-game-hash warning are retained.
 
 This release ports the published 0.3.0 baseline. Only compatibility/build provenance and release identity change. Fixture behavior, telemetry, report schemas, configuration and disabled-by-default behavior are unchanged. Separate unpublished development work is not included.
