@@ -4,9 +4,10 @@
 
 - The user closed further shooting rounds and requested finalization. Current version is `0.3.1`; preview checkpoints below are historical. The separate development worktree is excluded.
 - Final Release: 0 warnings/errors; 163 validation checks pass. The final companion audit passes 11 game contracts, resolves runtime references, and permits only reviewed compatibility/identity changes.
-- Final source/installed DLL SHA-256: `BA239F4A6C73873B0C420436FC0B302A3B7A933D4291CE8D4581B7DE36E9FAD1`. Installed with Tarkov closed at 2026-09-05 13:08 local. All 9 saved configurations and both HollywoodFX files remained unchanged.
-- Rollback: `E:\Games\SPT-Mod-Backups\20260905-130800-client-compatibility-final`, containing the previous preview DLL and configuration copies.
-- Package `BallisticsLab-0.3.1-SPT-4.1.4.zip` reproduced exactly: 103,782 bytes, SHA-256 `403B213C69678F21A79801E29221F71F13929B1F3C522334ACB99DE28C1C546B`.
+- Final source/installed DLL SHA-256: `EE37C0D3F4C5B3AB486C8A83B2C73117900B2A9227BA8C6B7B9812110061223A`. Installed with Tarkov closed at 2026-09-05 13:11 local. All 9 saved configurations and both HollywoodFX files remained unchanged.
+- Rollback: `E:\Games\SPT-Mod-Backups\20260905-131138-client-compatibility-final`, containing the previous final-label DLL/configurations; the earlier `20260905-130800-client-compatibility-final` backup retains the preview.
+- Package `BallisticsLab-0.3.1-SPT-4.1.4.zip` reproduced exactly: 103,644 bytes, SHA-256 `0E753960C5344039EF03F7EEE63E993D48F9B8219DE4B9EFD47484D8ABC930DC`.
+- Clean post-merge builds exposed commit-specific SourceLink/PDB provenance in DLL bytes. Publication stopped before tagging. Release now omits that debug provenance; a subsequent commit/rebuild retained the exact DLL hash, with zero failures in the repeated compiled compatibility audit.
 - Combined preview startup/raid use was observed, not full fixture/campaign acceptance. Finalization changes release identity/startup wording only; fixture behavior and schemas remain unchanged. See [release notes](docs/SPT-4.1.4-release.md).
 - Publication targets `spt-4.1.4` and `v0.3.1`, preserving prior branches/releases.
 
