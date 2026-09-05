@@ -89,7 +89,7 @@ internal static class PhysicalTransitionReportTests
         string json = PhysicalReportDocumentWriter.Build("[]", tracker.Snapshot());
         using JsonDocument document = JsonDocument.Parse(json);
         return document.RootElement.GetProperty("schema").GetInt32() == 5
-            && document.RootElement.GetProperty("pluginVersion").GetString() == "0.3.0"
+            && document.RootElement.GetProperty("pluginVersion").GetString() == LabBuild.PluginVersion
             && document.RootElement.GetProperty("records").GetArrayLength() == 0
             && document.RootElement.GetProperty("physicalTransitions").GetArrayLength() == 1;
     }
