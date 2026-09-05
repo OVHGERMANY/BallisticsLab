@@ -17,6 +17,11 @@
     <DocumentationRoot>$(MSBuildProjectDirectory)\..\..\docs\release</DocumentationRoot>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
   <ItemGroup>
     <Reference Include="BepInEx">
       <HintPath>$(SptRoot)\BepInEx\core\BepInEx.dll</HintPath>
