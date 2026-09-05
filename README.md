@@ -1,8 +1,10 @@
 # BallisticsLab
 
-BallisticsLab is an opt-in SPT 4.1.3 client-side range and telemetry plugin for repeatable terminal-ballistics testing.
+Version `0.3.1` is a compatibility update for official SPT `4.1.4` and EFT `0.16.9.5.40743`, based on published `v0.3.0`. See [release notes](docs/SPT-4.1.4-release.md) and [compatibility evidence](docs/SPT-4.1.4-compatibility.md). Fixture behavior, defaults and report schemas are unchanged.
 
-Version `0.3.0` is the normal SPT 4.1.3 release. Installation, use, privacy, and
+BallisticsLab is an opt-in client-side range and telemetry plugin for repeatable terminal-ballistics testing.
+
+Version `0.3.0` remains the published SPT 4.1.3 release. Historical installation, use, privacy, and
 compatibility guidance is under [`docs/release`](docs/release/INSTALL.md).
 
 The verified baseline, historical evidence, remaining acceptance gates, and deferred stages are tracked in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
@@ -52,7 +54,7 @@ Create the `v0.3.0` release archive explicitly:
 dotnet msbuild .\src\BallisticsLab\BallisticsLab.csproj -t:Package -p:Configuration=Release -p:SptRoot="$env:SPT_ROOT"
 ```
 
-The package is written to `dist/BallisticsLab-0.3.0-SPT-4.1.3.zip`. It contains the plugin DLL, its SHA-256 manifest, and concise end-user documentation; it contains no EFT, Unity, Harmony, BepInEx, or SPT runtime assembly.
+The package is written to `dist/BallisticsLab-0.3.1-SPT-4.1.4.zip`. It contains the plugin DLL, its SHA-256 manifest, and concise end-user documentation; it contains no EFT, Unity, Harmony, BepInEx, or SPT runtime assembly.
 
 Set `SPT_ROOT` to the local SPT installation directory before building or validating. The project deliberately has no machine-specific fallback path.
 

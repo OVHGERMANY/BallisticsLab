@@ -1,9 +1,9 @@
-# BallisticsLab 0.3.0
+# BallisticsLab 0.3.1
 
 ## Requirements
 
-- SPT 4.1.3
-- EFT 0.16.9.40743
+- SPT 4.1.4
+- EFT 0.16.9.5.40743
 
 ## Install
 
@@ -35,6 +35,6 @@ Close SPT and remove only `BepInEx\plugins\BallisticsLab`. To remove saved setti
 
 ## Compatibility and privacy
 
-This build supports SPT 4.1.3 only. Reports remain on the local computer under `BepInEx\plugins\BallisticsLab\Reports`; nothing is uploaded automatically. Review reports before sharing because they can contain session, fixture, ammunition, target, and timestamp identifiers.
+This build supports SPT 4.1.4 only. Reports remain on the local computer under `BepInEx\plugins\BallisticsLab\Reports`; nothing is uploaded automatically. Review reports before sharing because they can contain session, fixture, ammunition, target, and timestamp identifiers.
 
 BallisticsLab provides game-simulation data. Its GOST-oriented screens are not physical certification.

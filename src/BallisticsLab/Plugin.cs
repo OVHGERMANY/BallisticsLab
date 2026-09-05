@@ -44,7 +44,7 @@ namespace BallisticsLab
                 if (!configuration.Enabled.Value)
                 {
                     Logger.LogInfo(
-                        PluginName + " " + PluginVersion
+                        PluginName + " " + LabBuild.BuildVersion
                         + " loaded disabled. No game methods were patched; enable the lab and restart to use it.");
                     return;
                 }
@@ -74,9 +74,9 @@ namespace BallisticsLab
                 LabRuntime.Initialize();
                 _runtimeInitialized = true;
                 Logger.LogInfo(
-                    PluginName + " " + PluginVersion + " loaded for SPT "
+                    PluginName + " " + LabBuild.BuildVersion + " loaded for SPT "
                     + SptVersionCompatibility.SupportedCoreVersionText
-                    + ". Lab patches are enabled.");
+                    + ". Lab patches are enabled. Compatibility update; lab behavior unchanged.");
             }
             catch (Exception exception)
             {

@@ -51,7 +51,8 @@ Dictionary<string, AmmoRow> ammunition = new(StringComparer.Ordinal);
 Check(
     ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginGuid), "com.janky.ballisticslab")
     && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginName), "Janky-BallisticsLab")
-    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginVersion), "0.3.0")
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.PluginVersion), "0.3.1")
+    && ConstantMatches(typeof(LabBuild), nameof(LabBuild.BuildVersion), "0.3.1")
     && ConstantMatches(typeof(LabBuild), nameof(LabBuild.ReportSchema), 5)
     && ConstantMatches(
         typeof(PhysicalTelemetryContract),
@@ -70,18 +71,23 @@ Check(
     ConstantMatches(
         typeof(SptVersionCompatibility),
         nameof(SptVersionCompatibility.SupportedCoreVersionText),
-        "4.1.3")
+        "4.1.4")
     && ConstantMatches(
         typeof(SptVersionCompatibility),
         nameof(SptVersionCompatibility.SupportedEftVersionText),
-        "0.16.9.40743")
+        "0.16.9.5.40743")
     && ConstantMatches(
         typeof(SptVersionCompatibility),
         nameof(SptVersionCompatibility.VerifiedAssemblyHash),
-        "3D1B0C637467B773EF64C31A321B6C7CDEFC05025B88DB4E482489FA6F59FEBA")
-    && SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 1, 3))
-    && !SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 1, 2)),
-    "exact SPT 4.1.3 and EFT 0.16.9.40743 compatibility gate");
+        "EE25CEE1259777B38ED8B3E7841FDC2DB3C98540B1469FA539B1FF183476E436")
+    && SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 1, 4))
+    && !SptVersionCompatibility.IsExactSupportedCoreVersion(null)
+    && !SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 1, 2))
+    && !SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 1, 3))
+    && !SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 1, 5))
+    && !SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 1, 4, 0))
+    && !SptVersionCompatibility.IsExactSupportedCoreVersion(new Version(4, 2, 0)),
+    "exact SPT 4.1.4 and EFT 0.16.9.5.40743 compatibility gate");
 Check(LabPolicies.OutcomeName(0, false, false) == "PENETRATED / CONTINUING", "continuing taxonomy");
 Check(LabPolicies.OutcomeName(1, false, false) == "PENETRATED / DEVIATED", "deviation taxonomy");
 Check(LabPolicies.OutcomeName(3, false, false) == "PENETRATED / FRAGMENTED", "fragment taxonomy");
